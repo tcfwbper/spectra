@@ -29,9 +29,6 @@ func runInit(cmd *cobra.Command, args []string) error {
 	if err := util.CopyEmbeddedDir(embedded.SkillsFS, "skills", dir+"/.spectra/skills"); err != nil {
 		return fmt.Errorf("copying skills: %w", err)
 	}
-	if err := util.CopyEmbeddedFile(embedded.ReadmeFS, "README.md", dir+"/.spectra/README.md"); err != nil {
-		return fmt.Errorf("copying README.md: %w", err)
-	}
 
 	// 2. Copy templates/ to spec/
 	if err := util.CopyEmbeddedDir(embedded.TemplatesFS, "templates", dir+"/spec"); err != nil {
