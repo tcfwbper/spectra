@@ -4,6 +4,8 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/tcfwbper/spectra/util"
 )
 
 func TestInitCommand(t *testing.T) {
@@ -74,6 +76,81 @@ func TestInitCommand(t *testing.T) {
 	}
 	if !containsLine(string(gitignoreContent), ".spectra/vfs") {
 		t.Errorf(".gitignore does not contain '.spectra/vfs', got: %q", string(gitignoreContent))
+	}
+}
+
+func TestInitCommandDefaultConfig(t *testing.T) {
+	tmp := t.TempDir()
+	origDir, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chdir(tmp); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		if err := os.Chdir(origDir); err != nil {
+			t.Errorf("cleanup chdir failed: %v", err)
+		}
+	})
+
+	rootCmd.SetArgs([]string{"init"})
+	if err := rootCmd.Execute(); err != nil {
+		t.Fatalf("init command failed: %v", err)
+	}
+
+	configPath := filepath.Join(tmp, ".spectra", "config")
+	content, err := os.ReadFile(configPath)
+	if err != nil {
+		t.Fatalf("expected .spectra/config to exist: %v", err)
+	}
+
+	expected := "[core]\n\tlanguage = golang\n\tspec = ./spec\n\tsrc = ./src\n\ttest = ./src\n"
+	if string(content) != expected {
+		t.Errorf("default config:\ngot  %q\nwant %q", string(content), expected)
+	}
+}
+
+func TestInitCommandDoesNotOverwriteConfig(t *testing.T) {
+	tmp := t.TempDir()
+	origDir, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chdir(tmp); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		if err := os.Chdir(origDir); err != nil {
+			t.Errorf("cleanup chdir failed: %v", err)
+		}
+	})
+
+	// First init creates default config.
+	rootCmd.SetArgs([]string{"init"})
+	if err := rootCmd.Execute(); err != nil {
+		t.Fatal(err)
+	}
+
+	// User customizes via spectra config.
+	rootCmd.SetArgs([]string{"config", "language", "rust"})
+	if err := rootCmd.Execute(); err != nil {
+		t.Fatal(err)
+	}
+
+	// Second init should NOT overwrite the customized config.
+	rootCmd.SetArgs([]string{"init"})
+	if err := rootCmd.Execute(); err != nil {
+		t.Fatal(err)
+	}
+
+	configPath := filepath.Join(tmp, ".spectra", "config")
+	got, err := util.ReadConfigValue(configPath, "language")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got != "rust" {
+		t.Errorf("language after second init = %q, want %q (user customization lost)", got, "rust")
 	}
 }
 

@@ -35,7 +35,12 @@ func runInit(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("copying templates to spec: %w", err)
 	}
 
-	// 3. Ensure .gitignore contains ".spectra/vfs"
+	// 3. Write default config
+	if err := util.WriteDefaultConfig(dir + "/.spectra/config"); err != nil {
+		return fmt.Errorf("writing default config: %w", err)
+	}
+
+	// 4. Ensure .gitignore contains ".spectra/vfs"
 	if err := util.EnsureGitignoreLine(dir+"/.gitignore", ".spectra/vfs"); err != nil {
 		return fmt.Errorf("updating .gitignore: %w", err)
 	}
