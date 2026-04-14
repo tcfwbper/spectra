@@ -9,6 +9,10 @@ var rootCmd = &cobra.Command{
 	Short: "Spectra CLI tool",
 }
 
+func init() {
+	rootCmd.CompletionOptions.DisableDefaultCmd = true
+}
+
 func Execute() error {
 	return rootCmd.Execute()
 }
