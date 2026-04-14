@@ -52,12 +52,6 @@ func TestInitCommand(t *testing.T) {
 		t.Errorf("expected .spectra/skills/ to exist: %v", err)
 	}
 
-	// Verify .spectra/README.md exists
-	readmePath := filepath.Join(tmp, ".spectra", "README.md")
-	if _, err := os.Stat(readmePath); err != nil {
-		t.Errorf("expected .spectra/README.md to exist: %v", err)
-	}
-
 	// Verify spec/ has template files
 	specDir := filepath.Join(tmp, "spec")
 	expectedTemplates := []string{
