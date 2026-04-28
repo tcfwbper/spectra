@@ -150,10 +150,13 @@ func TestFileAccessor_PermissionDeniedBeforeCallback(t *testing.T) {
 	}
 
 	tmpDir := t.TempDir()
-	testFile := filepath.Join(tmpDir, "restricted.txt")
+	restrictedDir := filepath.Join(tmpDir, "restricted")
+	require.NoError(t, os.Mkdir(restrictedDir, 0755))
+	testFile := filepath.Join(restrictedDir, "restricted.txt")
 	require.NoError(t, os.WriteFile(testFile, []byte("content"), 0644))
-	require.NoError(t, os.Chmod(testFile, 0000))
-	defer func() { _ = os.Chmod(testFile, 0644) }()
+	// Remove all permissions on directory to prevent access to files inside
+	require.NoError(t, os.Chmod(restrictedDir, 0000))
+	defer func() { _ = os.Chmod(restrictedDir, 0755) }()
 
 	callbackInvoked := false
 	callback := func() error {
@@ -175,7 +178,9 @@ func TestFileAccessor_PermissionDeniedAfterCallback(t *testing.T) {
 	}
 
 	tmpDir := t.TempDir()
-	testFile := filepath.Join(tmpDir, "denied.txt")
+	deniedDir := filepath.Join(tmpDir, "denied")
+	require.NoError(t, os.Mkdir(deniedDir, 0755))
+	testFile := filepath.Join(deniedDir, "denied.txt")
 
 	callbackInvoked := false
 	callback := func() error {
@@ -183,7 +188,8 @@ func TestFileAccessor_PermissionDeniedAfterCallback(t *testing.T) {
 		if err := os.WriteFile(testFile, []byte("created"), 0644); err != nil {
 			return err
 		}
-		return os.Chmod(testFile, 0000)
+		// Remove directory permissions to prevent stat of files inside
+		return os.Chmod(deniedDir, 0000)
 	}
 
 	result, err := storage.FileAccessor(testFile, callback)
@@ -192,7 +198,7 @@ func TestFileAccessor_PermissionDeniedAfterCallback(t *testing.T) {
 	assert.True(t, callbackInvoked, "callback should be invoked")
 	assert.Regexp(t, `(?i)permission denied.*denied\.txt`, err.Error())
 
-	_ = os.Chmod(testFile, 0644)
+	_ = os.Chmod(deniedDir, 0755)
 }
 
 // TestFileAccessor_PathIsDirectory tests stat succeeds for directory; returns path
