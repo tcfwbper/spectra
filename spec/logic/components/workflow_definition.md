@@ -146,7 +146,7 @@ transitions:
   **Expected**: Runtime rejects the workflow definition with an error: "exit transition (from_node: '<from>', event_type: '<type>', to_node: '<to>') must target a human node, but targets '<node>' with type 'agent'".
 
 - **Condition**: A non-entry node is unreachable (no incoming transitions).
-  **Expected**: Runtime issues a warning but does not reject the workflow. Unreachable nodes are allowed but flagged.
+  **Expected**: Runtime rejects the workflow definition with an error: "node '<name>' is unreachable (no incoming transitions)".
 
 - **Condition**: A node not targeted by any exit transition has no outgoing transitions.
   **Expected**: Runtime rejects the workflow definition with an error: "node '<name>' has no outgoing transitions and is not an exit target".

@@ -24,12 +24,13 @@ WorkflowDefinitionLoader provides read-only access to workflow definition files 
 16. WorkflowDefinitionLoader validates that no two ExitTransitions share the identical `(FromNode, EventType, ToNode)` triple. If a duplicate is found, it returns an error: `"workflow definition '<workflowName>' validation failed: duplicate exit transition (from_node: '<from>', event_type: '<type>', to_node: '<to>')"`.
 17. WorkflowDefinitionLoader validates that all transitions in `ExitTransitions` match a transition defined in `Transitions` (exact match on `from_node`, `event_type`, and `to_node`). If an exit transition has no corresponding transition definition, it returns an error: `"workflow definition '<workflowName>' validation failed: exit transition (from_node: '<from>', event_type: '<type>', to_node: '<to>') has no corresponding transition definition"`.
 18. WorkflowDefinitionLoader validates that for each transition in `ExitTransitions`, the `to_node` references a node with `type == "human"`. If not, it returns an error: `"workflow definition '<workflowName>' validation failed: exit transition (from_node: '<from>', event_type: '<type>', to_node: '<to>') must target a human node, but targets '<nodeName>' with type '<actualType>'"`.
-19. WorkflowDefinitionLoader validates that every node not targeted by any exit transition has at least one outgoing transition. If a node has no outgoing transitions and is not an exit target, it returns an error: `"workflow definition '<workflowName>' validation failed: node '<nodeName>' has no outgoing transitions and is not an exit target"`.
-20. WorkflowDefinitionLoader validates that every node with `type == "agent"` references an `agent_role` that resolves to an existing agent definition. For each such node, WorkflowDefinitionLoader invokes the injected `AgentDefinitionLoader.Load(node.AgentRole)`. If the underlying load fails (file not found, parse error, or per-agent validation failure), it returns an error: `"workflow definition '<workflowName>' validation failed: node '<nodeName>' references invalid agent_role '<agentRole>': <underlying error>"`. This guarantees that all agent references are resolvable at workflow load time, not at runtime.
-21. If all validations pass, WorkflowDefinitionLoader returns the parsed WorkflowDefinition structure.
-22. WorkflowDefinitionLoader does not cache workflow definitions. Each `Load()` call reads from disk and re-runs the agent-role checks via AgentDefinitionLoader.
-23. WorkflowDefinitionLoader is safe to call concurrently from multiple goroutines. No file locking is required as all operations are read-only.
-24. WorkflowDefinitionLoader does not use FileAccessor because it does not need to prepare files. It directly uses `os.ReadFile()` or equivalent for read operations.
+19. WorkflowDefinitionLoader validates that every non-entry node has at least one incoming transition (i.e., at least one transition in `Transitions` has `ToNode` equal to the node's name). The entry node is exempt because it is reached by initial placement, not by a transition. If a non-entry node has no incoming transitions, it returns an error: `"workflow definition '<workflowName>' validation failed: node '<nodeName>' is unreachable (no incoming transitions)"`.
+20. WorkflowDefinitionLoader validates that every node not targeted by any exit transition has at least one outgoing transition. If a node has no outgoing transitions and is not an exit target, it returns an error: `"workflow definition '<workflowName>' validation failed: node '<nodeName>' has no outgoing transitions and is not an exit target"`.
+21. WorkflowDefinitionLoader validates that every node with `type == "agent"` references an `agent_role` that resolves to an existing agent definition. For each such node, WorkflowDefinitionLoader invokes the injected `AgentDefinitionLoader.Load(node.AgentRole)`. If the underlying load fails (file not found, parse error, or per-agent validation failure), it returns an error: `"workflow definition '<workflowName>' validation failed: node '<nodeName>' references invalid agent_role '<agentRole>': <underlying error>"`. This guarantees that all agent references are resolvable at workflow load time, not at runtime.
+22. If all validations pass, WorkflowDefinitionLoader returns the parsed WorkflowDefinition structure.
+23. WorkflowDefinitionLoader does not cache workflow definitions. Each `Load()` call reads from disk and re-runs the agent-role checks via AgentDefinitionLoader.
+24. WorkflowDefinitionLoader is safe to call concurrently from multiple goroutines. No file locking is required as all operations are read-only.
+25. WorkflowDefinitionLoader does not use FileAccessor because it does not need to prepare files. It directly uses `os.ReadFile()` or equivalent for read operations.
 
 ## Inputs
 
@@ -74,6 +75,7 @@ WorkflowDefinitionLoader provides read-only access to workflow definition files 
 | `"workflow definition '<workflowName>' validation failed: duplicate exit transition (from_node: '<from>', event_type: '<type>', to_node: '<to>')"` | Two ExitTransitions share the identical triple |
 | `"workflow definition '<workflowName>' validation failed: exit transition (from_node: '<from>', event_type: '<type>', to_node: '<to>') has no corresponding transition definition"` | An exit transition does not match any transition in Transitions |
 | `"workflow definition '<workflowName>' validation failed: exit transition (from_node: '<from>', event_type: '<type>', to_node: '<to>') must target a human node, but targets '<nodeName>' with type '<actualType>'"` | An exit transition's to_node targets a non-human node |
+| `"workflow definition '<workflowName>' validation failed: node '<nodeName>' is unreachable (no incoming transitions)"` | A non-entry node has no incoming transitions (unreachable from any other node) |
 | `"workflow definition '<workflowName>' validation failed: node '<nodeName>' has no outgoing transitions and is not an exit target"` | A non-exit-target node has no outgoing transitions |
 | `"workflow definition '<workflowName>' validation failed: node '<nodeName>' references invalid agent_role '<agentRole>': <underlying error>"` | An agent node references an agent_role that AgentDefinitionLoader cannot load (missing file, parse error, or per-agent validation failure) |
 
@@ -91,7 +93,7 @@ WorkflowDefinitionLoader provides read-only access to workflow definition files 
 
 6. **No File Locking**: WorkflowDefinitionLoader must not acquire file locks. Read-only operations on immutable files do not require locking.
 
-7. **Complete Validation**: WorkflowDefinitionLoader must validate all structural integrity constraints defined in `logic/components/workflow_definition.md`, `logic/components/transition.md`, `logic/components/exit_transition.md`, and `logic/components/node.md` before returning a WorkflowDefinition. This includes: required fields, PascalCase naming, EntryNode validity & type, node uniqueness, transition node-reference integrity, no self-loop transitions, transition uniqueness on `(from_node, event_type)`, ExitTransition uniqueness, ExitTransition correspondence to a defined transition, ExitTransition `to_node` type==human, non-exit-target outgoing transition requirement, and agent_role referential integrity (via AgentDefinitionLoader).
+7. **Complete Validation**: WorkflowDefinitionLoader must validate all structural integrity constraints defined in `logic/components/workflow_definition.md`, `logic/components/transition.md`, `logic/components/exit_transition.md`, and `logic/components/node.md` before returning a WorkflowDefinition. This includes: required fields, PascalCase naming, EntryNode validity & type, node uniqueness, transition node-reference integrity, no self-loop transitions, transition uniqueness on `(from_node, event_type)`, ExitTransition uniqueness, ExitTransition correspondence to a defined transition, ExitTransition `to_node` type==human, non-exit-target outgoing transition requirement, node reachability (every non-entry node must have at least one incoming transition), and agent_role referential integrity (via AgentDefinitionLoader).
 
 8. **Detailed Error Messages**: All validation errors must include the workflow name and the specific issue (field name, node name, event type, etc.).
 
@@ -212,8 +214,8 @@ WorkflowDefinitionLoader provides read-only access to workflow definition files 
 - **Condition**: `Description` field is missing or empty.
   **Expected**: WorkflowDefinitionLoader allows this. `Description` is optional (defaults to empty string).
 
-- **Condition**: A node is unreachable (no incoming transitions).
-  **Expected**: WorkflowDefinitionLoader allows this. Unreachable nodes are not a validation failure (they may be intentionally unused or for future expansion).
+- **Condition**: A non-entry node is unreachable (no incoming transitions).
+  **Expected**: WorkflowDefinitionLoader returns an error: `"workflow definition '<workflowName>' validation failed: node '<nodeName>' is unreachable (no incoming transitions)"`.
 
 - **Condition**: A node targeted by an exit transition has outgoing transitions defined.
   **Expected**: WorkflowDefinitionLoader allows this. Exit target nodes with outgoing transitions are not a validation failure (the Runtime will ignore those transitions).
