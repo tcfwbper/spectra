@@ -19,7 +19,7 @@ func TestSpectraFinder_FindInCurrentDir(t *testing.T) {
 
 	originalWd, err := os.Getwd()
 	require.NoError(t, err)
-	defer os.Chdir(originalWd)
+	defer func() { _ = os.Chdir(originalWd) }()
 
 	require.NoError(t, os.Chdir(tmpDir))
 
@@ -179,7 +179,7 @@ func TestSpectraFinder_PermissionDeniedOnParent(t *testing.T) {
 
 	require.NoError(t, os.MkdirAll(childDir, 0755))
 	require.NoError(t, os.Chmod(parentDir, 0000))
-	defer os.Chmod(parentDir, 0755)
+	defer func() { _ = os.Chmod(parentDir, 0755) }()
 
 	result, err := storage.SpectraFinder(childDir)
 	assert.Error(t, err)
@@ -222,7 +222,7 @@ func TestSpectraFinder_RelativeStartDir(t *testing.T) {
 
 	originalWd, err := os.Getwd()
 	require.NoError(t, err)
-	defer os.Chdir(originalWd)
+	defer func() { _ = os.Chdir(originalWd) }()
 
 	require.NoError(t, os.Chdir(tmpDir))
 
@@ -245,7 +245,7 @@ func TestSpectraFinder_RelativeStartDirWithParent(t *testing.T) {
 
 	originalWd, err := os.Getwd()
 	require.NoError(t, err)
-	defer os.Chdir(originalWd)
+	defer func() { _ = os.Chdir(originalWd) }()
 
 	require.NoError(t, os.Chdir(deepDir))
 
@@ -283,7 +283,7 @@ func TestSpectraFinder_ReturnsAbsolutePath(t *testing.T) {
 
 	originalWd, err := os.Getwd()
 	require.NoError(t, err)
-	defer os.Chdir(originalWd)
+	defer func() { _ = os.Chdir(originalWd) }()
 
 	require.NoError(t, os.Chdir(tmpDir))
 

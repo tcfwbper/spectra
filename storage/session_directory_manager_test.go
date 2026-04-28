@@ -108,7 +108,7 @@ func TestCreateSessionDirectory_PermissionDenied(t *testing.T) {
 	sessionsDir := filepath.Join(tmpDir, ".spectra", "sessions")
 	require.NoError(t, os.MkdirAll(sessionsDir, 0755))
 	require.NoError(t, os.Chmod(sessionsDir, 0555))
-	defer os.Chmod(sessionsDir, 0755)
+	defer func() { _ = os.Chmod(sessionsDir, 0755) }()
 
 	manager := storage.NewSessionDirectoryManager(tmpDir)
 	sessionUUID := "123e4567-e89b-12d3-a456-426614174000"
@@ -159,7 +159,7 @@ func TestSessionDirectoryManager_RelativeProjectRoot(t *testing.T) {
 
 	originalWd, err := os.Getwd()
 	require.NoError(t, err)
-	defer os.Chdir(originalWd)
+	defer func() { _ = os.Chdir(originalWd) }()
 
 	require.NoError(t, os.Chdir(tmpDir))
 
