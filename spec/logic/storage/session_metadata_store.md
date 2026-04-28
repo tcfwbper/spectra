@@ -2,7 +2,7 @@
 
 ## Overview
 
-SessionMetadataStore manages persistent storage of session metadata for a single session. It reads and writes the `session.json` file in pretty-printed JSON format, ensuring metadata is written atomically with file-level write locks. SessionMetadataStore handles only the session metadata fields (ID, WorkflowName, Status, CreatedAt, UpdatedAt, CurrentState, SessionData, Error); it does not manage EventHistory, which is maintained in memory by the Runtime. SessionMetadataStore does not manage the parent session directory; it expects the directory to exist before writing metadata.
+SessionMetadataStore manages persistent storage of [SessionMetadata](../entities/session_metadata.md) for a single session. It reads and writes the `session.json` file in pretty-printed JSON format, ensuring metadata is written atomically with file-level write locks. SessionMetadataStore serializes the SessionMetadata struct (ID, WorkflowName, Status, CreatedAt, UpdatedAt, CurrentState, SessionData, Error) and does not serialize EventHistory, which is persisted separately by [EventStore](./event_store.md). SessionMetadataStore does not manage the parent session directory; it expects the directory to exist before writing metadata.
 
 **Persistence Role**: SessionMetadataStore provides best-effort, last-write-wins persistence for user inspection and debugging. The Read operation is intended for external tools only (e.g., `spectra clear`, `spectra status`). The running Runtime must never read from SessionMetadataStore to determine behavior; the in-memory Session entity is the authoritative source of truth.
 
@@ -15,7 +15,7 @@ SessionMetadataStore manages persistent storage of session metadata for a single
 5. When writing session metadata, SessionMetadataStore acquires an exclusive file-level lock (using `flock` or equivalent) to prevent concurrent writes from multiple goroutines or processes.
 6. SessionMetadataStore serializes the session metadata to pretty-printed JSON format with 2-space indentation.
 7. The `Error` field is serialized with the `omitempty` JSON tag. When `Error` is nil, the field is omitted from the JSON output. When `Error` is set, it is serialized as a nested JSON object.
-8. The `EventHistory` field is excluded from serialization entirely. SessionMetadataStore only persists metadata fields defined in the session structure minus EventHistory.
+8. The `EventHistory` field is excluded from serialization entirely. SessionMetadataStore only serializes the SessionMetadata struct, which does not include EventHistory.
 9. SessionMetadataStore writes the JSON content to the file, replacing any existing content (truncate and write).
 10. SessionMetadataStore updates the `UpdatedAt` timestamp to the current POSIX timestamp before each write operation.
 11. SessionMetadataStore flushes the file buffer and releases the lock after each write.
@@ -39,7 +39,7 @@ SessionMetadataStore manages persistent storage of session metadata for a single
 
 | Field | Type | Constraints | Required |
 |-------|------|-------------|----------|
-| SessionMetadata | SessionMetadata struct | Valid session metadata structure (ID, WorkflowName, Status, CreatedAt, UpdatedAt, CurrentState, SessionData, Error). EventHistory is ignored if present. | Yes |
+| SessionMetadata | SessionMetadata struct | Valid [SessionMetadata](../entities/session_metadata.md) structure (ID, WorkflowName, Status, CreatedAt, UpdatedAt, CurrentState, SessionData, Error) | Yes |
 
 ## Outputs
 
@@ -62,7 +62,7 @@ SessionMetadataStore manages persistent storage of session metadata for a single
 
 | Field | Type | Description |
 |-------|------|-------------|
-| SessionMetadata | SessionMetadata struct | Session metadata structure with all fields except EventHistory populated from the file. EventHistory is empty. |
+| SessionMetadata | SessionMetadata struct | [SessionMetadata](../entities/session_metadata.md) structure populated from the file |
 
 **Error Cases**:
 
@@ -77,7 +77,7 @@ SessionMetadataStore manages persistent storage of session metadata for a single
 
 1. **Pretty-Printed JSON Format**: SessionMetadataStore must serialize session metadata as pretty-printed JSON with 2-space indentation for human readability.
 
-2. **EventHistory Exclusion**: The `EventHistory` field must never be serialized to `session.json`. SessionMetadataStore must exclude this field from JSON output.
+2. **EventHistory Exclusion**: SessionMetadataStore must only serialize SessionMetadata, which does not include EventHistory. EventHistory is persisted separately by EventStore.
 
 3. **Error Field Omitempty**: The `Error` field must use the `omitempty` JSON tag. When nil, the field is omitted from the JSON. When set, the full AgentError structure is serialized.
 
@@ -87,7 +87,7 @@ SessionMetadataStore manages persistent storage of session metadata for a single
 
 6. **File Permissions**: Newly created `session.json` files must have permissions `0644` (owner read/write, group/others read-only).
 
-7. **No In-Memory Cache**: SessionMetadataStore does not cache metadata in memory. Each read operation reads from disk. Note: Read is intended for external inspection and debugging tools only. The running Runtime must never read from SessionMetadataStore to determine behavior; the in-memory Session entity is the authoritative source of truth.
+7. **No In-Memory Cache**: SessionMetadataStore does not cache SessionMetadata in memory. Each read operation reads from disk. Note: Read is intended for external inspection and debugging tools only. The running Runtime must never read from SessionMetadataStore to determine behavior; the in-memory Session entity is the authoritative source of truth.
 
 8. **UpdatedAt Auto-Update**: The `UpdatedAt` field must be automatically updated to the current POSIX timestamp before each write operation, ensuring it reflects the last modification time.
 
@@ -153,11 +153,8 @@ SessionMetadataStore manages persistent storage of session metadata for a single
 - **Condition**: `UpdatedAt` is manually set by the caller before write operation.
   **Expected**: SessionMetadataStore overwrites the `UpdatedAt` field with the current timestamp. The caller-provided value is ignored.
 
-- **Condition**: `EventHistory` is present in the input SessionMetadata structure passed to write operation.
-  **Expected**: SessionMetadataStore ignores the `EventHistory` field entirely. It is not serialized to JSON. The Runtime must ensure EventHistory is populated separately by querying EventStore.
-
 - **Condition**: JSON file contains an `"eventHistory"` field from a previous version or manual edit.
-  **Expected**: SessionMetadataStore reads the field but does not populate it into the returned structure (assuming the Go struct tags exclude it). The field is effectively ignored.
+  **Expected**: SessionMetadataStore reads the field but does not populate it into the returned SessionMetadata structure (the SessionMetadata struct does not include EventHistory). The field is effectively ignored.
 
 - **Condition**: `SessionData` contains a key with namespace prefix `<NodeName>.ClaudeSessionID` with a non-string value.
   **Expected**: SessionMetadataStore serializes the value as-is (e.g., number, object). It does not validate the type. The Runtime is responsible for validating Claude session ID values are strings before writing.
@@ -167,8 +164,9 @@ SessionMetadataStore manages persistent storage of session metadata for a single
 
 ## Related
 
-- [Session](../entities/session/session.md) - Defines the Session structure and lifecycle
-- [EventStore](./event_store.md) - Manages EventHistory separately from session metadata
+- [SessionMetadata](../entities/session_metadata.md) - Defines the SessionMetadata structure that is persisted
+- [Session](../entities/session/session.md) - Embeds SessionMetadata and defines the full Session lifecycle
+- [EventStore](./event_store.md) - Manages EventHistory separately from SessionMetadata
 - [FileAccessor](./file_accessor.md) - Used to access `session.json` with preparation callback
 - [StorageLayout](./storage_layout.md) - Provides the path to `session.json`
 - [ARCHITECTURE.md](../../ARCHITECTURE.md) - Session lifecycle and workflow runtime
