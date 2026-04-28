@@ -46,25 +46,10 @@ const (
 	readBufferSize = 4096
 )
 
-// RuntimeMessage represents a message received from spectra-agent
-type RuntimeMessage struct {
-	Type    string         `json:"type"`
-	Payload map[string]any `json:"payload"`
-}
-
-// RuntimeResponse represents the response sent back to spectra-agent
-type RuntimeResponse struct {
-	Status  string `json:"status"`
-	Message string `json:"message"`
-}
-
-// MessageHandler is the callback function signature
-type MessageHandler func(sessionUUID string, message RuntimeMessage) RuntimeResponse
-
 // mockMessageHandler creates a simple success handler
-func mockMessageHandler() MessageHandler {
-	return func(sessionUUID string, message RuntimeMessage) RuntimeResponse {
-		return RuntimeResponse{Status: "success", Message: "ok"}
+func mockMessageHandler() storage.MessageHandler {
+	return func(sessionUUID string, message storage.RuntimeMessage) storage.RuntimeResponse {
+		return storage.RuntimeResponse{Status: "success", Message: "ok"}
 	}
 }
 
@@ -72,22 +57,22 @@ func mockMessageHandler() MessageHandler {
 type recordingMessageHandler struct {
 	mu           sync.Mutex
 	invocations  []recordedInvocation
-	responseFunc MessageHandler
+	responseFunc storage.MessageHandler
 }
 
 type recordedInvocation struct {
 	SessionUUID string
-	Message     RuntimeMessage
+	Message     storage.RuntimeMessage
 }
 
-func newRecordingMessageHandler(responseFunc MessageHandler) *recordingMessageHandler {
+func newRecordingMessageHandler(responseFunc storage.MessageHandler) *recordingMessageHandler {
 	return &recordingMessageHandler{
 		invocations:  []recordedInvocation{},
 		responseFunc: responseFunc,
 	}
 }
 
-func (r *recordingMessageHandler) Handle(sessionUUID string, message RuntimeMessage) RuntimeResponse {
+func (r *recordingMessageHandler) Handle(sessionUUID string, message storage.RuntimeMessage) storage.RuntimeResponse {
 	r.mu.Lock()
 	r.invocations = append(r.invocations, recordedInvocation{
 		SessionUUID: sessionUUID,
@@ -98,7 +83,7 @@ func (r *recordingMessageHandler) Handle(sessionUUID string, message RuntimeMess
 	if r.responseFunc != nil {
 		return r.responseFunc(sessionUUID, message)
 	}
-	return RuntimeResponse{Status: "success", Message: "recorded"}
+	return storage.RuntimeResponse{Status: "success", Message: "recorded"}
 }
 
 func (r *recordingMessageHandler) GetInvocations() []recordedInvocation {
@@ -174,8 +159,13 @@ func waitForSocket(socketPath string, timeout time.Duration) error {
 }
 
 // setupTestFixture creates a test fixture with session directory
+// Uses a shorter temp directory name to avoid Unix socket path length limits (108 chars)
 func setupTestFixture(t *testing.T, sessionUUID string) string {
-	tmpDir := t.TempDir()
+	// Use os.MkdirTemp with short prefix instead of t.TempDir() to avoid long paths
+	tmpDir, err := os.MkdirTemp("", "s")
+	require.NoError(t, err)
+	t.Cleanup(func() { os.RemoveAll(tmpDir) })
+
 	sessionDir := filepath.Join(tmpDir, ".spectra", "sessions", sessionUUID)
 	require.NoError(t, os.MkdirAll(sessionDir, 0755))
 	return tmpDir
@@ -489,8 +479,8 @@ func TestResponse_Success(t *testing.T) {
 
 	require.NoError(t, manager.CreateSocket())
 
-	successHandler := func(sessionUUID string, message RuntimeMessage) RuntimeResponse {
-		return RuntimeResponse{Status: "success", Message: "ok"}
+	successHandler := func(sessionUUID string, message storage.RuntimeMessage) storage.RuntimeResponse {
+		return storage.RuntimeResponse{Status: "success", Message: "ok"}
 	}
 	_, _, err := manager.Listen(successHandler)
 	require.NoError(t, err)
@@ -519,8 +509,8 @@ func TestResponse_Error(t *testing.T) {
 
 	require.NoError(t, manager.CreateSocket())
 
-	errorHandler := func(sessionUUID string, message RuntimeMessage) RuntimeResponse {
-		return RuntimeResponse{Status: "error", Message: "failed"}
+	errorHandler := func(sessionUUID string, message storage.RuntimeMessage) storage.RuntimeResponse {
+		return storage.RuntimeResponse{Status: "error", Message: "failed"}
 	}
 	_, _, err := manager.Listen(errorHandler)
 	require.NoError(t, err)
@@ -549,8 +539,8 @@ func TestResponse_EmptyMessage(t *testing.T) {
 
 	require.NoError(t, manager.CreateSocket())
 
-	emptyHandler := func(sessionUUID string, message RuntimeMessage) RuntimeResponse {
-		return RuntimeResponse{Status: "success", Message: ""}
+	emptyHandler := func(sessionUUID string, message storage.RuntimeMessage) storage.RuntimeResponse {
+		return storage.RuntimeResponse{Status: "success", Message: ""}
 	}
 	_, _, err := manager.Listen(emptyHandler)
 	require.NoError(t, err)
@@ -638,9 +628,9 @@ func TestDeleteSocket_ClosesActiveConnections(t *testing.T) {
 	require.NoError(t, manager.CreateSocket())
 	defer manager.DeleteSocket()
 
-	slowHandler := func(sessionUUID string, message RuntimeMessage) RuntimeResponse {
+	slowHandler := func(sessionUUID string, message storage.RuntimeMessage) storage.RuntimeResponse {
 		time.Sleep(listenerShutdownMax)
-		return RuntimeResponse{Status: "success", Message: "ok"}
+		return storage.RuntimeResponse{Status: "success", Message: "ok"}
 	}
 	_, _, err := manager.Listen(slowHandler)
 	require.NoError(t, err)
@@ -762,11 +752,15 @@ func TestCreateSocket_ResidualSocket(t *testing.T) {
 
 // TestCreateSocket_SessionDirDoesNotExist returns error when session directory missing
 func TestCreateSocket_SessionDirDoesNotExist(t *testing.T) {
-	tmpDir := t.TempDir()
+	// Use short temp dir name to avoid Unix socket path length limit
+	tmpDir, err := os.MkdirTemp("", "s")
+	require.NoError(t, err)
+	t.Cleanup(func() { os.RemoveAll(tmpDir) })
+
 	sessionUUID := "123e4567-e89b-12d3-a456-426614174000"
 
 	manager := storage.NewRuntimeSocketManager(tmpDir, sessionUUID)
-	err := manager.CreateSocket()
+	err = manager.CreateSocket()
 	assert.Error(t, err)
 	assert.Regexp(t, `(?i)failed to create runtime socket:.*no such file or directory`, err.Error())
 }
@@ -1119,7 +1113,10 @@ func TestReceive_MessageExceeds10MBLimit(t *testing.T) {
 	largeData := strings.Repeat("a", overLimitSize)
 	largeMsg := fmt.Sprintf(`{"type":"event","payload":{"eventType":"test","data":"%s"}}`, largeData)
 	err = client.SendMessage(largeMsg)
-	require.NoError(t, err)
+	// Note: The send may fail with "broken pipe" if the server closes the connection
+	// while the client is still writing. This is expected for oversized messages.
+	// The test verifies that the handler is not invoked, regardless of send result.
+	_ = err
 
 	assert.Eventually(t, func() bool {
 		return handler.Count() == 0
@@ -1525,9 +1522,9 @@ func TestListen_ConcurrentConnections(t *testing.T) {
 	defer manager.DeleteSocket()
 
 	var count int32
-	countingHandler := func(sessionUUID string, message RuntimeMessage) RuntimeResponse {
+	countingHandler := func(sessionUUID string, message storage.RuntimeMessage) storage.RuntimeResponse {
 		atomic.AddInt32(&count, 1)
-		return RuntimeResponse{Status: "success", Message: "ok"}
+		return storage.RuntimeResponse{Status: "success", Message: "ok"}
 	}
 
 	_, _, err := manager.Listen(countingHandler)
@@ -1568,9 +1565,9 @@ func TestListen_ConnectionGoroutineIsolation(t *testing.T) {
 	require.NoError(t, manager.CreateSocket())
 	defer manager.DeleteSocket()
 
-	slowHandler := func(sessionUUID string, message RuntimeMessage) RuntimeResponse {
+	slowHandler := func(sessionUUID string, message storage.RuntimeMessage) storage.RuntimeResponse {
 		time.Sleep(slowHandlerDelay)
-		return RuntimeResponse{Status: "success", Message: "ok"}
+		return storage.RuntimeResponse{Status: "success", Message: "ok"}
 	}
 
 	_, _, err := manager.Listen(slowHandler)
@@ -1642,9 +1639,9 @@ func TestDeleteSocket_DuringActiveConnections(t *testing.T) {
 
 	require.NoError(t, manager.CreateSocket())
 
-	slowHandler := func(sessionUUID string, message RuntimeMessage) RuntimeResponse {
+	slowHandler := func(sessionUUID string, message storage.RuntimeMessage) storage.RuntimeResponse {
 		time.Sleep(fastClientMaxWait)
-		return RuntimeResponse{Status: "success", Message: "ok"}
+		return storage.RuntimeResponse{Status: "success", Message: "ok"}
 	}
 
 	_, _, err := manager.Listen(slowHandler)
@@ -1840,8 +1837,8 @@ func TestReceive_MessageHandlerResponseSerialized(t *testing.T) {
 
 	require.NoError(t, manager.CreateSocket())
 
-	customHandler := func(sessionUUID string, message RuntimeMessage) RuntimeResponse {
-		return RuntimeResponse{Status: "success", Message: "processed"}
+	customHandler := func(sessionUUID string, message storage.RuntimeMessage) storage.RuntimeResponse {
+		return storage.RuntimeResponse{Status: "success", Message: "processed"}
 	}
 
 	_, _, err := manager.Listen(customHandler)
@@ -1861,7 +1858,7 @@ func TestReceive_MessageHandlerResponseSerialized(t *testing.T) {
 	response, err := client.ReadResponse()
 	require.NoError(t, err)
 
-	var resp RuntimeResponse
+	var resp storage.RuntimeResponse
 	err = json.Unmarshal([]byte(response), &resp)
 	require.NoError(t, err)
 	assert.Equal(t, "success", resp.Status)
@@ -1878,12 +1875,12 @@ func TestReceive_MessageHandlerSlow(t *testing.T) {
 	defer manager.DeleteSocket()
 
 	var count int32
-	slowHandler := func(sessionUUID string, message RuntimeMessage) RuntimeResponse {
+	slowHandler := func(sessionUUID string, message storage.RuntimeMessage) storage.RuntimeResponse {
 		n := atomic.AddInt32(&count, 1)
 		if n == 1 {
 			time.Sleep(verySlowHandlerDelay)
 		}
-		return RuntimeResponse{Status: "success", Message: "ok"}
+		return storage.RuntimeResponse{Status: "success", Message: "ok"}
 	}
 
 	_, _, err := manager.Listen(slowHandler)
@@ -2040,7 +2037,7 @@ func TestReceive_NoMessageBuffering(t *testing.T) {
 	var order []int
 	var mu sync.Mutex
 
-	orderingHandler := func(sessionUUID string, message RuntimeMessage) RuntimeResponse {
+	orderingHandler := func(sessionUUID string, message storage.RuntimeMessage) storage.RuntimeResponse {
 		mu.Lock()
 		defer mu.Unlock()
 
@@ -2053,7 +2050,7 @@ func TestReceive_NoMessageBuffering(t *testing.T) {
 				order = append(order, 3)
 			}
 		}
-		return RuntimeResponse{Status: "success", Message: "ok"}
+		return storage.RuntimeResponse{Status: "success", Message: "ok"}
 	}
 
 	_, _, err := manager.Listen(orderingHandler)
