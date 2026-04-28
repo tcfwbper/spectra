@@ -4,18 +4,20 @@ import (
 	"testing"
 
 	"github.com/google/uuid"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
+	_ "github.com/stretchr/testify/assert"
+	_ "github.com/stretchr/testify/require"
 )
 
 // TestEvent_CLIInvocation verifies agent emits event via spectra-agent CLI
 func TestEvent_CLIInvocation(t *testing.T) {
 	// Setup: Temporary test directory created
 	tmpDir := t.TempDir()
+	_ = tmpDir
 
 	// Runtime running with session files in tmpDir
 	// Session active with socket in tmpDir and Status="running"
 	sessionID := uuid.New()
+	_ = sessionID
 
 	// Execute: spectra-agent event emit TaskCompleted --session-id <uuid> --message "done" --payload '{"code": 0}'
 
@@ -29,6 +31,7 @@ func TestEvent_CLIInvocation(t *testing.T) {
 func TestEvent_CLIMissingSessionID(t *testing.T) {
 	// Setup: Temporary test directory created
 	tmpDir := t.TempDir()
+	_ = tmpDir
 
 	// Runtime running
 
@@ -42,10 +45,12 @@ func TestEvent_CLIMissingSessionID(t *testing.T) {
 func TestEvent_CLIDefaultsMessageToEmpty(t *testing.T) {
 	// Setup: Temporary test directory created
 	tmpDir := t.TempDir()
+	_ = tmpDir
 
 	// Runtime running with session files in tmpDir
 	// Session active with Status="running"
 	sessionID := uuid.New()
+	_ = sessionID
 
 	// Execute: spectra-agent event emit Started --session-id <uuid>
 
@@ -57,10 +62,12 @@ func TestEvent_CLIDefaultsMessageToEmpty(t *testing.T) {
 func TestEvent_CLIDefaultsPayloadToEmpty(t *testing.T) {
 	// Setup: Temporary test directory created
 	tmpDir := t.TempDir()
+	_ = tmpDir
 
 	// Runtime running with session files in tmpDir
 	// Session active with Status="running"
 	sessionID := uuid.New()
+	_ = sessionID
 
 	// Execute: spectra-agent event emit Started --session-id <uuid> --message "go"
 

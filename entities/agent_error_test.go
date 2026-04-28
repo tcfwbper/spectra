@@ -282,6 +282,7 @@ func TestAgentError_FieldsImmutable(t *testing.T) {
 func TestAgentError_AgentRoleDerivedFromNode(t *testing.T) {
 	// Setup: Session at agent node with agent_role="architect"
 	sessionID := uuid.New()
+	_ = sessionID
 
 	// Error raised without AgentRole in wire payload
 	// ErrorProcessor derives AgentRole from node definition
@@ -293,6 +294,7 @@ func TestAgentError_AgentRoleDerivedFromNode(t *testing.T) {
 func TestAgentError_EmptyAgentRoleForHumanNode(t *testing.T) {
 	// Setup: Session at human node (no agent_role defined)
 	sessionID := uuid.New()
+	_ = sessionID
 
 	// Error raised from human node
 
@@ -303,6 +305,7 @@ func TestAgentError_EmptyAgentRoleForHumanNode(t *testing.T) {
 func TestAgentError_PersistedToDisk(t *testing.T) {
 	// Setup: Temporary test directory created
 	tmpDir := t.TempDir()
+	_ = tmpDir
 
 	// Session files placed within tmpDir
 	sessionID := uuid.New()
@@ -326,9 +329,11 @@ func TestAgentError_PersistedToDisk(t *testing.T) {
 func TestAgentError_SessionDeletion(t *testing.T) {
 	// Setup: Temporary test directory created
 	tmpDir := t.TempDir()
+	_ = tmpDir
 
 	// Session exists with recorded AgentError in test directory
 	sessionID := uuid.New()
+	_ = sessionID
 
 	// Delete session
 
@@ -379,6 +384,7 @@ func TestAgentError_CurrentStateUnchanged(t *testing.T) {
 func TestAgentError_StatusPermanentlyFailed(t *testing.T) {
 	// Setup: Session transitioned to Status="failed" by AgentError
 	sessionID := uuid.New()
+	_ = sessionID
 
 	// Attempt any status transition
 
@@ -390,6 +396,7 @@ func TestAgentError_StatusPermanentlyFailed(t *testing.T) {
 func TestAgentError_NoAutomaticRetry(t *testing.T) {
 	// Setup: Session with Status="failed" due to AgentError
 	sessionID := uuid.New()
+	_ = sessionID
 
 	// Mock clock advanced by 5 seconds
 
