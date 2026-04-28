@@ -9,35 +9,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// AgentDefinition represents an agent configuration loaded from YAML.
-// This is a stub type awaiting implementation in the implementation phase.
-type AgentDefinition struct {
-	Role            string   `yaml:"role"`
-	Model           string   `yaml:"model"`
-	Effort          string   `yaml:"effort"`
-	SystemPrompt    string   `yaml:"system_prompt"`
-	AgentRoot       string   `yaml:"agent_root"`
-	AllowedTools    []string `yaml:"allowed_tools"`
-	DisallowedTools []string `yaml:"disallowed_tools"`
-}
-
-// AgentDefinitionLoader loads agent definitions from .spectra/agents/.
-// This is a stub type awaiting implementation in the implementation phase.
-type AgentDefinitionLoader struct {
-	projectRoot string
-}
-
-// NewAgentDefinitionLoader creates a new AgentDefinitionLoader
-func NewAgentDefinitionLoader(projectRoot string) *AgentDefinitionLoader {
-	return &AgentDefinitionLoader{projectRoot: projectRoot}
-}
-
-// Load loads an agent definition from disk.
-// Stub implementation - will be provided by the implementation phase.
-func (l *AgentDefinitionLoader) Load(agentRole string) (*AgentDefinition, error) {
-	return nil, nil
-}
-
 // Test helper functions
 
 func setupAgentTestDir(t *testing.T) string {
