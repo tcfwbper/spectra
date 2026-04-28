@@ -153,7 +153,7 @@ func TestFileAccessor_PermissionDeniedBeforeCallback(t *testing.T) {
 	testFile := filepath.Join(tmpDir, "restricted.txt")
 	require.NoError(t, os.WriteFile(testFile, []byte("content"), 0644))
 	require.NoError(t, os.Chmod(testFile, 0000))
-	defer os.Chmod(testFile, 0644)
+	defer func() { _ = os.Chmod(testFile, 0644) }()
 
 	callbackInvoked := false
 	callback := func() error {
@@ -192,7 +192,7 @@ func TestFileAccessor_PermissionDeniedAfterCallback(t *testing.T) {
 	assert.True(t, callbackInvoked, "callback should be invoked")
 	assert.Regexp(t, `(?i)permission denied.*denied\.txt`, err.Error())
 
-	os.Chmod(testFile, 0644)
+	_ = os.Chmod(testFile, 0644)
 }
 
 // TestFileAccessor_PathIsDirectory tests stat succeeds for directory; returns path
@@ -230,7 +230,7 @@ func TestFileAccessor_NilCallback(t *testing.T) {
 	testFile := filepath.Join(tmpDir, "test.txt")
 
 	assert.Panics(t, func() {
-		storage.FileAccessor(testFile, nil)
+		_, _ = storage.FileAccessor(testFile, nil)
 	})
 }
 
@@ -242,7 +242,7 @@ func TestFileAccessor_FileCreatedBetweenStatAndCallback(t *testing.T) {
 	callbackInvoked := false
 	callback := func() error {
 		callbackInvoked = true
-		os.WriteFile(testFile, []byte("created by external process"), 0644)
+		_ = os.WriteFile(testFile, []byte("created by external process"), 0644)
 		return nil
 	}
 
@@ -356,7 +356,7 @@ func TestFileAccessor_CallbackPanics(t *testing.T) {
 	}
 
 	assert.Panics(t, func() {
-		storage.FileAccessor(testFile, callback)
+		_, _ = storage.FileAccessor(testFile, callback)
 	})
 }
 
@@ -381,7 +381,7 @@ func TestFileAccessor_RelativePath(t *testing.T) {
 	tmpDir := t.TempDir()
 	originalWd, err := os.Getwd()
 	require.NoError(t, err)
-	defer os.Chdir(originalWd)
+	defer func() { _ = os.Chdir(originalWd) }()
 
 	require.NoError(t, os.Chdir(tmpDir))
 	testFile := "./relative.txt"
