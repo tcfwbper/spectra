@@ -905,8 +905,6 @@ func TestSessionMetadataStore_InvalidSessionUUID(t *testing.T) {
 	malformedUUID, err := uuid.Parse("00000000-0000-0000-0000-000000000000")
 	require.NoError(t, err)
 
-	// Manually construct path with invalid characters to simulate malformed UUID scenario
-	sessionDir := filepath.Join(tmpDir, ".spectra", "sessions", "../invalid")
 	// Create the store with a valid UUID but test against a malformed path scenario
 	store := storage.NewSessionMetadataStore(tmpDir, malformedUUID)
 
