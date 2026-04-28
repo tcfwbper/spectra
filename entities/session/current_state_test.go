@@ -15,7 +15,7 @@ import (
 func TestUpdateCurrentStateSafe_UpdatesState(t *testing.T) {
 	session := createTestSession(t, "running", "node1")
 	oldUpdatedAt := session.UpdatedAt
-	time.Sleep(10 * time.Millisecond)
+	time.Sleep(1 * time.Second)
 
 	session.metadataStore.On("Write", mock.Anything).Return(nil)
 
@@ -69,7 +69,7 @@ func TestUpdateCurrentStateSafe_AcceptsAnyNonEmptyString(t *testing.T) {
 func TestUpdateCurrentStateSafe_SelfTransition(t *testing.T) {
 	session := createTestSession(t, "running", "processing")
 	oldUpdatedAt := session.UpdatedAt
-	time.Sleep(10 * time.Millisecond)
+	time.Sleep(1 * time.Second)
 
 	session.metadataStore.On("Write", mock.Anything).Return(nil)
 
@@ -109,7 +109,7 @@ func TestUpdateCurrentStateSafe_Idempotent(t *testing.T) {
 
 	err1 := session.UpdateCurrentStateSafe("node2")
 	oldUpdatedAt1 := session.UpdatedAt
-	time.Sleep(10 * time.Millisecond)
+	time.Sleep(1 * time.Second)
 
 	err2 := session.UpdateCurrentStateSafe("node2")
 

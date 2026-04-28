@@ -16,7 +16,7 @@ import (
 func TestUpdateEventHistorySafe_AppendsEvent(t *testing.T) {
 	session := createTestSession(t, "running", "node1")
 	oldUpdatedAt := session.UpdatedAt
-	time.Sleep(10 * time.Millisecond)
+	time.Sleep(1 * time.Second)
 
 	session.eventStore.On("WriteEvent", mock.Anything).Return(nil)
 
@@ -44,7 +44,7 @@ func TestUpdateEventHistorySafe_AppendsToExisting(t *testing.T) {
 	}
 	session := createTestSessionWithEvents(t, "running", "node2", events)
 	oldUpdatedAt := session.UpdatedAt
-	time.Sleep(10 * time.Millisecond)
+	time.Sleep(1 * time.Second)
 
 	session.eventStore.On("WriteEvent", mock.Anything).Return(nil)
 
@@ -321,7 +321,7 @@ func TestEventHistory_ConcurrentAppends(t *testing.T) {
 				ID:        uuid.New().String(),
 				Type:      "Event",
 				SessionID: session.ID,
-				EmittedAt: int64(index),
+				EmittedAt: int64(index + 1), // EmittedAt must be > 0 per spec
 				EmittedBy: "node",
 			}
 			_ = session.UpdateEventHistorySafe(event)

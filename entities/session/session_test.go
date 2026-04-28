@@ -6,6 +6,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
 
@@ -159,7 +160,7 @@ func TestSession_InitializingToRunning(t *testing.T) {
 	// Session with Status="initializing"
 	session := createTestSession(t, "initializing", "start")
 	oldUpdatedAt := session.UpdatedAt
-	time.Sleep(10 * time.Millisecond)
+	time.Sleep(1 * time.Second)
 
 	session.metadataStore.On("Write", mock.Anything).Return(nil)
 
@@ -176,7 +177,7 @@ func TestSession_RunningToCompleted(t *testing.T) {
 	// Session with Status="running"
 	session := createTestSession(t, "running", "processing")
 	oldUpdatedAt := session.UpdatedAt
-	time.Sleep(10 * time.Millisecond)
+	time.Sleep(1 * time.Second)
 
 	session.metadataStore.On("Write", mock.Anything).Return(nil)
 
@@ -190,7 +191,7 @@ func TestSession_RunningToCompleted(t *testing.T) {
 
 	// Check notification
 	select {
-	case <-session.terminationNotifier.(chan struct{}):
+	case <-session.terminationNotifierChan:
 		// Notification received
 	case <-time.After(100 * time.Millisecond):
 		t.Fatal("Expected notification on terminationNotifier")
@@ -201,7 +202,7 @@ func TestSession_InitializingToFailed(t *testing.T) {
 	// Session with Status="initializing"
 	session := createTestSession(t, "initializing", "start")
 	oldUpdatedAt := session.UpdatedAt
-	time.Sleep(10 * time.Millisecond)
+	time.Sleep(1 * time.Second)
 
 	session.metadataStore.On("Write", mock.Anything).Return(nil)
 
@@ -218,7 +219,7 @@ func TestSession_InitializingToFailed(t *testing.T) {
 
 	// Check notification
 	select {
-	case <-session.terminationNotifier.(chan struct{}):
+	case <-session.terminationNotifierChan:
 		// Notification received
 	case <-time.After(100 * time.Millisecond):
 		t.Fatal("Expected notification on terminationNotifier")
@@ -229,7 +230,7 @@ func TestSession_RunningToFailed(t *testing.T) {
 	// Session with Status="running"
 	session := createTestSession(t, "running", "processing")
 	oldUpdatedAt := session.UpdatedAt
-	time.Sleep(10 * time.Millisecond)
+	time.Sleep(1 * time.Second)
 
 	session.metadataStore.On("Write", mock.Anything).Return(nil)
 
@@ -246,7 +247,7 @@ func TestSession_RunningToFailed(t *testing.T) {
 
 	// Check notification
 	select {
-	case <-session.terminationNotifier.(chan struct{}):
+	case <-session.terminationNotifierChan:
 		// Notification received
 	case <-time.After(100 * time.Millisecond):
 		t.Fatal("Expected notification on terminationNotifier")
@@ -475,12 +476,12 @@ func TestSession_TimestampOrderingMaintained(t *testing.T) {
 	assert.NoError(t, err)
 	assert.GreaterOrEqual(t, session.UpdatedAt, session.CreatedAt)
 
-	time.Sleep(10 * time.Millisecond)
+	time.Sleep(1 * time.Second)
 	err = session.UpdateSessionDataSafe("key", "value")
 	assert.NoError(t, err)
 	assert.GreaterOrEqual(t, session.UpdatedAt, session.CreatedAt)
 
-	time.Sleep(10 * time.Millisecond)
+	time.Sleep(1 * time.Second)
 	err = session.UpdateCurrentStateSafe("newState")
 	assert.NoError(t, err)
 	assert.GreaterOrEqual(t, session.UpdatedAt, session.CreatedAt)
@@ -552,7 +553,7 @@ func TestSession_TerminationNotifierCapacity(t *testing.T) {
 	session := createTestSession(t, "initializing", "start")
 
 	// Check channel capacity
-	ch := session.terminationNotifier.(chan struct{})
+	ch := session.terminationNotifierChan
 	assert.GreaterOrEqual(t, cap(ch), 2)
 }
 
@@ -567,7 +568,7 @@ func TestSession_SingleNotificationOnDone(t *testing.T) {
 
 	// Exactly one value sent on channel; channel length increases by 1
 	assert.NoError(t, err)
-	ch := session.terminationNotifier.(chan struct{})
+	ch := session.terminationNotifierChan
 	assert.Equal(t, 1, len(ch))
 }
 
@@ -583,7 +584,7 @@ func TestSession_SingleNotificationOnFail(t *testing.T) {
 
 	// Exactly one value sent on channel; channel length increases by 1
 	assert.NoError(t, err)
-	ch := session.terminationNotifier.(chan struct{})
+	ch := session.terminationNotifierChan
 	assert.Equal(t, 1, len(ch))
 }
 
@@ -601,6 +602,6 @@ func TestSession_NoDuplicateNotifications(t *testing.T) {
 
 	// First call sends notification; second call returns error without sending
 	assert.Error(t, err)
-	ch := session.terminationNotifier.(chan struct{})
+	ch := session.terminationNotifierChan
 	assert.Equal(t, 1, len(ch))
 }

@@ -17,7 +17,7 @@ import (
 func TestRun_InitializingToRunning(t *testing.T) {
 	session := createTestSession(t, "initializing", "start")
 	oldUpdatedAt := session.UpdatedAt
-	time.Sleep(10 * time.Millisecond)
+	time.Sleep(1 * time.Second)
 
 	session.metadataStore.On("Write", mock.Anything).Return(nil)
 
@@ -48,7 +48,7 @@ func TestRun_NoNotificationSent(t *testing.T) {
 	err := session.Run(session.terminationNotifier)
 
 	assert.NoError(t, err)
-	ch := session.terminationNotifier.(chan struct{})
+	ch := session.terminationNotifierChan
 	assert.Equal(t, 0, len(ch))
 }
 
@@ -57,7 +57,7 @@ func TestRun_NoNotificationSent(t *testing.T) {
 func TestDone_RunningToCompleted(t *testing.T) {
 	session := createTestSession(t, "running", "processing")
 	oldUpdatedAt := session.UpdatedAt
-	time.Sleep(10 * time.Millisecond)
+	time.Sleep(1 * time.Second)
 
 	session.metadataStore.On("Write", mock.Anything).Return(nil)
 
@@ -67,7 +67,7 @@ func TestDone_RunningToCompleted(t *testing.T) {
 	assert.Equal(t, "completed", session.Status)
 	assert.Greater(t, session.UpdatedAt, oldUpdatedAt)
 
-	ch := session.terminationNotifier.(chan struct{})
+	ch := session.terminationNotifierChan
 	assert.Equal(t, 1, len(ch))
 }
 
@@ -88,7 +88,7 @@ func TestDone_SendsNotification(t *testing.T) {
 
 	session.metadataStore.On("Write", mock.Anything).Return(nil)
 
-	ch := session.terminationNotifier.(chan struct{})
+	ch := session.terminationNotifierChan
 	initialLen := len(ch)
 
 	err := session.Done(session.terminationNotifier)
@@ -115,7 +115,7 @@ func TestDone_NonBlockingSend(t *testing.T) {
 func TestFail_InitializingToFailed(t *testing.T) {
 	session := createTestSession(t, "initializing", "start")
 	oldUpdatedAt := session.UpdatedAt
-	time.Sleep(10 * time.Millisecond)
+	time.Sleep(1 * time.Second)
 
 	session.metadataStore.On("Write", mock.Anything).Return(nil)
 
@@ -127,14 +127,14 @@ func TestFail_InitializingToFailed(t *testing.T) {
 	assert.Equal(t, runtimeError, session.Error)
 	assert.Greater(t, session.UpdatedAt, oldUpdatedAt)
 
-	ch := session.terminationNotifier.(chan struct{})
+	ch := session.terminationNotifierChan
 	assert.Equal(t, 1, len(ch))
 }
 
 func TestFail_RunningToFailed(t *testing.T) {
 	session := createTestSession(t, "running", "processing")
 	oldUpdatedAt := session.UpdatedAt
-	time.Sleep(10 * time.Millisecond)
+	time.Sleep(1 * time.Second)
 
 	session.metadataStore.On("Write", mock.Anything).Return(nil)
 
@@ -146,7 +146,7 @@ func TestFail_RunningToFailed(t *testing.T) {
 	assert.Equal(t, agentError, session.Error)
 	assert.Greater(t, session.UpdatedAt, oldUpdatedAt)
 
-	ch := session.terminationNotifier.(chan struct{})
+	ch := session.terminationNotifierChan
 	assert.Equal(t, 1, len(ch))
 }
 
@@ -168,7 +168,7 @@ func TestFail_SendsNotification(t *testing.T) {
 
 	session.metadataStore.On("Write", mock.Anything).Return(nil)
 
-	ch := session.terminationNotifier.(chan struct{})
+	ch := session.terminationNotifierChan
 	initialLen := len(ch)
 
 	agentError := &AgentError{NodeName: "agent", Message: "error"}
@@ -305,7 +305,7 @@ func TestFail_RejectsCompleted(t *testing.T) {
 	assert.Regexp(t, "(?i)cannot fail.*status is 'completed'.*workflow already terminated", err.Error())
 	assert.Equal(t, "completed", session.Status)
 
-	ch := session.terminationNotifier.(chan struct{})
+	ch := session.terminationNotifierChan
 	assert.Equal(t, 0, len(ch))
 }
 
@@ -321,7 +321,7 @@ func TestFail_RejectsFailed(t *testing.T) {
 	assert.Equal(t, "failed", session.Status)
 	assert.Equal(t, firstError, session.Error)
 
-	ch := session.terminationNotifier.(chan struct{})
+	ch := session.terminationNotifierChan
 	assert.Equal(t, 0, len(ch))
 }
 
@@ -412,7 +412,8 @@ func TestLifecycle_AtomicStatusAndTimestampUpdate(t *testing.T) {
 			// Can't directly access UpdatedAt safely without another lock,
 			// but this tests that status transitions are atomic
 			if status == "running" {
-				// Status changed
+				// Status changed - do nothing, just observing
+				_ = status
 			}
 		}
 	}()
@@ -454,7 +455,7 @@ func TestDone_NotIdempotent(t *testing.T) {
 	assert.Error(t, err2)
 	assert.Equal(t, "completed", session.Status)
 
-	ch := session.terminationNotifier.(chan struct{})
+	ch := session.terminationNotifierChan
 	assert.Equal(t, 1, len(ch))
 }
 
@@ -474,7 +475,7 @@ func TestFail_NotIdempotent(t *testing.T) {
 	assert.Regexp(t, "(?i)already failed", err2.Error())
 	assert.Equal(t, firstError, session.Error)
 
-	ch := session.terminationNotifier.(chan struct{})
+	ch := session.terminationNotifierChan
 	assert.Equal(t, 1, len(ch))
 }
 
@@ -527,7 +528,7 @@ func TestLifecycle_ReleasesLockOnValidationFailure(t *testing.T) {
 	}()
 
 	go func() {
-		time.Sleep(10 * time.Millisecond)
+		time.Sleep(1 * time.Second)
 		_ = session.GetStatusSafe()
 		done <- true
 	}()
@@ -568,7 +569,7 @@ func TestLifecycle_ConcurrentRunFail(t *testing.T) {
 	assert.True(t, (runErr == nil && failErr != nil) || (runErr != nil && failErr == nil))
 	assert.True(t, session.Status == "running" || session.Status == "failed")
 
-	ch := session.terminationNotifier.(chan struct{})
+	ch := session.terminationNotifierChan
 	assert.LessOrEqual(t, len(ch), 1)
 }
 
@@ -598,7 +599,7 @@ func TestLifecycle_ConcurrentDoneFail(t *testing.T) {
 	assert.True(t, (doneErr == nil && failErr != nil) || (doneErr != nil && failErr == nil))
 	assert.True(t, session.Status == "completed" || session.Status == "failed")
 
-	ch := session.terminationNotifier.(chan struct{})
+	ch := session.terminationNotifierChan
 	assert.Equal(t, 1, len(ch))
 }
 
@@ -631,7 +632,7 @@ func TestLifecycle_ConcurrentFailCalls(t *testing.T) {
 	assert.Equal(t, "failed", session.Status)
 	assert.NotNil(t, session.Error)
 
-	ch := session.terminationNotifier.(chan struct{})
+	ch := session.terminationNotifierChan
 	assert.Equal(t, 1, len(ch))
 }
 
@@ -664,7 +665,7 @@ func TestLifecycle_PersistenceFailureInDone(t *testing.T) {
 	assert.Equal(t, "completed", session.Status)
 	session.logger.AssertCalled(t, "Warning", mock.Anything)
 
-	ch := session.terminationNotifier.(chan struct{})
+	ch := session.terminationNotifierChan
 	assert.Equal(t, 1, len(ch))
 }
 
@@ -682,7 +683,7 @@ func TestLifecycle_PersistenceFailureInFail(t *testing.T) {
 	assert.Equal(t, runtimeError, session.Error)
 	session.logger.AssertCalled(t, "Warning", mock.Anything)
 
-	ch := session.terminationNotifier.(chan struct{})
+	ch := session.terminationNotifierChan
 	assert.Equal(t, 1, len(ch))
 }
 
@@ -742,7 +743,7 @@ func TestLifecycle_CompletedIsFinal(t *testing.T) {
 	assert.Error(t, err)
 	assert.Equal(t, "completed", session.Status)
 
-	ch := session.terminationNotifier.(chan struct{})
+	ch := session.terminationNotifierChan
 	assert.Equal(t, 0, len(ch))
 }
 

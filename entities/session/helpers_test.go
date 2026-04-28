@@ -49,63 +49,17 @@ func (m *mockLogger) GetWarnings() []string {
 	return append([]string(nil), m.warnings...)
 }
 
-// SessionMetadata represents the persistable state of a session.
-type SessionMetadata struct {
-	ID           string         `json:"id"`
-	WorkflowName string         `json:"workflow_name"`
-	Status       string         `json:"status"`
-	CreatedAt    int64          `json:"created_at"`
-	UpdatedAt    int64          `json:"updated_at"`
-	CurrentState string         `json:"current_state"`
-	SessionData  map[string]any `json:"session_data"`
-	Error        error          `json:"error,omitempty"`
-}
-
-// Session represents a single execution instance of a workflow.
-// It embeds SessionMetadata and adds runtime-only fields.
-type Session struct {
-	SessionMetadata
-	EventHistory        []Event
-	mu                  sync.RWMutex
-	terminationNotifier chan<- struct{}
-	metadataStore       *mockSessionMetadataStore
-	eventStore          *mockEventStore
-	logger              *mockLogger
-}
-
-// Event represents a workflow event.
-type Event struct {
-	ID        string         `json:"id"`
-	Type      string         `json:"type"`
-	SessionID string         `json:"session_id"`
-	EmittedAt int64          `json:"emitted_at"`
-	EmittedBy string         `json:"emitted_by"`
-	Message   string         `json:"message"`
-	Payload   map[string]any `json:"payload"`
-}
-
-// AgentError represents an error from an agent node.
-type AgentError struct {
-	NodeName string
-	Message  string
-}
-
-func (e *AgentError) Error() string {
-	return e.Message
-}
-
-// RuntimeError represents an error from the runtime.
-type RuntimeError struct {
-	Issuer  string
-	Message string
-}
-
-func (e *RuntimeError) Error() string {
-	return e.Message
+// testSession wraps Session with access to mock stores for testing.
+type testSession struct {
+	*Session
+	metadataStore            *mockSessionMetadataStore
+	eventStore               *mockEventStore
+	logger                   *mockLogger
+	terminationNotifierChan  chan struct{} // Bidirectional channel for testing
 }
 
 // createTestSession creates a session for testing with the given initial state.
-func createTestSession(t *testing.T, status string, currentState string) *Session {
+func createTestSession(t *testing.T, status string, currentState string) *testSession {
 	t.Helper()
 	now := time.Now().Unix()
 	sessionID := uuid.New().String()
@@ -128,17 +82,24 @@ func createTestSession(t *testing.T, status string, currentState string) *Sessio
 			Error:        nil,
 		},
 		EventHistory:        []Event{},
+		mu:                  sync.RWMutex{},
 		terminationNotifier: terminationNotifier,
 		metadataStore:       metadataStore,
 		eventStore:          eventStore,
 		logger:              logger,
 	}
 
-	return session
+	return &testSession{
+		Session:                 session,
+		metadataStore:           metadataStore,
+		eventStore:              eventStore,
+		logger:                  logger,
+		terminationNotifierChan: terminationNotifier,
+	}
 }
 
 // createTestSessionWithUpdatedAt creates a session with a specific UpdatedAt timestamp.
-func createTestSessionWithUpdatedAt(t *testing.T, status string, currentState string, updatedAt int64) *Session {
+func createTestSessionWithUpdatedAt(t *testing.T, status string, currentState string, updatedAt int64) *testSession {
 	t.Helper()
 	session := createTestSession(t, status, currentState)
 	session.UpdatedAt = updatedAt
@@ -146,7 +107,7 @@ func createTestSessionWithUpdatedAt(t *testing.T, status string, currentState st
 }
 
 // createTestSessionWithData creates a session with pre-populated SessionData.
-func createTestSessionWithData(t *testing.T, status string, currentState string, data map[string]any) *Session {
+func createTestSessionWithData(t *testing.T, status string, currentState string, data map[string]any) *testSession {
 	t.Helper()
 	session := createTestSession(t, status, currentState)
 	session.SessionData = data
@@ -154,7 +115,7 @@ func createTestSessionWithData(t *testing.T, status string, currentState string,
 }
 
 // createTestSessionWithError creates a session with a pre-set error.
-func createTestSessionWithError(t *testing.T, status string, currentState string, err error) *Session {
+func createTestSessionWithError(t *testing.T, status string, currentState string, err error) *testSession {
 	t.Helper()
 	session := createTestSession(t, status, currentState)
 	session.Error = err
@@ -162,7 +123,7 @@ func createTestSessionWithError(t *testing.T, status string, currentState string
 }
 
 // createTestSessionWithEvents creates a session with pre-populated EventHistory.
-func createTestSessionWithEvents(t *testing.T, status string, currentState string, events []Event) *Session {
+func createTestSessionWithEvents(t *testing.T, status string, currentState string, events []Event) *testSession {
 	t.Helper()
 	session := createTestSession(t, status, currentState)
 	session.EventHistory = events
