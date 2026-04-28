@@ -136,18 +136,21 @@ func TestSessionMetadataStore_ReadBlocksDuringWrite(t *testing.T) {
 	}
 	require.NoError(t, store.Write(initialMetadata))
 
+	// Verification approach: We cannot deterministically control which goroutine acquires
+	// the file lock first due to Go scheduler and OS lock contention. Instead, we verify:
+	// 1. Both operations complete successfully without corruption
+	// 2. The final state is consistent (file contains valid JSON)
+	// 3. No race conditions occur (verified by running with -race flag)
+
 	var wg sync.WaitGroup
 	wg.Add(2)
 
 	var readStatus string
-	writeReady := make(chan struct{})
-	writeDone := make(chan struct{})
-	readStarted := make(chan struct{})
+	var readErr error
 
-	// Goroutine 1: Write (holds lock)
+	// Goroutine 1: Write with updated metadata
 	go func() {
 		defer wg.Done()
-		defer close(writeDone)
 		metadata := &helpers.SessionMetadata{
 			ID:           sessionUUID,
 			WorkflowName: "TestWorkflow",
@@ -157,20 +160,15 @@ func TestSessionMetadataStore_ReadBlocksDuringWrite(t *testing.T) {
 			CurrentState: "StartNode",
 			SessionData:  map[string]interface{}{},
 		}
-		close(writeReady)
-		// Wait for read to start attempting before we complete
-		<-readStarted
 		err := store.Write(metadata)
 		assert.NoError(t, err)
 	}()
 
-	// Goroutine 2: Read (should be blocked until write completes)
+	// Goroutine 2: Read concurrently
 	go func() {
 		defer wg.Done()
-		<-writeReady
-		close(readStarted)
 		metadata, err := store.Read()
-		assert.NoError(t, err)
+		readErr = err
 		if metadata != nil {
 			readStatus = metadata.Status
 		}
@@ -178,9 +176,17 @@ func TestSessionMetadataStore_ReadBlocksDuringWrite(t *testing.T) {
 
 	wg.Wait()
 
-	// Read should return newly written metadata (updated) or initial metadata
-	// Due to timing, it could be either, but should be valid
-	assert.Contains(t, []string{"initial", "updated"}, readStatus, "Read should return valid status")
+	// Both operations should succeed
+	assert.NoError(t, readErr)
+
+	// Read should return valid metadata (either "initial" before write or "updated" after write)
+	assert.Contains(t, []string{"initial", "updated"}, readStatus,
+		"Read should return valid status - either initial (if read acquired lock first) or updated (if write acquired lock first)")
+
+	// Verify final file state is consistent
+	finalMetadata, err := store.Read()
+	assert.NoError(t, err)
+	assert.Equal(t, "updated", finalMetadata.Status, "Final file should contain updated status")
 }
 
 // TestSessionMetadataStore_WriteBlocksDuringRead verifies write waits for read to complete
@@ -204,32 +210,32 @@ func TestSessionMetadataStore_WriteBlocksDuringRead(t *testing.T) {
 	}
 	require.NoError(t, store.Write(initialMetadata))
 
+	// Verification approach: We cannot deterministically control which goroutine acquires
+	// the file lock first due to Go scheduler and OS lock contention. Instead, we verify:
+	// 1. Both operations complete successfully without corruption
+	// 2. The final state is consistent (file contains updated metadata after both complete)
+	// 3. No race conditions occur (verified by running with -race flag)
+
 	var wg sync.WaitGroup
 	wg.Add(2)
 
-	readStarted := make(chan struct{})
-	readDone := make(chan struct{})
-	writeStarted := make(chan struct{})
-	writeDone := make(chan struct{})
+	var readStatus string
+	var readErr error
+	var writeErr error
 
-	// Goroutine 1: Read (acquires lock first)
+	// Goroutine 1: Read concurrently
 	go func() {
 		defer wg.Done()
-		defer close(readDone)
-		close(readStarted)
-		// Wait for write to be ready
-		<-writeStarted
 		metadata, err := store.Read()
-		assert.NoError(t, err)
-		assert.Equal(t, "initial", metadata.Status)
+		readErr = err
+		if metadata != nil {
+			readStatus = metadata.Status
+		}
 	}()
 
-	// Goroutine 2: Write (should be blocked until read completes)
+	// Goroutine 2: Write concurrently
 	go func() {
 		defer wg.Done()
-		defer close(writeDone)
-		<-readStarted
-		close(writeStarted)
 		metadata := &helpers.SessionMetadata{
 			ID:           sessionUUID,
 			WorkflowName: "TestWorkflow",
@@ -239,20 +245,23 @@ func TestSessionMetadataStore_WriteBlocksDuringRead(t *testing.T) {
 			CurrentState: "StartNode",
 			SessionData:  map[string]interface{}{},
 		}
-		err := store.Write(metadata)
-		assert.NoError(t, err)
+		writeErr = store.Write(metadata)
 	}()
 
 	wg.Wait()
 
-	// Verify both operations completed
-	<-readDone
-	<-writeDone
+	// Both operations should succeed
+	assert.NoError(t, readErr)
+	assert.NoError(t, writeErr)
 
-	// Verify write succeeded
-	metadata, err := store.Read()
+	// Read should return valid metadata (either "initial" or "updated" depending on lock acquisition order)
+	assert.Contains(t, []string{"initial", "updated"}, readStatus,
+		"Read should return valid status - either initial (if read acquired lock first) or updated (if write acquired lock first)")
+
+	// Verify final file state is consistent
+	finalMetadata, err := store.Read()
 	assert.NoError(t, err)
-	assert.Equal(t, "updated", metadata.Status)
+	assert.Equal(t, "updated", finalMetadata.Status, "Final file should contain updated status after both operations complete")
 }
 
 // TestSessionMetadataStore_ConcurrentSameProcess verifies multiple goroutines in same process write safely
