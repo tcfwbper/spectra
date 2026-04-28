@@ -10,42 +10,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// Node represents a node in a workflow.
-// This is a stub type awaiting implementation in the implementation phase.
-type Node struct {
-	Name        string `yaml:"name"`
-	Type        string `yaml:"type"`
-	AgentRole   string `yaml:"agent_role,omitempty"`
-	Description string `yaml:"description,omitempty"`
-}
-
-// Transition represents a state transition in a workflow.
-// This is a stub type awaiting implementation in the implementation phase.
-type Transition struct {
-	FromNode  string `yaml:"from_node"`
-	EventType string `yaml:"event_type"`
-	ToNode    string `yaml:"to_node"`
-}
-
-// ExitTransition represents a workflow exit transition.
-// This is a stub type awaiting implementation in the implementation phase.
-type ExitTransition struct {
-	FromNode  string `yaml:"from_node"`
-	EventType string `yaml:"event_type"`
-	ToNode    string `yaml:"to_node"`
-}
-
-// WorkflowDefinition represents a workflow configuration loaded from YAML.
-// This is a stub type awaiting implementation in the implementation phase.
-type WorkflowDefinition struct {
-	Name            string           `yaml:"name"`
-	Description     string           `yaml:"description,omitempty"`
-	EntryNode       string           `yaml:"entry_node"`
-	ExitTransitions []ExitTransition `yaml:"exit_transitions"`
-	Nodes           []Node           `yaml:"nodes"`
-	Transitions     []Transition     `yaml:"transitions"`
-}
-
 // MockAgentDefinitionLoader is a mock implementation for testing.
 // It records all Load calls and allows customizing the return behavior via loadFn.
 type MockAgentDefinitionLoader struct {
@@ -80,32 +44,6 @@ func (m *MockAgentDefinitionLoader) GetCalls() []string {
 	result := make([]string, len(m.calls))
 	copy(result, m.calls)
 	return result
-}
-
-// AgentLoader is an interface for loading agent definitions
-type AgentLoader interface {
-	Load(agentRole string) (*AgentDefinition, error)
-}
-
-// WorkflowDefinitionLoader loads workflow definitions from .spectra/workflows/.
-// This is a stub type awaiting implementation in the implementation phase.
-type WorkflowDefinitionLoader struct {
-	projectRoot string
-	agentLoader AgentLoader
-}
-
-// NewWorkflowDefinitionLoader creates a new WorkflowDefinitionLoader
-func NewWorkflowDefinitionLoader(projectRoot string, agentLoader AgentLoader) *WorkflowDefinitionLoader {
-	return &WorkflowDefinitionLoader{
-		projectRoot: projectRoot,
-		agentLoader: agentLoader,
-	}
-}
-
-// Load loads a workflow definition from disk.
-// Stub implementation - will be provided by the implementation phase.
-func (l *WorkflowDefinitionLoader) Load(workflowName string) (*WorkflowDefinition, error) {
-	return nil, nil
 }
 
 // Test helper functions

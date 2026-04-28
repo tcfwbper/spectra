@@ -11,39 +11,6 @@ import (
 	"github.com/tcfwbper/spectra/storage"
 )
 
-// Node represents a node in a workflow
-type Node struct {
-	Name        string `yaml:"name"`
-	Type        string `yaml:"type"`
-	AgentRole   string `yaml:"agent_role,omitempty"`
-	Description string `yaml:"description,omitempty"`
-}
-
-// Transition represents a state transition in a workflow
-type Transition struct {
-	FromNode  string `yaml:"from_node"`
-	EventType string `yaml:"event_type"`
-	ToNode    string `yaml:"to_node"`
-}
-
-// ExitTransition represents a workflow exit transition
-type ExitTransition struct {
-	FromNode  string `yaml:"from_node"`
-	EventType string `yaml:"event_type"`
-	ToNode    string `yaml:"to_node"`
-}
-
-// WorkflowDefinition represents a workflow configuration loaded from YAML
-// This is a stub awaiting implementation.
-type WorkflowDefinition struct {
-	Name            string           `yaml:"name"`
-	Description     string           `yaml:"description,omitempty"`
-	EntryNode       string           `yaml:"entry_node"`
-	ExitTransitions []ExitTransition `yaml:"exit_transitions"`
-	Nodes           []Node           `yaml:"nodes"`
-	Transitions     []Transition     `yaml:"transitions"`
-}
-
 // MockAgentDefinitionLoader is a mock implementation for testing
 type MockAgentDefinitionLoader struct {
 	mu    sync.Mutex
@@ -58,37 +25,11 @@ func NewMockAgentDefinitionLoader() *MockAgentDefinitionLoader {
 }
 
 // Load calls the mock function
-func (m *MockAgentDefinitionLoader) Load(agentRole string) (*AgentDefinition, error) {
+func (m *MockAgentDefinitionLoader) Load(agentRole string) (*storage.AgentDefinition, error) {
 	m.mu.Lock()
 	m.calls = append(m.calls, agentRole)
 	m.mu.Unlock()
-	return &AgentDefinition{Role: agentRole}, nil
-}
-
-// AgentLoader is an interface for loading agent definitions
-type AgentLoader interface {
-	Load(agentRole string) (*AgentDefinition, error)
-}
-
-// WorkflowDefinitionLoader loads workflow definitions from .spectra/workflows/
-// This is a stub awaiting implementation.
-type WorkflowDefinitionLoader struct {
-	projectRoot string
-	agentLoader AgentLoader
-}
-
-// NewWorkflowDefinitionLoader creates a new WorkflowDefinitionLoader
-func NewWorkflowDefinitionLoader(projectRoot string, agentLoader AgentLoader) *WorkflowDefinitionLoader {
-	return &WorkflowDefinitionLoader{
-		projectRoot: projectRoot,
-		agentLoader: agentLoader,
-	}
-}
-
-// Load loads a workflow definition from disk
-// Stub implementation - will be provided by the implementation phase
-func (l *WorkflowDefinitionLoader) Load(workflowName string) (*WorkflowDefinition, error) {
-	return nil, nil
+	return &storage.AgentDefinition{Role: agentRole}, nil
 }
 
 // Test helper functions
@@ -134,9 +75,9 @@ func TestWorkflowDefinitionLoader_Load_ConcurrentSameWorkflow(t *testing.T) {
 	mockLoader := NewMockAgentDefinitionLoader()
 	writeWorkflowYAML(t, tmpDir, "Simple", createMinimalValidWorkflowYAML("Simple"))
 
-	loader := NewWorkflowDefinitionLoader(tmpDir, mockLoader)
+	loader := storage.NewWorkflowDefinitionLoader(tmpDir, mockLoader)
 
-	done := make(chan *WorkflowDefinition, 10)
+	done := make(chan *storage.WorkflowDefinition, 10)
 	for range 10 {
 		go func() {
 			def, err := loader.Load("Simple")
@@ -145,7 +86,7 @@ func TestWorkflowDefinitionLoader_Load_ConcurrentSameWorkflow(t *testing.T) {
 		}()
 	}
 
-	results := make([]*WorkflowDefinition, 10)
+	results := make([]*storage.WorkflowDefinition, 10)
 	for i := range 10 {
 		results[i] = <-done
 	}
@@ -164,7 +105,7 @@ func TestWorkflowDefinitionLoader_Load_ConcurrentDifferentWorkflows(t *testing.T
 		writeWorkflowYAML(t, tmpDir, wf, createMinimalValidWorkflowYAML(wf))
 	}
 
-	loader := NewWorkflowDefinitionLoader(tmpDir, mockLoader)
+	loader := storage.NewWorkflowDefinitionLoader(tmpDir, mockLoader)
 
 	done := make(chan string, 10)
 	for i := range 10 {

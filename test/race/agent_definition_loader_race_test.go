@@ -10,34 +10,6 @@ import (
 	"github.com/tcfwbper/spectra/storage"
 )
 
-// AgentDefinition represents an agent configuration loaded from YAML
-type AgentDefinition struct {
-	Role            string   `yaml:"role"`
-	Model           string   `yaml:"model"`
-	Effort          string   `yaml:"effort"`
-	SystemPrompt    string   `yaml:"system_prompt"`
-	AgentRoot       string   `yaml:"agent_root"`
-	AllowedTools    []string `yaml:"allowed_tools"`
-	DisallowedTools []string `yaml:"disallowed_tools"`
-}
-
-// AgentDefinitionLoader loads agent definitions from .spectra/agents/
-// This is a stub awaiting implementation.
-type AgentDefinitionLoader struct {
-	projectRoot string
-}
-
-// NewAgentDefinitionLoader creates a new AgentDefinitionLoader
-func NewAgentDefinitionLoader(projectRoot string) *AgentDefinitionLoader {
-	return &AgentDefinitionLoader{projectRoot: projectRoot}
-}
-
-// Load loads an agent definition from disk
-// Stub implementation - will be provided by the implementation phase
-func (l *AgentDefinitionLoader) Load(agentRole string) (*AgentDefinition, error) {
-	return nil, nil
-}
-
 // Test helper functions
 
 func setupAgentTestDir(t *testing.T) string {
@@ -70,9 +42,9 @@ func TestAgentDefinitionLoader_Load_ConcurrentSameRole(t *testing.T) {
 	tmpDir := setupAgentTestDir(t)
 	writeAgentYAML(t, tmpDir, "Architect", createValidAgentYAML("Architect", "."))
 
-	loader := NewAgentDefinitionLoader(tmpDir)
+	loader := storage.NewAgentDefinitionLoader(tmpDir)
 
-	done := make(chan *AgentDefinition, 10)
+	done := make(chan *storage.AgentDefinition, 10)
 	for range 10 {
 		go func() {
 			def, err := loader.Load("Architect")
@@ -81,7 +53,7 @@ func TestAgentDefinitionLoader_Load_ConcurrentSameRole(t *testing.T) {
 		}()
 	}
 
-	results := make([]*AgentDefinition, 10)
+	results := make([]*storage.AgentDefinition, 10)
 	for i := range 10 {
 		results[i] = <-done
 	}
@@ -99,7 +71,7 @@ func TestAgentDefinitionLoader_Load_ConcurrentDifferentRoles(t *testing.T) {
 		writeAgentYAML(t, tmpDir, role, createValidAgentYAML(role, "."))
 	}
 
-	loader := NewAgentDefinitionLoader(tmpDir)
+	loader := storage.NewAgentDefinitionLoader(tmpDir)
 
 	done := make(chan string, 10)
 	for i := range 10 {
