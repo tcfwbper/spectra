@@ -4,8 +4,8 @@ import (
 	"testing"
 
 	"github.com/google/uuid"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
+	_ "github.com/stretchr/testify/assert"
+	_ "github.com/stretchr/testify/require"
 )
 
 // TestEvent_SimultaneousEmission verifies multiple events emitted simultaneously are serialized
@@ -16,6 +16,7 @@ func TestEvent_SimultaneousEmission(t *testing.T) {
 
 	// Setup: Session with Status="running"
 	sessionID := uuid.New()
+	_ = sessionID
 
 	// Two Event instances emitted at same time for same session
 

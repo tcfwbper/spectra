@@ -409,6 +409,7 @@ func TestRuntimeError_SessionIssuer(t *testing.T) {
 func TestRuntimeError_PersistenceSuccess(t *testing.T) {
 	// Setup: Temporary test directory created
 	tmpDir := t.TempDir()
+	_ = tmpDir
 
 	// Session files placed within tmpDir
 	// SessionMetadataStore operational
@@ -435,6 +436,7 @@ func TestRuntimeError_PersistenceSuccess(t *testing.T) {
 func TestRuntimeError_PersistenceFailureLogged(t *testing.T) {
 	// Setup: Temporary test directory created
 	tmpDir := t.TempDir()
+	_ = tmpDir
 
 	// Mock SessionMetadataStore configured to return write error simulating disk full
 	sessionID := uuid.New()
@@ -460,9 +462,11 @@ func TestRuntimeError_PersistenceFailureLogged(t *testing.T) {
 func TestRuntimeError_SessionDeletion(t *testing.T) {
 	// Setup: Temporary test directory created
 	tmpDir := t.TempDir()
+	_ = tmpDir
 
 	// Session exists with recorded RuntimeError in tmpDir
 	sessionID := uuid.New()
+	_ = sessionID
 
 	// Delete session
 
@@ -513,6 +517,7 @@ func TestRuntimeError_CurrentStateUnchanged(t *testing.T) {
 func TestRuntimeError_StatusPermanentlyFailed(t *testing.T) {
 	// Setup: Session transitioned to Status="failed" by RuntimeError
 	sessionID := uuid.New()
+	_ = sessionID
 
 	// Attempt any status transition
 
@@ -524,6 +529,7 @@ func TestRuntimeError_StatusPermanentlyFailed(t *testing.T) {
 func TestRuntimeError_NoAutomaticRetry(t *testing.T) {
 	// Setup: Session with Status="failed" due to RuntimeError
 	sessionID := uuid.New()
+	_ = sessionID
 
 	// Mock clock advanced by 5 seconds
 
@@ -612,6 +618,7 @@ func TestRuntimeError_SensitiveDataPersisted(t *testing.T) {
 func TestRuntimeError_PanicInMessageRouter(t *testing.T) {
 	// Setup: Mock MessageRouter configured to panic with "index out of bounds" during message processing
 	sessionID := uuid.New()
+	_ = sessionID
 
 	// Trigger message processing that causes panic
 
@@ -624,6 +631,7 @@ func TestRuntimeError_PanicInMessageRouter(t *testing.T) {
 func TestRuntimeError_PanicStackTraceInDetail(t *testing.T) {
 	// Setup: Mock component configured to panic during processing
 	sessionID := uuid.New()
+	_ = sessionID
 
 	// Trigger panic condition
 
@@ -635,9 +643,11 @@ func TestRuntimeError_PanicStackTraceInDetail(t *testing.T) {
 func TestRuntimeError_SocketCreationFailure(t *testing.T) {
 	// Setup: Temporary test directory created
 	tmpDir := t.TempDir()
+	_ = tmpDir
 
 	// Socket file created programmatically at target path within tmpDir before session initialization
 	sessionID := uuid.New()
+	_ = sessionID
 
 	// Initialize session
 
@@ -650,9 +660,11 @@ func TestRuntimeError_SocketCreationFailure(t *testing.T) {
 func TestRuntimeError_SocketPermissionDenied(t *testing.T) {
 	// Setup: Temporary test directory created
 	tmpDir := t.TempDir()
+	_ = tmpDir
 
 	// Target socket directory created within tmpDir with permissions set to read-only (0444)
 	sessionID := uuid.New()
+	_ = sessionID
 
 	// Initialize session
 
@@ -665,6 +677,7 @@ func TestRuntimeError_SocketPermissionDenied(t *testing.T) {
 func TestRuntimeError_UnderlyingErrorWrapped(t *testing.T) {
 	// Setup: Mock system operation configured to return specific errno (e.g., ENOENT)
 	sessionID := uuid.New()
+	_ = sessionID
 
 	// Trigger failing operation
 
@@ -766,6 +779,7 @@ func TestRuntimeError_DeepNestedDetail(t *testing.T) {
 func TestRuntimeError_ErrorLogWritten(t *testing.T) {
 	// Setup: Temporary test directory created
 	tmpDir := t.TempDir()
+	_ = tmpDir
 
 	// Session files placed within tmpDir
 	sessionID := uuid.New()

@@ -4,18 +4,20 @@ import (
 	"testing"
 
 	"github.com/google/uuid"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
+	_ "github.com/stretchr/testify/assert"
+	_ "github.com/stretchr/testify/require"
 )
 
 // TestAgentError_CLIInvocation verifies agent raises error via spectra-agent CLI
 func TestAgentError_CLIInvocation(t *testing.T) {
 	// Setup: Temporary test directory created
 	tmpDir := t.TempDir()
+	_ = tmpDir
 
 	// Runtime running with session files in tmpDir
 	// Session active with socket in tmpDir
 	sessionID := uuid.New()
+	_ = sessionID
 
 	// Execute: spectra-agent error "task failed" --session-id <uuid> --detail '{"code": 500}'
 
@@ -29,6 +31,7 @@ func TestAgentError_CLIInvocation(t *testing.T) {
 func TestAgentError_CLIMissingSessionID(t *testing.T) {
 	// Setup: Temporary test directory created
 	tmpDir := t.TempDir()
+	_ = tmpDir
 
 	// Runtime running
 

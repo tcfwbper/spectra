@@ -4,8 +4,8 @@ import (
 	"testing"
 
 	"github.com/google/uuid"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
+	_ "github.com/stretchr/testify/assert"
+	_ "github.com/stretchr/testify/require"
 )
 
 // TestAgentError_MultipleErrorsSerialized verifies multiple simultaneous errors are serialized; first error wins
@@ -16,6 +16,7 @@ func TestAgentError_MultipleErrorsSerialized(t *testing.T) {
 
 	// Setup: Session with Status="running"
 	sessionID := uuid.New()
+	_ = sessionID
 
 	// Two AgentError instances raised simultaneously for same session
 

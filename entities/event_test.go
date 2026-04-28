@@ -49,6 +49,7 @@ func TestEvent_EmptyMessage(t *testing.T) {
 		payloadJSON,
 		sessionID,
 	)
+	_ = evt
 
 	require.NoError(t, err)
 	// assert.Equal(t, "", evt.Message)
@@ -66,6 +67,7 @@ func TestEvent_EmptyPayload(t *testing.T) {
 		nil, // Payload omitted
 		sessionID,
 	)
+	_ = evt
 
 	require.NoError(t, err)
 	// assert.JSONEq(t, `{}`, string(evt.Payload))
@@ -82,6 +84,7 @@ func TestEvent_BothMessageAndPayloadOmitted(t *testing.T) {
 		nil, // Payload omitted
 		sessionID,
 	)
+	_ = evt
 
 	require.NoError(t, err)
 	// assert.Equal(t, "", evt.Message)
@@ -99,6 +102,7 @@ func TestEvent_EmittedBySetToCurrentState(t *testing.T) {
 		nil,
 		sessionID,
 	)
+	_ = evt
 
 	require.NoError(t, err)
 	// assert.Equal(t, "processing", evt.EmittedBy)
@@ -118,6 +122,7 @@ func TestEvent_EmittedByNotProvidedByCaller(t *testing.T) {
 		nil,
 		sessionID,
 	)
+	_ = evt
 
 	require.NoError(t, err)
 	// Verify runtime sets EmittedBy="review" from session's CurrentState
@@ -366,6 +371,7 @@ func TestEvent_FieldsImmutable(t *testing.T) {
 		nil,
 		sessionID,
 	)
+	_ = evt
 	require.NoError(t, err)
 
 	// Attempt to modify Type, Message, Payload, or other fields
@@ -377,6 +383,7 @@ func TestEvent_FieldsImmutable(t *testing.T) {
 func TestEvent_OrderingChronological(t *testing.T) {
 	// Setup: Session with multiple events emitted at different times
 	sessionID := uuid.New()
+	_ = sessionID
 
 	// Query EventHistory
 
@@ -387,6 +394,7 @@ func TestEvent_OrderingChronological(t *testing.T) {
 func TestEvent_OrderingTiebreaker(t *testing.T) {
 	// Setup: Session with two events emitted simultaneously (same EmittedAt)
 	sessionID := uuid.New()
+	_ = sessionID
 
 	// Query EventHistory
 
@@ -397,6 +405,7 @@ func TestEvent_OrderingTiebreaker(t *testing.T) {
 func TestEvent_AppendedToHistory(t *testing.T) {
 	// Setup: Temporary test directory created
 	tmpDir := t.TempDir()
+	_ = tmpDir
 
 	// Session with existing EventHistory of 2 events stored in tmpDir
 	sessionID := uuid.New()
@@ -408,6 +417,7 @@ func TestEvent_AppendedToHistory(t *testing.T) {
 		nil,
 		sessionID,
 	)
+	_ = evt
 	require.NoError(t, err)
 
 	// Verify event appended as 3rd entry in EventHistory
@@ -418,9 +428,11 @@ func TestEvent_AppendedToHistory(t *testing.T) {
 func TestEvent_SessionDeletion(t *testing.T) {
 	// Setup: Temporary test directory created
 	tmpDir := t.TempDir()
+	_ = tmpDir
 
 	// Session exists with EventHistory containing events in tmpDir
 	sessionID := uuid.New()
+	_ = sessionID
 
 	// Delete session
 
@@ -439,6 +451,7 @@ func TestEvent_MessageDeliveredToRecipient(t *testing.T) {
 		nil,
 		sessionID,
 	)
+	_ = evt
 	require.NoError(t, err)
 
 	// Verify message "task done" delivered to orchestrator node
@@ -456,6 +469,7 @@ func TestEvent_MessageQueuedForFutureNode(t *testing.T) {
 		nil,
 		sessionID,
 	)
+	_ = evt
 	require.NoError(t, err)
 
 	// Verify event emitted
@@ -474,6 +488,7 @@ func TestEvent_UndeliveredMessageLogged(t *testing.T) {
 		nil,
 		sessionID,
 	)
+	_ = evt
 	require.NoError(t, err)
 
 	// Verify message marked undelivered in session log
@@ -494,6 +509,7 @@ func TestEvent_LargeMessage(t *testing.T) {
 		nil,
 		sessionID,
 	)
+	_ = evt
 
 	require.NoError(t, err)
 	// Verify message stored correctly
@@ -510,6 +526,7 @@ func TestEvent_UnicodeMessage(t *testing.T) {
 		nil,
 		sessionID,
 	)
+	_ = evt
 
 	require.NoError(t, err)
 	// Verify Unicode preserved correctly
@@ -533,6 +550,7 @@ func TestEvent_LargePayload(t *testing.T) {
 		payloadJSON,
 		sessionID,
 	)
+	_ = evt
 
 	require.NoError(t, err)
 	// Verify Payload stored correctly
@@ -559,6 +577,7 @@ func TestEvent_DeepNestedPayload(t *testing.T) {
 		payloadJSON,
 		sessionID,
 	)
+	_ = evt
 
 	require.NoError(t, err)
 	// Verify nested structure preserved
@@ -568,6 +587,7 @@ func TestEvent_DeepNestedPayload(t *testing.T) {
 func TestEvent_RepeatedQueryIdempotent(t *testing.T) {
 	// Setup: Session with EventHistory of 3 events
 	sessionID := uuid.New()
+	_ = sessionID
 
 	// Query EventHistory multiple times
 
