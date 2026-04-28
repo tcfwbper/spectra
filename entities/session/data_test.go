@@ -15,7 +15,7 @@ import (
 func TestUpdateSessionDataSafe_NewKey(t *testing.T) {
 	session := createTestSession(t, "running", "processing")
 	oldUpdatedAt := session.UpdatedAt
-	time.Sleep(10 * time.Millisecond)
+	time.Sleep(1 * time.Second)
 
 	session.metadataStore.On("Write", mock.Anything).Return(nil)
 
@@ -30,7 +30,7 @@ func TestUpdateSessionDataSafe_OverwriteExisting(t *testing.T) {
 	data := map[string]any{"key1": "old"}
 	session := createTestSessionWithData(t, "running", "processing", data)
 	oldUpdatedAt := session.UpdatedAt
-	time.Sleep(10 * time.Millisecond)
+	time.Sleep(1 * time.Second)
 
 	session.metadataStore.On("Write", mock.Anything).Return(nil)
 
