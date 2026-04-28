@@ -257,8 +257,9 @@ exit_transitions:
 	loader := NewWorkflowDefinitionLoader(tmpDir, mockLoader)
 	def, err := loader.Load("Unreachable")
 
-	require.NoError(t, err)
-	assert.NotNil(t, def)
+	assert.Nil(t, def)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "workflow definition 'Unreachable' validation failed: node 'Isolated' is unreachable (no incoming transitions)")
 }
 
 func TestWorkflowDefinitionLoader_Load_ExitTargetWithOutgoingTransitions(t *testing.T) {
@@ -284,6 +285,9 @@ exit_transitions:
   - from_node: "Start"
     event_type: "Begin"
     to_node: "Middle"
+  - from_node: "Middle"
+    event_type: "Next"
+    to_node: "End"
 `
 	writeWorkflowYAML(t, tmpDir, "ExitWithOut", yamlContent)
 
@@ -1033,10 +1037,13 @@ nodes:
 transitions:
   - from_node: "Start"
     event_type: "Begin"
+    to_node: "Isolated"
+  - from_node: "Start"
+    event_type: "Skip"
     to_node: "End"
 exit_transitions:
   - from_node: "Start"
-    event_type: "Begin"
+    event_type: "Skip"
     to_node: "End"
 `
 	writeWorkflowYAML(t, tmpDir, "Isolated", yamlContent)

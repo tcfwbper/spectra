@@ -60,11 +60,11 @@
 | `TestNode_AddedToWorkflow` | `unit` | Node successfully added to workflow Nodes array. | Temporary test directory created; empty workflow definition in test directory; all file operations occur within test fixtures | Add node with `Name="TestNode"`, `Type="human"` | Node appears in workflow's `Nodes` array; workflow validation succeeds |
 | `TestNode_MultipleNodesInWorkflow` | `unit` | Multiple nodes coexist in workflow. | Temporary test directory created; workflow definition in test directory; all file operations occur within test fixtures | Add nodes: `Name="Agent1"` (agent), `Name="Human1"` (human), `Name="Agent2"` (agent) | All three nodes in workflow's `Nodes` array; all unique |
 
-### Validation Failures — Isolation Warning
+### Validation Failures — Unreachable Node
 
 | Test ID | Category | Description | Setup | Input | Expected |
 |---|---|---|---|---|---|
-| `TestNode_UnreachableNode` | `unit` | Issues warning for node with no incoming or outgoing transitions. | Temporary test directory created; workflow definition in test directory with node "Isolated" having no transitions; all file operations occur within test fixtures | Validate workflow | Returns warning message matching `/unreachable.*node.*Isolated/i`; workflow not rejected |
+| `TestNode_UnreachableNode` | `unit` | Returns error for node with no incoming transitions (unreachable). | Temporary test directory created; workflow definition in test directory with node "Isolated" having no incoming transitions; all file operations occur within test fixtures | Validate workflow | Returns error message matching `/unreachable.*node.*Isolated/i`; workflow rejected |
 
 ### Immutability
 

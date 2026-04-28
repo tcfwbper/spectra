@@ -191,15 +191,20 @@ func (l *WorkflowDefinitionLoader) Load(workflowName string) (*WorkflowDefinitio
 		exitTargets[et.ToNode] = true
 	}
 
+	// Validate that every non-entry node has at least one incoming transition
+	for nodeName := range nodeMap {
+		if nodeName == def.EntryNode {
+			continue
+		}
+		if !nodesWithIncoming[nodeName] {
+			return nil, fmt.Errorf("workflow definition '%s' validation failed: node '%s' is unreachable (no incoming transitions)", workflowName, nodeName)
+		}
+	}
+
 	// Validate that non-exit-target nodes have outgoing transitions
-	// Exception: unreachable nodes (no incoming transitions) are allowed
 	for nodeName := range nodeMap {
 		// Skip if it's an exit target
 		if exitTargets[nodeName] {
-			continue
-		}
-		// Skip if the node is unreachable (no incoming transitions and not the entry node)
-		if !nodesWithIncoming[nodeName] && nodeName != def.EntryNode {
 			continue
 		}
 		// Check if it has outgoing transitions

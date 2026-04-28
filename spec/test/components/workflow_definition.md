@@ -112,11 +112,11 @@
 | `TestWorkflowDefinition_ExitTargetNodeMayLackOutgoing` | `unit` | Node targeted by exit transition is allowed to have no outgoing transitions. | Temporary test directory created; `.spectra/workflows/` directory created in test directory; all file operations occur within test fixtures | `Name="Test"`, `Nodes=[{Name:"Start", Type:"human"}, {Name:"End", Type:"human"}]`, `Transitions=[{FromNode:"Start", EventType:"Go", ToNode:"End"}, {FromNode:"Start", EventType:"Exit", ToNode:"End"}]`, `ExitTransitions=[{FromNode:"Start", EventType:"Exit", ToNode:"End"}]` (End is exit target, has no outgoing) | Workflow validation succeeds; no error |
 | `TestWorkflowDefinition_ExitTargetWithOutgoingWarning` | `unit` | Warning issued when exit target node has outgoing transitions. | Temporary test directory created; workflow with exit transition to "Final"; "Final" has outgoing transition to "Start"; all file operations occur within test fixtures | Validate workflow | Returns warning message matching `/exit target.*Final.*outgoing transitions.*never be used/i`; workflow not rejected |
 
-### Happy Path — Unreachable Node Warning
+### Validation Failures — Unreachable Node
 
 | Test ID | Category | Description | Setup | Input | Expected |
 |---|---|---|---|---|---|
-| `TestWorkflowDefinition_UnreachableNodeWarning` | `unit` | Warning issued for node with no incoming transitions (except entry node). | Temporary test directory created; workflow with node "Isolated" that has no incoming transitions and is not the entry node; all file operations occur within test fixtures | Validate workflow | Returns warning matching `/unreachable.*node.*Isolated/i` or similar; workflow not rejected |
+| `TestWorkflowDefinition_UnreachableNodeRejected` | `unit` | Returns error for node with no incoming transitions (except entry node). | Temporary test directory created; workflow with node "Isolated" that has no incoming transitions and is not the entry node; all file operations occur within test fixtures | Validate workflow | Returns error matching `/unreachable.*node.*Isolated/i`; workflow rejected |
 
 ### Happy Path — YAML Serialization
 
