@@ -10,6 +10,8 @@
 
 **Fixture Isolation**: All tests create Session instances in memory using programmatic construction. No external files or directories are required unless explicitly stated in the Setup column. Mock dependencies (SessionMetadataStore, EventStore, etc.) are created within each test.
 
+**SessionMetadata Embedding**: Session embeds SessionMetadata as an anonymous field. All SessionMetadata fields (ID, WorkflowName, Status, CreatedAt, UpdatedAt, CurrentState, SessionData, Error) are directly accessible on Session instances (e.g., `session.ID`, `session.Status`).
+
 ---
 
 ## `Session`
@@ -18,10 +20,11 @@
 
 | Test ID | Category | Description | Setup | Input | Expected |
 |---|---|---|---|---|---|
-| `TestSession_ValidConstruction` | `unit` | Creates Session with all required fields initialized correctly. | Mock workflow with `EntryNode="start"`, `WorkflowName="TestWorkflow"` | Session constructed via SessionInitializer | Returns valid Session; `ID` is UUID; `Status="initializing"`; `CreatedAt=UpdatedAt` (both POSIX timestamps > 0); `CurrentState="start"`; `EventHistory=[]`; `SessionData={}`; `Error=nil` |
-| `TestSession_TimestampInitialization` | `unit` | CreatedAt and UpdatedAt are set to same timestamp at construction. | Mock workflow | Session constructed | `CreatedAt == UpdatedAt`; both are POSIX timestamps > 0 |
-| `TestSession_EmptyEventHistory` | `unit` | EventHistory initialized as empty slice. | Mock workflow | Session constructed | `EventHistory` is empty slice (length 0); not nil |
-| `TestSession_EmptySessionData` | `unit` | SessionData initialized as empty map. | Mock workflow | Session constructed | `SessionData` is empty map (length 0); not nil |
+| `TestSession_ValidConstruction` | `unit` | Creates Session with all required fields initialized correctly. | Mock workflow with `EntryNode="start"`, `WorkflowName="TestWorkflow"` | Session constructed via SessionInitializer | Returns valid Session; SessionMetadata fields embedded and accessible: `ID` is UUID; `Status="initializing"`; `CreatedAt=UpdatedAt` (both POSIX timestamps > 0); `CurrentState="start"`; `SessionData={}`; `Error=nil`; Runtime-only fields: `EventHistory=[]`; `mu` initialized; `terminationNotifier` provided |
+| `TestSession_TimestampInitialization` | `unit` | CreatedAt and UpdatedAt are set to same timestamp at construction. | Mock workflow | Session constructed | SessionMetadata embedded: `CreatedAt == UpdatedAt`; both are POSIX timestamps > 0 |
+| `TestSession_EmptyEventHistory` | `unit` | EventHistory initialized as empty slice. | Mock workflow | Session constructed | Runtime-only field: `EventHistory` is empty slice (length 0); not nil |
+| `TestSession_EmptySessionData` | `unit` | SessionData initialized as empty map. | Mock workflow | Session constructed | SessionMetadata embedded: `SessionData` is empty map (length 0); not nil |
+| `TestSession_SessionMetadataEmbedded` | `unit` | SessionMetadata fields directly accessible on Session. | Mock workflow | Session constructed with `ID="test-uuid"`, `WorkflowName="TestFlow"` | Can access `session.ID`, `session.WorkflowName`, `session.Status`, etc. directly without `.Metadata` accessor |
 
 ### Happy Path — Field Access via Getters
 
@@ -60,13 +63,12 @@
 | `TestSession_FailOnCompleted` | `unit` | Fail rejects session already completed. | Session with `Status="completed"` | Call `Fail(*RuntimeError, terminationNotifier)` | Returns error matching `/cannot fail.*status is 'completed'/i`; status unchanged; original `Error` remains `nil` |
 | `TestSession_FailOnFailed` | `unit` | Fail rejects session already failed (first error wins). | Session with `Status="failed"`, `Error=*AgentError("first error")` | Call `Fail(*RuntimeError("second error"), terminationNotifier)` | Returns error matching `/session already failed/i`; `Error` remains first error |
 
-### Immutability
+### Read-Only Convention
 
 | Test ID | Category | Description | Setup | Input | Expected |
 |---|---|---|---|---|---|
-| `TestSession_IDImmutableAfterConstruction` | `unit` | ID field cannot be modified after construction. | Session constructed with `ID=<uuid>` | Attempt to access or modify `ID` field directly from outside package | Field is unexported or immutable; original UUID preserved |
-| `TestSession_WorkflowNameImmutableAfterConstruction` | `unit` | WorkflowName field cannot be modified after construction. | Session constructed with `WorkflowName="TestFlow"` | Attempt to access or modify `WorkflowName` field directly from outside package | Field is unexported or immutable; original name preserved |
-| `TestSession_CreatedAtImmutableAfterConstruction` | `unit` | CreatedAt field cannot be modified after construction. | Session constructed with `CreatedAt=<timestamp>` | Attempt to access or modify `CreatedAt` field directly from outside package | Field is unexported or immutable; original timestamp preserved |
+| `TestSession_SessionMetadataFieldsExported` | `unit` | SessionMetadata fields are exported (accessible) but should not be modified directly. | Session constructed with `ID=<uuid>`, `WorkflowName="TestFlow"`, `CreatedAt=<timestamp>` | Access `session.ID`, `session.WorkflowName`, `session.CreatedAt` | All fields accessible; modification not prevented by compiler (read-only by convention only) |
+| `TestSession_MutationThroughMethodsOnly` | `unit` | Session mutations should use provided methods, not direct field assignment. | Session with `Status="initializing"` | Call `session.Run(terminationNotifier)` instead of `session.Status = "running"` | Status updated correctly via method; direct assignment possible but not recommended |
 
 ### Atomic Replacement
 
@@ -102,6 +104,12 @@
 |---|---|---|---|---|---|
 | `TestSession_InMemoryStateAuthoritative` | `unit` | In-memory state updated even when persistence fails. | Mock SessionMetadataStore that returns error on write; session with `Status="initializing"` | Call `Run(terminationNotifier)` | Returns `nil`; in-memory `Status="running"`; persistence failure logged as warning |
 | `TestSession_PersistenceFailureLogged` | `unit` | Persistence failures logged but do not error. | Mock SessionMetadataStore that fails; session with `Status="running"`; mock logger | Call `UpdateSessionDataSafe("key", "value")` | Returns `nil`; warning logged matching `/persistence failed/i`; in-memory state updated |
+
+### Happy Path — SessionMetadata Persistence Integration
+
+| Test ID | Category | Description | Setup | Input | Expected |
+|---|---|---|---|---|---|
+| `TestSession_SessionMetadataExtraction` | `unit` | SessionMetadata can be extracted from Session for persistence. | Session with populated fields | Access embedded SessionMetadata fields directly or copy struct | SessionMetadata fields (ID, WorkflowName, Status, CreatedAt, UpdatedAt, CurrentState, SessionData, Error) accessible; runtime-only fields (EventHistory, mu, terminationNotifier) not included in SessionMetadata |
 
 ### Edge Cases
 

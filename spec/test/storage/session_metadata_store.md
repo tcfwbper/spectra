@@ -41,8 +41,8 @@
 
 | Test ID | Category | Description | Setup | Input | Expected |
 |---|---|---|---|---|---|
-| `TestSessionMetadataStore_EventHistoryNotSerialized` | `unit` | EventHistory field excluded from JSON output. | Temporary test directory created programmatically within test fixture; session directory created inside test fixture | SessionMetadata with EventHistory containing 3 events | Returns nil; file does not contain "eventHistory" field; only metadata fields present |
-| `TestSessionMetadataStore_EventHistoryIgnoredOnWrite` | `unit` | EventHistory in input is ignored. | Temporary test directory created programmatically within test fixture; session directory created inside test fixture | SessionMetadata with populated EventHistory | EventHistory not serialized; all other fields written correctly |
+| `TestSessionMetadataStore_EventHistoryNotSerialized` | `unit` | EventHistory field excluded from JSON output (not part of SessionMetadata struct). | Temporary test directory created programmatically within test fixture; session directory created inside test fixture | SessionMetadata struct (does not include EventHistory field) | Returns nil; file does not contain "eventHistory" field; only SessionMetadata fields present |
+| `TestSessionMetadataStore_EventHistoryFieldIgnored` | `unit` | Pre-existing eventHistory field in JSON ignored on read. | Temporary test directory created programmatically within test fixture; session directory and `session.json` manually created with "eventHistory" array inside test fixture | | Returns SessionMetadata; EventHistory not populated (field does not exist in SessionMetadata struct); other fields read correctly |
 
 ### Happy Path — Error Field Omitempty
 
@@ -66,12 +66,11 @@
 | `TestSessionMetadataStore_ReadComplexSessionData` | `unit` | Reads metadata with complex nested SessionData. | Temporary test directory created programmatically within test fixture; session directory and `session.json` with nested SessionData (arrays, objects) created inside test fixture | | Returns SessionMetadata; SessionData structure preserved; all nested fields correct |
 | `TestSessionMetadataStore_ReadErrorFieldPresent` | `unit` | Reads metadata with Error field set. | Temporary test directory created programmatically within test fixture; session directory and `session.json` with Error field created inside test fixture | | Returns SessionMetadata; Error field populated with correct AgentError structure |
 
-### Happy Path — Read (EventHistory Empty)
+### Happy Path — Read (SessionMetadata Structure)
 
 | Test ID | Category | Description | Setup | Input | Expected |
 |---|---|---|---|---|---|
-| `TestSessionMetadataStore_ReadEventHistoryEmpty` | `unit` | EventHistory always empty after read. | Temporary test directory created programmatically within test fixture; session directory and `session.json` with metadata created inside test fixture | | Returns SessionMetadata; EventHistory is nil or empty slice |
-| `TestSessionMetadataStore_ReadIgnoresEventHistoryField` | `unit` | Ignores eventHistory field if present in file. | Temporary test directory created programmatically within test fixture; session directory and `session.json` manually edited to include "eventHistory" array created inside test fixture | | Returns SessionMetadata; EventHistory is nil/empty; field not populated from file |
+| `TestSessionMetadata Store_ReadOnlySessionMetadataFields` | `unit` | Read returns SessionMetadata struct with all persistable fields. | Temporary test directory created programmatically within test fixture; session directory and `session.json` with complete metadata created inside test fixture | | Returns SessionMetadata with ID, WorkflowName, Status, CreatedAt, UpdatedAt, CurrentState, SessionData, Error populated correctly |
 
 ### Happy Path — File Locking (Write)
 
