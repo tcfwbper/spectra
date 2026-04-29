@@ -13,7 +13,8 @@ func TestTransition_ListTransitionsInWorkflow(t *testing.T) {
 
 	// Input: Execute `spectra workflow transitions list --workflow <workflow-id>`
 	// Expected: Command succeeds; output lists all 3 transitions with from_node, event_type, to_node
-	// TODO: Implement e2e test
+	t.Skip("Requires CLI or runtime infrastructure")
+// TODO: Implement e2e test
 }
 
 // TestTransition_ValidateWorkflowWithTransitions verifies CLI validates workflow containing transitions
@@ -25,5 +26,6 @@ func TestTransition_ValidateWorkflowWithTransitions(t *testing.T) {
 
 	// Input: Execute `spectra workflow validate --workflow <workflow-id>`
 	// Expected: Command succeeds; no errors reported
-	// TODO: Implement e2e test
+	t.Skip("Requires CLI or runtime infrastructure")
+// TODO: Implement e2e test
 }

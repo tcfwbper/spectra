@@ -13,7 +13,7 @@ func TestNode_ListNodesInWorkflow(t *testing.T) {
 
 	// Input: Execute `spectra workflow nodes list --workflow <workflow-id>`
 	// Expected: Command succeeds; output lists all 3 nodes with names and types
-	// TODO: Implement e2e test
+	t.Skip("Requires CLI infrastructure")
 }
 
 // TestNode_ValidateWorkflowWithNodes verifies CLI validates workflow containing nodes
@@ -25,5 +25,5 @@ func TestNode_ValidateWorkflowWithNodes(t *testing.T) {
 
 	// Input: Execute `spectra workflow validate --workflow <workflow-id>`
 	// Expected: Command succeeds; no errors reported
-	// TODO: Implement e2e test
+	t.Skip("Requires CLI infrastructure")
 }
