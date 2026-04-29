@@ -61,3 +61,8 @@ func NewAgentError(
 		OccurredAt:   occurredAt,
 	}, nil
 }
+
+// Error implements the error interface for AgentError.
+func (e *AgentError) Error() string {
+	return e.Message
+}

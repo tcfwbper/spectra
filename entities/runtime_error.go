@@ -71,3 +71,8 @@ func NewRuntimeError(
 		OccurredAt:   occurredAt,
 	}, nil
 }
+
+// Error implements the error interface for RuntimeError.
+func (e *RuntimeError) Error() string {
+	return e.Message
+}
