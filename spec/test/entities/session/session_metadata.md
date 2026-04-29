@@ -1,10 +1,10 @@
 # Test Specification: `session_metadata.go`
 
 ## Source File Under Test
-`entities/session_metadata.go`
+`entities/session/session_metadata.go`
 
 ## Test File
-`entities/session_metadata_test.go`
+`entities/session/session_metadata_test.go`
 
 ---
 
