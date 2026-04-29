@@ -720,7 +720,7 @@ func TestInitialize_SessionDirectoryAlreadyExists(t *testing.T) {
 	_, err = si.Initialize("TestWorkflow", terminationNotifier)
 
 	require.Error(t, err)
-	assert.Regexp(t, `(?i)failed to create session directory:.*session directory already exists.*UUID collision or previous session was not cleaned up`, err.Error())
+	assert.Regexp(t, `(?i)failed to create session directory:.*session directory already exists.*UUID collision or a previous session was not cleaned up`, err.Error())
 }
 
 func TestInitialize_SessionDirectoryPermissionDenied(t *testing.T) {
