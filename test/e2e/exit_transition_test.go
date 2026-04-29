@@ -13,7 +13,8 @@ func TestExitTransition_ListExitTransitionsInWorkflow(t *testing.T) {
 
 	// Input: Execute `spectra workflow exit-transitions list --workflow <workflow-id>`
 	// Expected: Command succeeds; output lists both ExitTransitions with from_node, event_type, to_node
-	// TODO: Implement e2e test
+	t.Skip("Requires CLI or runtime infrastructure")
+// TODO: Implement e2e test
 }
 
 // TestExitTransition_ValidateWorkflowWithExitTransitions verifies CLI validates workflow containing exit transitions
@@ -25,7 +26,8 @@ func TestExitTransition_ValidateWorkflowWithExitTransitions(t *testing.T) {
 
 	// Input: Execute `spectra workflow validate --workflow <workflow-id>`
 	// Expected: Command succeeds; no errors reported
-	// TODO: Implement e2e test
+	t.Skip("Requires CLI or runtime infrastructure")
+// TODO: Implement e2e test
 }
 
 // TestExitTransition_WorkflowCompletesViaExit verifies end-to-end workflow completes via ExitTransition
@@ -37,5 +39,6 @@ func TestExitTransition_WorkflowCompletesViaExit(t *testing.T) {
 
 	// Input: Execute workflow until ExitTransition event emitted
 	// Expected: Workflow completes; session status shows "completed"; final state at exit target node
-	// TODO: Implement e2e test
+	t.Skip("Requires CLI or runtime infrastructure")
+// TODO: Implement e2e test
 }

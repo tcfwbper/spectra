@@ -12,7 +12,8 @@ func TestExitTransition_SimultaneousExitAndNormalEvent(t *testing.T) {
 	// Input: Emit "Exit" and "Continue" simultaneously
 	// Expected: First event processed; if "Exit" first, session completes; if "Continue" first, session transitions
 	//           and "Exit" fails (not at "Hub"); events serialized by session lock
-	// TODO: Implement race condition test
+	t.Skip("Requires CLI or runtime infrastructure")
+// TODO: Implement race condition test
 }
 
 // TestExitTransition_MultipleSimultaneousExitEvents verifies multiple exit events for different ExitTransitions emitted simultaneously are serialized
@@ -23,5 +24,6 @@ func TestExitTransition_MultipleSimultaneousExitEvents(t *testing.T) {
 	// Input: Emit "Exit1" and "Exit2" simultaneously
 	// Expected: First event processed completes session; second event fails (session already completed);
 	//           only one ExitTransition triggers; events serialized by session lock
-	// TODO: Implement race condition test
+	t.Skip("Requires CLI or runtime infrastructure")
+// TODO: Implement race condition test
 }
