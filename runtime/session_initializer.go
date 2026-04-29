@@ -33,6 +33,7 @@ type SessionForInitializer interface {
 	GetUpdatedAt() int64
 	GetEventHistory() []session.Event
 	GetSessionData() map[string]any
+	GetErrorSafe() error
 }
 
 // SessionInitializer orchestrates the complete initialization flow for creating a new session.
@@ -397,4 +398,10 @@ func (sw *sessionWrapper) GetSessionData() map[string]any {
 		result[k] = v
 	}
 	return result
+}
+
+func (sw *sessionWrapper) GetErrorSafe() error {
+	sw.mu.RLock()
+	defer sw.mu.RUnlock()
+	return sw.Session.Error
 }

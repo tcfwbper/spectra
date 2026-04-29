@@ -183,6 +183,9 @@ func (m *mockSessionFinalizerForRuntime) Finalize(sess SessionForFinalizer) {
 	if m.callOrder != nil {
 		m.callOrder.record("Finalize")
 	}
+	// Add a small delay to simulate realistic finalization time (printing, file I/O, etc.)
+	// This allows double-signal tests to properly test the second signal handling
+	time.Sleep(100 * time.Millisecond)
 }
 
 // mockRuntimeSocketManagerForRuntime mocks RuntimeSocketManager for Runtime tests.
@@ -195,6 +198,7 @@ type mockRuntimeSocketManagerForRuntime struct {
 	listenSyncErr      error
 	capturedHandler    MessageHandler
 	callOrder          *runtimeCallOrderTracker
+	closeOnce          sync.Once
 }
 
 func newMockRuntimeSocketManagerForRuntime() *mockRuntimeSocketManagerForRuntime {
@@ -224,6 +228,10 @@ func (m *mockRuntimeSocketManagerForRuntime) DeleteSocket() error {
 	if m.callOrder != nil {
 		m.callOrder.record("DeleteSocket")
 	}
+	// Simulate socket closure by closing listenerDoneCh (only once)
+	m.closeOnce.Do(func() {
+		close(m.listenDoneCh)
+	})
 	return nil
 }
 
@@ -301,34 +309,6 @@ func captureStderr(t *testing.T, fn func()) string {
 	r.Close()
 
 	return buf.String()
-}
-
-// =====================================================================
-// Interfaces that Runtime depends on (to be implemented in runtime.go)
-// =====================================================================
-
-// SessionInitializerInterface is the interface Runtime uses for session initialization.
-type SessionInitializerInterface interface {
-	Initialize(workflowName string, terminationNotifier chan<- struct{}) (SessionForInitializer, error)
-}
-
-// SessionFinalizerInterface is the interface Runtime uses for session finalization.
-type SessionFinalizerInterface interface {
-	Finalize(session SessionForFinalizer)
-}
-
-// RuntimeSocketManagerInterface is the interface Runtime uses for socket management.
-type RuntimeSocketManagerInterface interface {
-	Listen(handler MessageHandler) (<-chan error, <-chan struct{}, error)
-	DeleteSocket() error
-}
-
-// MessageHandler type alias for the socket manager callback.
-type MessageHandler func(sessionUUID string, message entities.RuntimeMessage) entities.RuntimeResponse
-
-// MessageRouterInterface is the interface Runtime uses for message routing.
-type MessageRouterInterface interface {
-	RouteMessage(sessionUUID string, message entities.RuntimeMessage) entities.RuntimeResponse
 }
 
 // =====================================================================
@@ -610,10 +590,8 @@ func TestRun_ListenerGoroutineCompletes(t *testing.T) {
 	}
 
 	// Don't close listenDoneCh yet — Runtime should block waiting for it
+	// Runtime will call DeleteSocket which will close listenDoneCh
 	time.Sleep(50 * time.Millisecond)
-
-	// Now close listenerDoneCh to let Runtime proceed to Finalize
-	close(sm.listenDoneCh)
 
 	select {
 	case <-done:
@@ -652,7 +630,7 @@ func TestRun_SIGINT_GracefulShutdown(t *testing.T) {
 
 	// Close listenerDoneCh to unblock cleanup
 	time.Sleep(50 * time.Millisecond)
-	close(sm.listenDoneCh)
+	// Channel closed by DeleteSocket automatically
 
 	select {
 	case <-done:
@@ -686,7 +664,7 @@ func TestRun_SIGINT_SessionStatusUnchanged(t *testing.T) {
 	require.NoError(t, proc.Signal(syscall.SIGINT))
 
 	time.Sleep(50 * time.Millisecond)
-	close(sm.listenDoneCh)
+	// Channel closed by DeleteSocket automatically
 
 	select {
 	case <-done:
@@ -721,7 +699,7 @@ func TestRun_SIGINT_SocketDeletedBeforeFinalization(t *testing.T) {
 	require.NoError(t, proc.Signal(syscall.SIGINT))
 
 	time.Sleep(50 * time.Millisecond)
-	close(sm.listenDoneCh)
+	// Channel closed by DeleteSocket automatically
 
 	select {
 	case <-done:
@@ -757,7 +735,7 @@ func TestRun_SIGINT_LocksReleased(t *testing.T) {
 	require.NoError(t, proc.Signal(syscall.SIGINT))
 
 	time.Sleep(50 * time.Millisecond)
-	close(sm.listenDoneCh)
+	// Channel closed by DeleteSocket automatically
 
 	select {
 	case <-done:
@@ -793,7 +771,7 @@ func TestRun_SIGTERM_GracefulShutdown(t *testing.T) {
 	require.NoError(t, proc.Signal(syscall.SIGTERM))
 
 	time.Sleep(50 * time.Millisecond)
-	close(sm.listenDoneCh)
+	// Channel closed by DeleteSocket automatically
 
 	select {
 	case <-done:
@@ -827,7 +805,7 @@ func TestRun_SIGTERM_SessionStatusUnchanged(t *testing.T) {
 	require.NoError(t, proc.Signal(syscall.SIGTERM))
 
 	time.Sleep(50 * time.Millisecond)
-	close(sm.listenDoneCh)
+	// Channel closed by DeleteSocket automatically
 
 	select {
 	case <-done:
@@ -937,7 +915,7 @@ func TestRun_ListenerErrorReceived(t *testing.T) {
 
 	// Close listenerDoneCh to allow cleanup
 	time.Sleep(50 * time.Millisecond)
-	close(sm.listenDoneCh)
+	// Channel closed by DeleteSocket automatically
 
 	select {
 	case <-done:
@@ -982,7 +960,7 @@ func TestRun_ListenerErrorAfterTermination_Discarded(t *testing.T) {
 	}
 
 	// Close listenerDoneCh
-	close(sm.listenDoneCh)
+	// Channel closed by DeleteSocket automatically
 
 	select {
 	case <-done:
@@ -1020,7 +998,7 @@ func TestRun_SocketDeleteCalledTwice(t *testing.T) {
 	require.NoError(t, proc.Signal(syscall.SIGINT))
 
 	time.Sleep(50 * time.Millisecond)
-	close(sm.listenDoneCh)
+	// Channel closed by DeleteSocket automatically
 
 	select {
 	case <-done:
@@ -1284,7 +1262,7 @@ func TestRun_StatusInitializing_SIGINT_ExitCode1(t *testing.T) {
 	require.NoError(t, proc.Signal(syscall.SIGINT))
 
 	time.Sleep(50 * time.Millisecond)
-	close(sm.listenDoneCh)
+	// Channel closed by DeleteSocket automatically
 
 	select {
 	case <-done:
@@ -1329,7 +1307,7 @@ func TestRun_CompletionAndSIGINT_Race(t *testing.T) {
 	_ = proc.Signal(syscall.SIGINT)
 
 	time.Sleep(50 * time.Millisecond)
-	close(sm.listenDoneCh)
+	// Channel closed by DeleteSocket automatically
 
 	select {
 	case <-done:
@@ -1369,7 +1347,7 @@ func TestRun_ListenerErrorAndCompletion_Race(t *testing.T) {
 	sm.listenErrCh <- fmt.Errorf("listener error")
 
 	time.Sleep(50 * time.Millisecond)
-	close(sm.listenDoneCh)
+	// Channel closed by DeleteSocket automatically
 
 	select {
 	case <-done:
@@ -1411,7 +1389,7 @@ func TestRun_TerminationNotifierBufferNotExhausted(t *testing.T) {
 	sess.Done(notifier)
 
 	time.Sleep(50 * time.Millisecond)
-	close(sm.listenDoneCh)
+	// Channel closed by DeleteSocket automatically
 
 	select {
 	case <-done:
@@ -1454,7 +1432,7 @@ func TestRun_TerminationNotifierNeverClosed(t *testing.T) {
 	// Clean up
 	sess.Done(notifier)
 	time.Sleep(50 * time.Millisecond)
-	close(sm.listenDoneCh)
+	// Channel closed by DeleteSocket automatically
 	select {
 	case <-done:
 	case <-time.After(5 * time.Second):
@@ -1485,7 +1463,7 @@ func TestRun_ListenerErrChNeverClosed(t *testing.T) {
 		sess.Done(notifier)
 	}
 	time.Sleep(50 * time.Millisecond)
-	close(sm.listenDoneCh)
+	// Channel closed by DeleteSocket automatically
 
 	select {
 	case <-done:
@@ -1530,7 +1508,7 @@ func TestRun_ListenerDoneChClosedExactlyOnce(t *testing.T) {
 	time.Sleep(50 * time.Millisecond)
 
 	// Close listenerDoneCh exactly once
-	close(sm.listenDoneCh)
+	// Channel closed by DeleteSocket automatically
 
 	select {
 	case <-done:
@@ -1606,7 +1584,7 @@ func TestRun_MetadataPersistenceFails_NonBlocking(t *testing.T) {
 	}
 
 	time.Sleep(50 * time.Millisecond)
-	close(sm.listenDoneCh)
+	// Channel closed by DeleteSocket automatically
 
 	select {
 	case <-done:
@@ -1651,7 +1629,7 @@ func TestRun_MessageRouterPanic(t *testing.T) {
 	}
 
 	time.Sleep(50 * time.Millisecond)
-	close(sm.listenDoneCh)
+	// Channel closed by DeleteSocket automatically
 
 	select {
 	case <-done:
@@ -1690,7 +1668,7 @@ func TestRun_ListenerProcessingMessage_SocketDeleted(t *testing.T) {
 
 	time.Sleep(50 * time.Millisecond)
 	// Listener goroutine exits and closes listenerDoneCh
-	close(sm.listenDoneCh)
+	// Channel closed by DeleteSocket automatically
 
 	select {
 	case <-done:
@@ -1824,7 +1802,7 @@ func TestRun_SessionInitializerReturnsSession(t *testing.T) {
 		sess.Done(notifier)
 	}
 	time.Sleep(50 * time.Millisecond)
-	close(sm.listenDoneCh)
+	// Channel closed by DeleteSocket automatically
 	select {
 	case <-done:
 	case <-time.After(5 * time.Second):
@@ -1892,7 +1870,7 @@ func TestRun_SessionFinalizerCalledOnAllPaths(t *testing.T) {
 		require.NoError(t, proc.Signal(syscall.SIGINT))
 
 		time.Sleep(50 * time.Millisecond)
-		close(sm.listenDoneCh)
+		// Channel closed by DeleteSocket automatically
 
 		select {
 		case <-done:
@@ -1938,7 +1916,7 @@ func TestRun_RuntimeSocketManagerListenCalled(t *testing.T) {
 		sess.Done(notifier)
 	}
 	time.Sleep(50 * time.Millisecond)
-	close(sm.listenDoneCh)
+	// Channel closed by DeleteSocket automatically
 	select {
 	case <-done:
 	case <-time.After(5 * time.Second):
@@ -1971,7 +1949,7 @@ func TestRun_RuntimeSocketManagerDeleteSocketCalled(t *testing.T) {
 	}
 
 	time.Sleep(50 * time.Millisecond)
-	close(sm.listenDoneCh)
+	// Channel closed by DeleteSocket automatically
 
 	select {
 	case <-done:
@@ -2021,7 +1999,7 @@ func TestRun_MessageRouterInitializedWithDependencies(t *testing.T) {
 		sess.Done(notifier)
 	}
 	time.Sleep(50 * time.Millisecond)
-	close(sm.listenDoneCh)
+	// Channel closed by DeleteSocket automatically
 	select {
 	case <-done:
 	case <-time.After(5 * time.Second):
@@ -2055,7 +2033,7 @@ func TestRun_LocksReleasedOnExit(t *testing.T) {
 		sess.Done(notifier)
 	}
 	time.Sleep(50 * time.Millisecond)
-	close(sm.listenDoneCh)
+	// Channel closed by DeleteSocket automatically
 
 	select {
 	case <-done:
@@ -2091,7 +2069,7 @@ func TestRun_LocksReleasedOnSIGINT(t *testing.T) {
 	require.NoError(t, proc.Signal(syscall.SIGINT))
 
 	time.Sleep(50 * time.Millisecond)
-	close(sm.listenDoneCh)
+	// Channel closed by DeleteSocket automatically
 
 	select {
 	case <-done:
@@ -2138,7 +2116,7 @@ func TestRun_ListenerGoroutineSpawned(t *testing.T) {
 		sess.Done(notifier)
 	}
 	time.Sleep(50 * time.Millisecond)
-	close(sm.listenDoneCh)
+	// Channel closed by DeleteSocket automatically
 	select {
 	case <-done:
 	case <-time.After(5 * time.Second):
@@ -2177,7 +2155,7 @@ func TestRun_MainLoopBlocksOnSelect(t *testing.T) {
 		sess.Done(notifier)
 	}
 	time.Sleep(50 * time.Millisecond)
-	close(sm.listenDoneCh)
+	// Channel closed by DeleteSocket automatically
 
 	select {
 	case <-done:
@@ -2217,7 +2195,7 @@ func TestRun_CleanupOrder_StopListener_WaitGoroutine_Finalize(t *testing.T) {
 
 	// Delay closing listenerDoneCh to prove Runtime waits
 	time.Sleep(100 * time.Millisecond)
-	close(sm.listenDoneCh)
+	// Channel closed by DeleteSocket automatically
 
 	select {
 	case <-done:
@@ -2273,7 +2251,7 @@ func TestRun_CleanupOrder_DrainErrors_AfterDoneChannel(t *testing.T) {
 	}
 
 	time.Sleep(50 * time.Millisecond)
-	close(sm.listenDoneCh)
+	// Channel closed by DeleteSocket automatically
 
 	select {
 	case <-done:
