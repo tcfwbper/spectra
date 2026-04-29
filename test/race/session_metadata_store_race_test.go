@@ -11,7 +11,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/tcfwbper/spectra/entities"
+	"github.com/tcfwbper/spectra/entities/session"
 	"github.com/tcfwbper/spectra/storage"
 )
 
@@ -32,8 +32,8 @@ func TestSessionMetadataStore_ConcurrentWriteSameFile(t *testing.T) {
 	for i := 0; i < numGoroutines; i++ {
 		go func(index int) {
 			defer wg.Done()
-			metadata := &entities.SessionMetadata{
-				ID:           sessionUUID,
+			metadata := &session.SessionMetadata{
+				ID:           sessionUUID.String(),
 				WorkflowName: "TestWorkflow",
 				Status:       "running",
 				CreatedAt:    time.Now().Unix(),
@@ -85,8 +85,8 @@ func TestSessionMetadataStore_ConcurrentWriteSerializes(t *testing.T) {
 	for i := 0; i < numGoroutines; i++ {
 		go func(index int) {
 			defer wg.Done()
-			metadata := &entities.SessionMetadata{
-				ID:           sessionUUID,
+			metadata := &session.SessionMetadata{
+				ID:           sessionUUID.String(),
 				WorkflowName: "TestWorkflow",
 				Status:       statuses[index],
 				CreatedAt:    time.Now().Unix(),
@@ -125,8 +125,8 @@ func TestSessionMetadataStore_ReadBlocksDuringWrite(t *testing.T) {
 	store := storage.NewSessionMetadataStore(tmpDir, sessionUUID)
 
 	// Initial write
-	initialMetadata := &entities.SessionMetadata{
-		ID:           sessionUUID,
+	initialMetadata := &session.SessionMetadata{
+		ID:           sessionUUID.String(),
 		WorkflowName: "TestWorkflow",
 		Status:       "initial",
 		CreatedAt:    time.Now().Unix(),
@@ -151,8 +151,8 @@ func TestSessionMetadataStore_ReadBlocksDuringWrite(t *testing.T) {
 	// Goroutine 1: Write with updated metadata
 	go func() {
 		defer wg.Done()
-		metadata := &entities.SessionMetadata{
-			ID:           sessionUUID,
+		metadata := &session.SessionMetadata{
+			ID:           sessionUUID.String(),
 			WorkflowName: "TestWorkflow",
 			Status:       "updated",
 			CreatedAt:    time.Now().Unix(),
@@ -199,8 +199,8 @@ func TestSessionMetadataStore_WriteBlocksDuringRead(t *testing.T) {
 	store := storage.NewSessionMetadataStore(tmpDir, sessionUUID)
 
 	// Initial write
-	initialMetadata := &entities.SessionMetadata{
-		ID:           sessionUUID,
+	initialMetadata := &session.SessionMetadata{
+		ID:           sessionUUID.String(),
 		WorkflowName: "TestWorkflow",
 		Status:       "initial",
 		CreatedAt:    time.Now().Unix(),
@@ -236,8 +236,8 @@ func TestSessionMetadataStore_WriteBlocksDuringRead(t *testing.T) {
 	// Goroutine 2: Write concurrently
 	go func() {
 		defer wg.Done()
-		metadata := &entities.SessionMetadata{
-			ID:           sessionUUID,
+		metadata := &session.SessionMetadata{
+			ID:           sessionUUID.String(),
 			WorkflowName: "TestWorkflow",
 			Status:       "updated",
 			CreatedAt:    time.Now().Unix(),
@@ -281,8 +281,8 @@ func TestSessionMetadataStore_ConcurrentSameProcess(t *testing.T) {
 	for i := 0; i < numGoroutines; i++ {
 		go func(index int) {
 			defer wg.Done()
-			metadata := &entities.SessionMetadata{
-				ID:           sessionUUID,
+			metadata := &session.SessionMetadata{
+				ID:           sessionUUID.String(),
 				WorkflowName: "TestWorkflow",
 				Status:       "running",
 				CreatedAt:    time.Now().Unix(),

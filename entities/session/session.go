@@ -19,18 +19,6 @@ type Logger interface {
 	Warning(msg string)
 }
 
-// SessionMetadata represents the persistable state of a session.
-type SessionMetadata struct {
-	ID           string         `json:"id"`
-	WorkflowName string         `json:"workflow_name"`
-	Status       string         `json:"status"`
-	CreatedAt    int64          `json:"created_at"`
-	UpdatedAt    int64          `json:"updated_at"`
-	CurrentState string         `json:"current_state"`
-	SessionData  map[string]any `json:"session_data"`
-	Error        error          `json:"error,omitempty"`
-}
-
 // Session represents a single execution instance of a workflow.
 // It embeds SessionMetadata and adds runtime-only fields.
 type Session struct {

@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/tcfwbper/spectra/entities"
+	"github.com/tcfwbper/spectra/entities/session"
 )
 
 // SessionMetadataStore manages persistent storage of SessionMetadata for a single session.
@@ -30,7 +30,7 @@ func NewSessionMetadataStore(projectRoot string, sessionUUID uuid.UUID) *Session
 }
 
 // Write writes session metadata to the session.json file.
-func (s *SessionMetadataStore) Write(metadata *entities.SessionMetadata) error {
+func (s *SessionMetadataStore) Write(metadata *session.SessionMetadata) error {
 	// Update the UpdatedAt field to current timestamp
 	metadata.UpdatedAt = time.Now().Unix()
 
@@ -113,7 +113,7 @@ func (s *SessionMetadataStore) Write(metadata *entities.SessionMetadata) error {
 }
 
 // Read reads session metadata from the session.json file.
-func (s *SessionMetadataStore) Read() (*entities.SessionMetadata, error) {
+func (s *SessionMetadataStore) Read() (*session.SessionMetadata, error) {
 	// Check if file exists
 	if _, err := os.Stat(s.metadataPath); os.IsNotExist(err) {
 		return nil, fmt.Errorf("session metadata file does not exist: %s", s.metadataPath)
@@ -147,14 +147,14 @@ func (s *SessionMetadataStore) Read() (*entities.SessionMetadata, error) {
 		return nil, fmt.Errorf("failed to read session metadata file: %w", err)
 	}
 
-	var metadata entities.SessionMetadata
+	var metadata session.SessionMetadata
 	err = json.Unmarshal(buf, &metadata)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse session metadata: %w", err)
 	}
 
 	// Validate required fields
-	if metadata.ID == uuid.Nil {
+	if metadata.ID == "" {
 		return nil, fmt.Errorf("failed to parse session metadata: missing required field 'ID'")
 	}
 

@@ -11,7 +11,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/tcfwbper/spectra/entities"
+	"github.com/tcfwbper/spectra/entities/session"
 	"github.com/tcfwbper/spectra/storage"
 )
 
@@ -34,8 +34,8 @@ func TestSessionMetadataStore_WriteFirst(t *testing.T) {
 	require.NoError(t, os.MkdirAll(sessionDir, 0755))
 
 	store := storage.NewSessionMetadataStore(tmpDir, sessionUUID)
-	metadata := &entities.SessionMetadata{
-		ID:           sessionUUID,
+	metadata := &session.SessionMetadata{
+		ID:           sessionUUID.String(),
 		WorkflowName: "TestWorkflow",
 		Status:       "initializing",
 		CreatedAt:    time.Now().Unix(),
@@ -70,8 +70,8 @@ func TestSessionMetadataStore_WriteCreatesFile(t *testing.T) {
 	require.NoError(t, os.MkdirAll(sessionDir, 0755))
 
 	store := storage.NewSessionMetadataStore(tmpDir, sessionUUID)
-	metadata := &entities.SessionMetadata{
-		ID:           sessionUUID,
+	metadata := &session.SessionMetadata{
+		ID:           sessionUUID.String(),
 		WorkflowName: "TestWorkflow",
 		Status:       "initializing",
 		CreatedAt:    time.Now().Unix(),
@@ -102,8 +102,8 @@ func TestSessionMetadataStore_WriteOverwrites(t *testing.T) {
 	store := storage.NewSessionMetadataStore(tmpDir, sessionUUID)
 
 	// First write
-	metadata := &entities.SessionMetadata{
-		ID:           sessionUUID,
+	metadata := &session.SessionMetadata{
+		ID:           sessionUUID.String(),
 		WorkflowName: "TestWorkflow",
 		Status:       "initializing",
 		CreatedAt:    time.Now().Unix(),
@@ -134,8 +134,8 @@ func TestSessionMetadataStore_WriteMultipleTimes(t *testing.T) {
 	require.NoError(t, os.MkdirAll(sessionDir, 0755))
 
 	store := storage.NewSessionMetadataStore(tmpDir, sessionUUID)
-	metadata := &entities.SessionMetadata{
-		ID:           sessionUUID,
+	metadata := &session.SessionMetadata{
+		ID:           sessionUUID.String(),
 		WorkflowName: "TestWorkflow",
 		Status:       "initializing",
 		CreatedAt:    time.Now().Unix(),
@@ -167,8 +167,8 @@ func TestSessionMetadataStore_PrettyPrinted2SpaceIndent(t *testing.T) {
 	require.NoError(t, os.MkdirAll(sessionDir, 0755))
 
 	store := storage.NewSessionMetadataStore(tmpDir, sessionUUID)
-	metadata := &entities.SessionMetadata{
-		ID:           sessionUUID,
+	metadata := &session.SessionMetadata{
+		ID:           sessionUUID.String(),
 		WorkflowName: "TestWorkflow",
 		Status:       "running",
 		CreatedAt:    time.Now().Unix(),
@@ -205,8 +205,8 @@ func TestSessionMetadataStore_EmptySessionData(t *testing.T) {
 	require.NoError(t, os.MkdirAll(sessionDir, 0755))
 
 	store := storage.NewSessionMetadataStore(tmpDir, sessionUUID)
-	metadata := &entities.SessionMetadata{
-		ID:           sessionUUID,
+	metadata := &session.SessionMetadata{
+		ID:           sessionUUID.String(),
 		WorkflowName: "TestWorkflow",
 		Status:       "initializing",
 		CreatedAt:    time.Now().Unix(),
@@ -234,22 +234,14 @@ func TestSessionMetadataStore_EventHistoryNotSerialized(t *testing.T) {
 	require.NoError(t, os.MkdirAll(sessionDir, 0755))
 
 	store := storage.NewSessionMetadataStore(tmpDir, sessionUUID)
-	metadata := &entities.SessionMetadata{
-		ID:           sessionUUID,
+	metadata := &session.SessionMetadata{
+		ID:           sessionUUID.String(),
 		WorkflowName: "TestWorkflow",
 		Status:       "initializing",
 		CreatedAt:    time.Now().Unix(),
 		UpdatedAt:    time.Now().Unix(),
 		CurrentState: "StartNode",
 		SessionData:  map[string]interface{}{},
-		EventHistory: []entities.Event{
-			{
-				ID:        uuid.New(),
-				Type:      "TestEvent",
-				Message:   "test",
-				EmittedAt: time.Now().Unix(),
-			},
-		},
 	}
 
 	err := store.Write(metadata)
@@ -258,6 +250,7 @@ func TestSessionMetadataStore_EventHistoryNotSerialized(t *testing.T) {
 	metadataFile := filepath.Join(sessionDir, "session.json")
 	content, err := os.ReadFile(metadataFile)
 	assert.NoError(t, err)
+	// SessionMetadata no longer has EventHistory field
 	assert.NotContains(t, string(content), "eventHistory")
 }
 
@@ -295,7 +288,7 @@ func TestSessionMetadataStore_EventHistoryFieldIgnored(t *testing.T) {
 	metadata, err := store.Read()
 	assert.NoError(t, err)
 	assert.NotNil(t, metadata)
-	assert.Empty(t, metadata.EventHistory)
+	// SessionMetadata no longer has EventHistory field - it's ignored during deserialization
 	assert.Equal(t, "TestWorkflow", metadata.WorkflowName)
 }
 
@@ -307,8 +300,8 @@ func TestSessionMetadataStore_ErrorFieldOmittedWhenNil(t *testing.T) {
 	require.NoError(t, os.MkdirAll(sessionDir, 0755))
 
 	store := storage.NewSessionMetadataStore(tmpDir, sessionUUID)
-	metadata := &entities.SessionMetadata{
-		ID:           sessionUUID,
+	metadata := &session.SessionMetadata{
+		ID:           sessionUUID.String(),
 		WorkflowName: "TestWorkflow",
 		Status:       "running",
 		CreatedAt:    time.Now().Unix(),
@@ -335,18 +328,13 @@ func TestSessionMetadataStore_ErrorFieldPresentWhenSet(t *testing.T) {
 	require.NoError(t, os.MkdirAll(sessionDir, 0755))
 
 	store := storage.NewSessionMetadataStore(tmpDir, sessionUUID)
-	agentError, err := entities.NewAgentError(
-		"TestAgent",
-		"Test error message",
-		json.RawMessage(`{"detail":"value"}`),
-		sessionUUID,
-		"FailedNode",
-		time.Now().Unix(),
-	)
-	require.NoError(t, err)
+	agentError := &session.AgentError{
+		NodeName: "TestAgent",
+		Message:  "Test error message",
+	}
 
-	metadata := &entities.SessionMetadata{
-		ID:           sessionUUID,
+	metadata := &session.SessionMetadata{
+		ID:           sessionUUID.String(),
 		WorkflowName: "TestWorkflow",
 		Status:       "failed",
 		CreatedAt:    time.Now().Unix(),
@@ -356,14 +344,14 @@ func TestSessionMetadataStore_ErrorFieldPresentWhenSet(t *testing.T) {
 		Error:        agentError,
 	}
 
-	err = store.Write(metadata)
+	err := store.Write(metadata)
 	assert.NoError(t, err)
 
 	metadataFile := filepath.Join(sessionDir, "session.json")
 	content, err := os.ReadFile(metadataFile)
 	assert.NoError(t, err)
 	assert.Contains(t, string(content), `"error"`)
-	assert.Contains(t, string(content), `"AgentRole": "TestAgent"`)
+	assert.Contains(t, string(content), `"NodeName"`)
 	assert.Contains(t, string(content), `"Test error message"`)
 }
 
@@ -378,8 +366,8 @@ func TestSessionMetadataStore_UpdatedAtAutoUpdated(t *testing.T) {
 	oldTimestamp := time.Now().Unix() - 3600 // 1 hour ago
 	beforeWrite := time.Now().Unix()
 
-	metadata := &entities.SessionMetadata{
-		ID:           sessionUUID,
+	metadata := &session.SessionMetadata{
+		ID:           sessionUUID.String(),
 		WorkflowName: "TestWorkflow",
 		Status:       "running",
 		CreatedAt:    oldTimestamp,
@@ -408,8 +396,8 @@ func TestSessionMetadataStore_UpdatedAtChangesOnEachWrite(t *testing.T) {
 	require.NoError(t, os.MkdirAll(sessionDir, 0755))
 
 	store := storage.NewSessionMetadataStore(tmpDir, sessionUUID)
-	metadata := &entities.SessionMetadata{
-		ID:           sessionUUID,
+	metadata := &session.SessionMetadata{
+		ID:           sessionUUID.String(),
 		WorkflowName: "TestWorkflow",
 		Status:       "running",
 		CreatedAt:    time.Now().Unix(),
@@ -465,14 +453,13 @@ func TestSessionMetadataStore_ReadValidFile(t *testing.T) {
 	metadata, err := store.Read()
 	assert.NoError(t, err)
 	assert.NotNil(t, metadata)
-	assert.Equal(t, sessionUUID.String(), metadata.ID.String())
+	assert.Equal(t, sessionUUID.String(), metadata.ID)
 	assert.Equal(t, "TestWorkflow", metadata.WorkflowName)
 	assert.Equal(t, "running", metadata.Status)
 	assert.Equal(t, createdAt, metadata.CreatedAt)
 	assert.Equal(t, updatedAt, metadata.UpdatedAt)
 	assert.Equal(t, "StartNode", metadata.CurrentState)
 	assert.Equal(t, "value", metadata.SessionData["key"])
-	assert.Empty(t, metadata.EventHistory)
 }
 
 // TestSessionMetadataStore_ReadComplexSessionData reads metadata with complex nested SessionData
@@ -531,12 +518,8 @@ func TestSessionMetadataStore_ReadErrorFieldPresent(t *testing.T) {
 		"currentState": "FailedNode",
 		"sessionData":  map[string]interface{}{},
 		"error": map[string]interface{}{
-			"AgentRole":    "TestAgent",
-			"Message":      "Test error",
-			"Detail":       json.RawMessage(`{}`),
-			"SessionID":    sessionUUID.String(),
-			"FailingState": "FailedNode",
-			"OccurredAt":   time.Now().Unix(),
+			"NodeName": "TestAgent",
+			"Message":  "Test error",
 		},
 	}
 	jsonBytes, err := json.MarshalIndent(jsonContent, "", "  ")
@@ -548,8 +531,8 @@ func TestSessionMetadataStore_ReadErrorFieldPresent(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, metadata)
 	assert.NotNil(t, metadata.Error)
-	assert.Equal(t, "TestAgent", metadata.Error.AgentRole)
-	assert.Equal(t, "Test error", metadata.Error.Message)
+	// Error is deserialized as a map[string]interface{} since it's an interface{}
+	assert.Equal(t, "Test error", metadata.Error.Error())
 }
 
 // TestSessionMetadataStore_ReadOnlySessionMetadataFields verifies Read returns SessionMetadata struct with all persistable fields
@@ -581,7 +564,7 @@ func TestSessionMetadataStore_ReadOnlySessionMetadataFields(t *testing.T) {
 	assert.NotNil(t, metadata)
 
 	// Verify all fields are populated
-	assert.Equal(t, sessionUUID, metadata.ID)
+	assert.Equal(t, sessionUUID.String(), metadata.ID)
 	assert.Equal(t, "TestWorkflow", metadata.WorkflowName)
 	assert.Equal(t, "running", metadata.Status)
 	assert.Equal(t, createdAt, metadata.CreatedAt)
@@ -589,8 +572,7 @@ func TestSessionMetadataStore_ReadOnlySessionMetadataFields(t *testing.T) {
 	assert.Equal(t, "StartNode", metadata.CurrentState)
 	assert.NotNil(t, metadata.SessionData)
 	assert.Nil(t, metadata.Error)
-	// Verify EventHistory is not populated (field excluded from SessionMetadata)
-	assert.Empty(t, metadata.EventHistory, "EventHistory should be empty/nil as it's not part of SessionMetadata persistence")
+	// EventHistory is not part of SessionMetadata persistence
 }
 
 // TestSessionMetadataStore_WriteParentDirDoesNotExist returns error when session directory missing
@@ -600,8 +582,8 @@ func TestSessionMetadataStore_WriteParentDirDoesNotExist(t *testing.T) {
 	// Do not create session directory
 
 	store := storage.NewSessionMetadataStore(tmpDir, sessionUUID)
-	metadata := &entities.SessionMetadata{
-		ID:           sessionUUID,
+	metadata := &session.SessionMetadata{
+		ID:           sessionUUID.String(),
 		WorkflowName: "TestWorkflow",
 		Status:       "initializing",
 		CreatedAt:    time.Now().Unix(),
@@ -623,8 +605,8 @@ func TestSessionMetadataStore_WriteSerializationFails(t *testing.T) {
 	require.NoError(t, os.MkdirAll(sessionDir, 0755))
 
 	store := storage.NewSessionMetadataStore(tmpDir, sessionUUID)
-	metadata := &entities.SessionMetadata{
-		ID:           sessionUUID,
+	metadata := &session.SessionMetadata{
+		ID:           sessionUUID.String(),
 		WorkflowName: "TestWorkflow",
 		Status:       "running",
 		CreatedAt:    time.Now().Unix(),
@@ -651,8 +633,8 @@ func TestSessionMetadataStore_WriteExceeds10MBLimit(t *testing.T) {
 
 	// Create large data (11 MB)
 	largeData := strings.Repeat("x", 11*1024*1024)
-	metadata := &entities.SessionMetadata{
-		ID:           sessionUUID,
+	metadata := &session.SessionMetadata{
+		ID:           sessionUUID.String(),
 		WorkflowName: "TestWorkflow",
 		Status:       "running",
 		CreatedAt:    time.Now().Unix(),
@@ -679,8 +661,8 @@ func TestSessionMetadataStore_WriteExactly10MB(t *testing.T) {
 
 	// Create metadata that will serialize to exactly 10 MB
 	// Need to account for JSON overhead (field names, quotes, indentation)
-	baseMetadata := &entities.SessionMetadata{
-		ID:           sessionUUID,
+	baseMetadata := &session.SessionMetadata{
+		ID:           sessionUUID.String(),
 		WorkflowName: "TestWorkflow",
 		Status:       "running",
 		CreatedAt:    time.Now().Unix(),
@@ -844,8 +826,8 @@ func TestSessionMetadataStore_WriteIdempotent(t *testing.T) {
 	require.NoError(t, os.MkdirAll(sessionDir, 0755))
 
 	store := storage.NewSessionMetadataStore(tmpDir, sessionUUID)
-	metadata := &entities.SessionMetadata{
-		ID:           sessionUUID,
+	metadata := &session.SessionMetadata{
+		ID:           sessionUUID.String(),
 		WorkflowName: "TestWorkflow",
 		Status:       "running",
 		CreatedAt:    time.Now().Unix(),
@@ -873,8 +855,8 @@ func TestSessionMetadataStore_NewFilePermissions0644(t *testing.T) {
 	require.NoError(t, os.MkdirAll(sessionDir, 0755))
 
 	store := storage.NewSessionMetadataStore(tmpDir, sessionUUID)
-	metadata := &entities.SessionMetadata{
-		ID:           sessionUUID,
+	metadata := &session.SessionMetadata{
+		ID:           sessionUUID.String(),
 		WorkflowName: "TestWorkflow",
 		Status:       "initializing",
 		CreatedAt:    time.Now().Unix(),
@@ -907,8 +889,8 @@ func TestSessionMetadataStore_InvalidSessionUUID(t *testing.T) {
 	// Create the store with a valid UUID but test against a malformed path scenario
 	store := storage.NewSessionMetadataStore(tmpDir, malformedUUID)
 
-	metadata := &entities.SessionMetadata{
-		ID:           uuid.New(),
+	metadata := &session.SessionMetadata{
+		ID:           uuid.New().String(),
 		WorkflowName: "TestWorkflow",
 		Status:       "initializing",
 		CreatedAt:    time.Now().Unix(),
@@ -929,8 +911,8 @@ func TestSessionMetadataStore_EmptySessionUUID(t *testing.T) {
 	require.NoError(t, os.MkdirAll(sessionsDir, 0755))
 
 	store := storage.NewSessionMetadataStore(tmpDir, uuid.Nil)
-	metadata := &entities.SessionMetadata{
-		ID:           uuid.New(),
+	metadata := &session.SessionMetadata{
+		ID:           uuid.New().String(),
 		WorkflowName: "TestWorkflow",
 		Status:       "initializing",
 		CreatedAt:    time.Now().Unix(),
@@ -951,8 +933,8 @@ func TestSessionMetadataStore_SessionDataWithNamespacedKeys(t *testing.T) {
 	require.NoError(t, os.MkdirAll(sessionDir, 0755))
 
 	store := storage.NewSessionMetadataStore(tmpDir, sessionUUID)
-	metadata := &entities.SessionMetadata{
-		ID:           sessionUUID,
+	metadata := &session.SessionMetadata{
+		ID:           sessionUUID.String(),
 		WorkflowName: "TestWorkflow",
 		Status:       "running",
 		CreatedAt:    time.Now().Unix(),
@@ -980,8 +962,8 @@ func TestSessionMetadataStore_SessionDataNonStringValue(t *testing.T) {
 	require.NoError(t, os.MkdirAll(sessionDir, 0755))
 
 	store := storage.NewSessionMetadataStore(tmpDir, sessionUUID)
-	metadata := &entities.SessionMetadata{
-		ID:           sessionUUID,
+	metadata := &session.SessionMetadata{
+		ID:           sessionUUID.String(),
 		WorkflowName: "TestWorkflow",
 		Status:       "running",
 		CreatedAt:    time.Now().Unix(),
@@ -1049,8 +1031,8 @@ func TestSessionMetadataStore_NoStateValidation(t *testing.T) {
 	require.NoError(t, os.MkdirAll(sessionDir, 0755))
 
 	store := storage.NewSessionMetadataStore(tmpDir, sessionUUID)
-	metadata := &entities.SessionMetadata{
-		ID:           sessionUUID,
+	metadata := &session.SessionMetadata{
+		ID:           sessionUUID.String(),
 		WorkflowName: "TestWorkflow",
 		Status:       "running",
 		CreatedAt:    time.Now().Unix(),
@@ -1079,8 +1061,8 @@ func TestSessionMetadataStore_WriteTruncates(t *testing.T) {
 
 	// First write with large data (5 KB)
 	largeData := strings.Repeat("x", 5*1024)
-	metadata := &entities.SessionMetadata{
-		ID:           sessionUUID,
+	metadata := &session.SessionMetadata{
+		ID:           sessionUUID.String(),
 		WorkflowName: "TestWorkflow",
 		Status:       "running",
 		CreatedAt:    time.Now().Unix(),
@@ -1123,8 +1105,8 @@ func TestSessionMetadataStore_NullValuesInSessionData(t *testing.T) {
 	require.NoError(t, os.MkdirAll(sessionDir, 0755))
 
 	store := storage.NewSessionMetadataStore(tmpDir, sessionUUID)
-	metadata := &entities.SessionMetadata{
-		ID:           sessionUUID,
+	metadata := &session.SessionMetadata{
+		ID:           sessionUUID.String(),
 		WorkflowName: "TestWorkflow",
 		Status:       "running",
 		CreatedAt:    time.Now().Unix(),
@@ -1158,8 +1140,8 @@ func TestSessionMetadataStore_EmptyStringsInFields(t *testing.T) {
 	require.NoError(t, os.MkdirAll(sessionDir, 0755))
 
 	store := storage.NewSessionMetadataStore(tmpDir, sessionUUID)
-	metadata := &entities.SessionMetadata{
-		ID:           sessionUUID,
+	metadata := &session.SessionMetadata{
+		ID:           sessionUUID.String(),
 		WorkflowName: "", // Empty string
 		Status:       "running",
 		CreatedAt:    time.Now().Unix(),
