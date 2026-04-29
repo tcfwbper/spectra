@@ -13,7 +13,6 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/tcfwbper/spectra/entities"
 	"github.com/tcfwbper/spectra/storage"
-	"github.com/tcfwbper/spectra/test/helpers"
 )
 
 // TestSessionMetadataStore_New constructs SessionMetadataStore with valid inputs
@@ -35,7 +34,7 @@ func TestSessionMetadataStore_WriteFirst(t *testing.T) {
 	require.NoError(t, os.MkdirAll(sessionDir, 0755))
 
 	store := storage.NewSessionMetadataStore(tmpDir, sessionUUID)
-	metadata := &helpers.SessionMetadata{
+	metadata := &entities.SessionMetadata{
 		ID:           sessionUUID,
 		WorkflowName: "TestWorkflow",
 		Status:       "initializing",
@@ -71,7 +70,7 @@ func TestSessionMetadataStore_WriteCreatesFile(t *testing.T) {
 	require.NoError(t, os.MkdirAll(sessionDir, 0755))
 
 	store := storage.NewSessionMetadataStore(tmpDir, sessionUUID)
-	metadata := &helpers.SessionMetadata{
+	metadata := &entities.SessionMetadata{
 		ID:           sessionUUID,
 		WorkflowName: "TestWorkflow",
 		Status:       "initializing",
@@ -103,7 +102,7 @@ func TestSessionMetadataStore_WriteOverwrites(t *testing.T) {
 	store := storage.NewSessionMetadataStore(tmpDir, sessionUUID)
 
 	// First write
-	metadata := &helpers.SessionMetadata{
+	metadata := &entities.SessionMetadata{
 		ID:           sessionUUID,
 		WorkflowName: "TestWorkflow",
 		Status:       "initializing",
@@ -135,7 +134,7 @@ func TestSessionMetadataStore_WriteMultipleTimes(t *testing.T) {
 	require.NoError(t, os.MkdirAll(sessionDir, 0755))
 
 	store := storage.NewSessionMetadataStore(tmpDir, sessionUUID)
-	metadata := &helpers.SessionMetadata{
+	metadata := &entities.SessionMetadata{
 		ID:           sessionUUID,
 		WorkflowName: "TestWorkflow",
 		Status:       "initializing",
@@ -168,7 +167,7 @@ func TestSessionMetadataStore_PrettyPrinted2SpaceIndent(t *testing.T) {
 	require.NoError(t, os.MkdirAll(sessionDir, 0755))
 
 	store := storage.NewSessionMetadataStore(tmpDir, sessionUUID)
-	metadata := &helpers.SessionMetadata{
+	metadata := &entities.SessionMetadata{
 		ID:           sessionUUID,
 		WorkflowName: "TestWorkflow",
 		Status:       "running",
@@ -206,7 +205,7 @@ func TestSessionMetadataStore_EmptySessionData(t *testing.T) {
 	require.NoError(t, os.MkdirAll(sessionDir, 0755))
 
 	store := storage.NewSessionMetadataStore(tmpDir, sessionUUID)
-	metadata := &helpers.SessionMetadata{
+	metadata := &entities.SessionMetadata{
 		ID:           sessionUUID,
 		WorkflowName: "TestWorkflow",
 		Status:       "initializing",
@@ -235,7 +234,7 @@ func TestSessionMetadataStore_EventHistoryNotSerialized(t *testing.T) {
 	require.NoError(t, os.MkdirAll(sessionDir, 0755))
 
 	store := storage.NewSessionMetadataStore(tmpDir, sessionUUID)
-	metadata := &helpers.SessionMetadata{
+	metadata := &entities.SessionMetadata{
 		ID:           sessionUUID,
 		WorkflowName: "TestWorkflow",
 		Status:       "initializing",
@@ -308,7 +307,7 @@ func TestSessionMetadataStore_ErrorFieldOmittedWhenNil(t *testing.T) {
 	require.NoError(t, os.MkdirAll(sessionDir, 0755))
 
 	store := storage.NewSessionMetadataStore(tmpDir, sessionUUID)
-	metadata := &helpers.SessionMetadata{
+	metadata := &entities.SessionMetadata{
 		ID:           sessionUUID,
 		WorkflowName: "TestWorkflow",
 		Status:       "running",
@@ -346,7 +345,7 @@ func TestSessionMetadataStore_ErrorFieldPresentWhenSet(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	metadata := &helpers.SessionMetadata{
+	metadata := &entities.SessionMetadata{
 		ID:           sessionUUID,
 		WorkflowName: "TestWorkflow",
 		Status:       "failed",
@@ -379,7 +378,7 @@ func TestSessionMetadataStore_UpdatedAtAutoUpdated(t *testing.T) {
 	oldTimestamp := time.Now().Unix() - 3600 // 1 hour ago
 	beforeWrite := time.Now().Unix()
 
-	metadata := &helpers.SessionMetadata{
+	metadata := &entities.SessionMetadata{
 		ID:           sessionUUID,
 		WorkflowName: "TestWorkflow",
 		Status:       "running",
@@ -409,7 +408,7 @@ func TestSessionMetadataStore_UpdatedAtChangesOnEachWrite(t *testing.T) {
 	require.NoError(t, os.MkdirAll(sessionDir, 0755))
 
 	store := storage.NewSessionMetadataStore(tmpDir, sessionUUID)
-	metadata := &helpers.SessionMetadata{
+	metadata := &entities.SessionMetadata{
 		ID:           sessionUUID,
 		WorkflowName: "TestWorkflow",
 		Status:       "running",
@@ -601,7 +600,7 @@ func TestSessionMetadataStore_WriteParentDirDoesNotExist(t *testing.T) {
 	// Do not create session directory
 
 	store := storage.NewSessionMetadataStore(tmpDir, sessionUUID)
-	metadata := &helpers.SessionMetadata{
+	metadata := &entities.SessionMetadata{
 		ID:           sessionUUID,
 		WorkflowName: "TestWorkflow",
 		Status:       "initializing",
@@ -624,7 +623,7 @@ func TestSessionMetadataStore_WriteSerializationFails(t *testing.T) {
 	require.NoError(t, os.MkdirAll(sessionDir, 0755))
 
 	store := storage.NewSessionMetadataStore(tmpDir, sessionUUID)
-	metadata := &helpers.SessionMetadata{
+	metadata := &entities.SessionMetadata{
 		ID:           sessionUUID,
 		WorkflowName: "TestWorkflow",
 		Status:       "running",
@@ -652,7 +651,7 @@ func TestSessionMetadataStore_WriteExceeds10MBLimit(t *testing.T) {
 
 	// Create large data (11 MB)
 	largeData := strings.Repeat("x", 11*1024*1024)
-	metadata := &helpers.SessionMetadata{
+	metadata := &entities.SessionMetadata{
 		ID:           sessionUUID,
 		WorkflowName: "TestWorkflow",
 		Status:       "running",
@@ -680,7 +679,7 @@ func TestSessionMetadataStore_WriteExactly10MB(t *testing.T) {
 
 	// Create metadata that will serialize to exactly 10 MB
 	// Need to account for JSON overhead (field names, quotes, indentation)
-	baseMetadata := &helpers.SessionMetadata{
+	baseMetadata := &entities.SessionMetadata{
 		ID:           sessionUUID,
 		WorkflowName: "TestWorkflow",
 		Status:       "running",
@@ -845,7 +844,7 @@ func TestSessionMetadataStore_WriteIdempotent(t *testing.T) {
 	require.NoError(t, os.MkdirAll(sessionDir, 0755))
 
 	store := storage.NewSessionMetadataStore(tmpDir, sessionUUID)
-	metadata := &helpers.SessionMetadata{
+	metadata := &entities.SessionMetadata{
 		ID:           sessionUUID,
 		WorkflowName: "TestWorkflow",
 		Status:       "running",
@@ -874,7 +873,7 @@ func TestSessionMetadataStore_NewFilePermissions0644(t *testing.T) {
 	require.NoError(t, os.MkdirAll(sessionDir, 0755))
 
 	store := storage.NewSessionMetadataStore(tmpDir, sessionUUID)
-	metadata := &helpers.SessionMetadata{
+	metadata := &entities.SessionMetadata{
 		ID:           sessionUUID,
 		WorkflowName: "TestWorkflow",
 		Status:       "initializing",
@@ -908,7 +907,7 @@ func TestSessionMetadataStore_InvalidSessionUUID(t *testing.T) {
 	// Create the store with a valid UUID but test against a malformed path scenario
 	store := storage.NewSessionMetadataStore(tmpDir, malformedUUID)
 
-	metadata := &helpers.SessionMetadata{
+	metadata := &entities.SessionMetadata{
 		ID:           uuid.New(),
 		WorkflowName: "TestWorkflow",
 		Status:       "initializing",
@@ -930,7 +929,7 @@ func TestSessionMetadataStore_EmptySessionUUID(t *testing.T) {
 	require.NoError(t, os.MkdirAll(sessionsDir, 0755))
 
 	store := storage.NewSessionMetadataStore(tmpDir, uuid.Nil)
-	metadata := &helpers.SessionMetadata{
+	metadata := &entities.SessionMetadata{
 		ID:           uuid.New(),
 		WorkflowName: "TestWorkflow",
 		Status:       "initializing",
@@ -952,7 +951,7 @@ func TestSessionMetadataStore_SessionDataWithNamespacedKeys(t *testing.T) {
 	require.NoError(t, os.MkdirAll(sessionDir, 0755))
 
 	store := storage.NewSessionMetadataStore(tmpDir, sessionUUID)
-	metadata := &helpers.SessionMetadata{
+	metadata := &entities.SessionMetadata{
 		ID:           sessionUUID,
 		WorkflowName: "TestWorkflow",
 		Status:       "running",
@@ -981,7 +980,7 @@ func TestSessionMetadataStore_SessionDataNonStringValue(t *testing.T) {
 	require.NoError(t, os.MkdirAll(sessionDir, 0755))
 
 	store := storage.NewSessionMetadataStore(tmpDir, sessionUUID)
-	metadata := &helpers.SessionMetadata{
+	metadata := &entities.SessionMetadata{
 		ID:           sessionUUID,
 		WorkflowName: "TestWorkflow",
 		Status:       "running",
@@ -1050,7 +1049,7 @@ func TestSessionMetadataStore_NoStateValidation(t *testing.T) {
 	require.NoError(t, os.MkdirAll(sessionDir, 0755))
 
 	store := storage.NewSessionMetadataStore(tmpDir, sessionUUID)
-	metadata := &helpers.SessionMetadata{
+	metadata := &entities.SessionMetadata{
 		ID:           sessionUUID,
 		WorkflowName: "TestWorkflow",
 		Status:       "running",
@@ -1080,7 +1079,7 @@ func TestSessionMetadataStore_WriteTruncates(t *testing.T) {
 
 	// First write with large data (5 KB)
 	largeData := strings.Repeat("x", 5*1024)
-	metadata := &helpers.SessionMetadata{
+	metadata := &entities.SessionMetadata{
 		ID:           sessionUUID,
 		WorkflowName: "TestWorkflow",
 		Status:       "running",
@@ -1124,7 +1123,7 @@ func TestSessionMetadataStore_NullValuesInSessionData(t *testing.T) {
 	require.NoError(t, os.MkdirAll(sessionDir, 0755))
 
 	store := storage.NewSessionMetadataStore(tmpDir, sessionUUID)
-	metadata := &helpers.SessionMetadata{
+	metadata := &entities.SessionMetadata{
 		ID:           sessionUUID,
 		WorkflowName: "TestWorkflow",
 		Status:       "running",
@@ -1159,7 +1158,7 @@ func TestSessionMetadataStore_EmptyStringsInFields(t *testing.T) {
 	require.NoError(t, os.MkdirAll(sessionDir, 0755))
 
 	store := storage.NewSessionMetadataStore(tmpDir, sessionUUID)
-	metadata := &helpers.SessionMetadata{
+	metadata := &entities.SessionMetadata{
 		ID:           sessionUUID,
 		WorkflowName: "", // Empty string
 		Status:       "running",

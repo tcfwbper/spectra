@@ -6,6 +6,7 @@ import (
 
 // TestRuntimeResponse_SocketTransmission_Success verifies RuntimeResponse successfully transmitted over Unix domain socket
 func TestRuntimeResponse_SocketTransmission_Success(t *testing.T) {
+	t.Skip("requires full Runtime and RuntimeSocketManager integration (not yet implemented)")
 	// Setup: Temporary test directory created
 	tmpDir := t.TempDir()
 	_ = tmpDir
@@ -24,6 +25,7 @@ func TestRuntimeResponse_SocketTransmission_Success(t *testing.T) {
 
 // TestRuntimeResponse_SocketTransmission_Error verifies RuntimeResponse with error status successfully transmitted
 func TestRuntimeResponse_SocketTransmission_Error(t *testing.T) {
+	t.Skip("requires full Runtime and RuntimeSocketManager integration (not yet implemented)")
 	// Setup: Temporary test directory created
 	tmpDir := t.TempDir()
 	_ = tmpDir

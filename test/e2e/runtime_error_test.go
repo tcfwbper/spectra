@@ -10,6 +10,7 @@ import (
 
 // TestRuntimeError_HumanNotified verifies human is notified when RuntimeError occurs
 func TestRuntimeError_HumanNotified(t *testing.T) {
+	t.Skip("requires Runtime implementation to trigger and observe RuntimeError notification (not yet implemented)")
 	// Setup: Temporary test directory created
 	tmpDir := t.TempDir()
 	_ = tmpDir

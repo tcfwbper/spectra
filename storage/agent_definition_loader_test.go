@@ -725,6 +725,19 @@ agent_root: "."
 
 // Dependency Interaction
 
+func TestAgentDefinitionLoader_Load_UsesStorageLayout(t *testing.T) {
+	tmpDir := setupAgentTestDir(t)
+	writeAgentYAML(t, tmpDir, "Architect", createValidAgentYAML("Architect", "."))
+
+	loader := NewAgentDefinitionLoader(tmpDir)
+	def, err := loader.Load("Architect")
+
+	require.NoError(t, err)
+	assert.NotNil(t, def)
+	expectedPath := GetAgentPath(tmpDir, "Architect")
+	assert.FileExists(t, expectedPath)
+}
+
 func TestAgentDefinitionLoader_Load_ReadsFromCorrectPath(t *testing.T) {
 	tmpDir := setupAgentTestDir(t)
 	writeAgentYAML(t, tmpDir, "Architect", createValidAgentYAML("Architect", "."))

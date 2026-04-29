@@ -11,8 +11,8 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/tcfwbper/spectra/entities"
 	"github.com/tcfwbper/spectra/storage"
-	"github.com/tcfwbper/spectra/test/helpers"
 )
 
 // TestSessionMetadataStore_ConcurrentWriteSameFile tests multiple goroutines write to same file safely
@@ -32,7 +32,7 @@ func TestSessionMetadataStore_ConcurrentWriteSameFile(t *testing.T) {
 	for i := 0; i < numGoroutines; i++ {
 		go func(index int) {
 			defer wg.Done()
-			metadata := &helpers.SessionMetadata{
+			metadata := &entities.SessionMetadata{
 				ID:           sessionUUID,
 				WorkflowName: "TestWorkflow",
 				Status:       "running",
@@ -85,7 +85,7 @@ func TestSessionMetadataStore_ConcurrentWriteSerializes(t *testing.T) {
 	for i := 0; i < numGoroutines; i++ {
 		go func(index int) {
 			defer wg.Done()
-			metadata := &helpers.SessionMetadata{
+			metadata := &entities.SessionMetadata{
 				ID:           sessionUUID,
 				WorkflowName: "TestWorkflow",
 				Status:       statuses[index],
@@ -125,7 +125,7 @@ func TestSessionMetadataStore_ReadBlocksDuringWrite(t *testing.T) {
 	store := storage.NewSessionMetadataStore(tmpDir, sessionUUID)
 
 	// Initial write
-	initialMetadata := &helpers.SessionMetadata{
+	initialMetadata := &entities.SessionMetadata{
 		ID:           sessionUUID,
 		WorkflowName: "TestWorkflow",
 		Status:       "initial",
@@ -151,7 +151,7 @@ func TestSessionMetadataStore_ReadBlocksDuringWrite(t *testing.T) {
 	// Goroutine 1: Write with updated metadata
 	go func() {
 		defer wg.Done()
-		metadata := &helpers.SessionMetadata{
+		metadata := &entities.SessionMetadata{
 			ID:           sessionUUID,
 			WorkflowName: "TestWorkflow",
 			Status:       "updated",
@@ -199,7 +199,7 @@ func TestSessionMetadataStore_WriteBlocksDuringRead(t *testing.T) {
 	store := storage.NewSessionMetadataStore(tmpDir, sessionUUID)
 
 	// Initial write
-	initialMetadata := &helpers.SessionMetadata{
+	initialMetadata := &entities.SessionMetadata{
 		ID:           sessionUUID,
 		WorkflowName: "TestWorkflow",
 		Status:       "initial",
@@ -236,7 +236,7 @@ func TestSessionMetadataStore_WriteBlocksDuringRead(t *testing.T) {
 	// Goroutine 2: Write concurrently
 	go func() {
 		defer wg.Done()
-		metadata := &helpers.SessionMetadata{
+		metadata := &entities.SessionMetadata{
 			ID:           sessionUUID,
 			WorkflowName: "TestWorkflow",
 			Status:       "updated",
@@ -281,7 +281,7 @@ func TestSessionMetadataStore_ConcurrentSameProcess(t *testing.T) {
 	for i := 0; i < numGoroutines; i++ {
 		go func(index int) {
 			defer wg.Done()
-			metadata := &helpers.SessionMetadata{
+			metadata := &entities.SessionMetadata{
 				ID:           sessionUUID,
 				WorkflowName: "TestWorkflow",
 				Status:       "running",
