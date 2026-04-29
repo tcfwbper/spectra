@@ -63,3 +63,35 @@ func createExitTransitionExpectError(t *testing.T, fromNode, eventType, toNode s
 	require.Error(t, err)
 	return err
 }
+
+// createAgentDefinition is a helper to create an agent definition for testing
+func createAgentDefinition(t *testing.T, role, model, effort, systemPrompt, agentRoot string, allowedTools, disallowedTools []string) *components.AgentDefinition {
+	t.Helper()
+	agent, err := components.NewAgentDefinition(role, model, effort, systemPrompt, agentRoot, allowedTools, disallowedTools)
+	require.NoError(t, err)
+	return agent
+}
+
+// createAgentDefinitionExpectError is a helper to create an agent definition expecting an error
+func createAgentDefinitionExpectError(t *testing.T, role, model, effort, systemPrompt, agentRoot string, allowedTools, disallowedTools []string) error {
+	t.Helper()
+	_, err := components.NewAgentDefinition(role, model, effort, systemPrompt, agentRoot, allowedTools, disallowedTools)
+	require.Error(t, err)
+	return err
+}
+
+// createWorkflowDefinition is a helper to create a workflow definition for testing
+func createWorkflowDefinition(t *testing.T, name, description, entryNode string, exitTransitions []*components.ExitTransition, nodes []*components.Node, transitions []*components.Transition) *components.WorkflowDefinition {
+	t.Helper()
+	workflow, err := components.NewWorkflowDefinition(name, description, entryNode, exitTransitions, nodes, transitions)
+	require.NoError(t, err)
+	return workflow
+}
+
+// createWorkflowDefinitionExpectError is a helper to create a workflow definition expecting an error
+func createWorkflowDefinitionExpectError(t *testing.T, name, description, entryNode string, exitTransitions []*components.ExitTransition, nodes []*components.Node, transitions []*components.Transition) error {
+	t.Helper()
+	_, err := components.NewWorkflowDefinition(name, description, entryNode, exitTransitions, nodes, transitions)
+	require.Error(t, err)
+	return err
+}
