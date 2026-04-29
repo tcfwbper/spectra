@@ -926,8 +926,8 @@ func TestWorkflowDefinition_FieldsImmutable(t *testing.T) {
 	require.Equal(t, "Test", workflow.GetDescription())
 	require.Equal(t, "Start", workflow.GetEntryNode())
 	require.Len(t, workflow.GetExitTransitions(), 1)
-	require.Len(t, workflow.GetNodes(), 1)
-	require.Len(t, workflow.GetTransitions(), 1)
+	require.Len(t, workflow.GetNodes(), 2)
+	require.Len(t, workflow.GetTransitions(), 2)
 }
 
 // TestWorkflowDefinition_ImplementsInterface WorkflowDefinition type implements expected interface
