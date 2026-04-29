@@ -931,7 +931,7 @@ func TestTransition_TargetNodeSingleCharacter(t *testing.T) {
 
 func TestTransition_TargetNodeLongName(t *testing.T) {
 	// Generate a 256-character PascalCase node name
-	longName := strings.Repeat("NodeNameSegment", 17) // 15*17=255 + 1 more char
+	longName := strings.Repeat("NodeNameSegment", 17) + "X" // 15*17=255 + 1 = 256
 	longName = longName[:256]
 	wfDef := buildTransitionWorkflowWithHumanNode(longName)
 	transitioner, sess, _, _, _ := createTransitionFixture(t, wfDef)
