@@ -7,7 +7,7 @@ SessionMetadata represents the persistable state of a session, excluding the eve
 ## Behavior
 
 1. SessionMetadata is a plain data structure with no methods of its own.
-2. All mutations to SessionMetadata fields occur through Session entity methods (see [Session](./session/session.md)).
+2. All mutations to SessionMetadata fields occur through Session entity methods (see [Session](./session.md)).
 3. SessionMetadata is embedded in the Session entity, allowing direct field access on Session instances.
 4. SessionMetadata instances are created only during Session construction by SessionInitializer.
 5. SessionMetadata is designed to be JSON-serializable for persistence to `session.json`.
@@ -15,7 +15,7 @@ SessionMetadata represents the persistable state of a session, excluding the eve
 
 ## Inputs
 
-SessionMetadata is not invoked; it is constructed as part of Session initialization. See [Session](./session/session.md) for construction details.
+SessionMetadata is not invoked; it is constructed as part of Session initialization. See [Session](./session.md) for construction details.
 
 ## Outputs
 
@@ -29,7 +29,7 @@ SessionMetadata is not invoked; it is constructed as part of Session initializat
 | `CreatedAt` | int64 (POSIX seconds) | > 0 | Timestamp at construction |
 | `UpdatedAt` | int64 (POSIX seconds) | >= `CreatedAt` | Timestamp of last in-memory mutation; refreshed by every mutating method |
 | `CurrentState` | string | Always a workflow-defined node name | Active node in the workflow state machine |
-| `SessionData` | `map[string]any` | See [Session data.md](./session/data.md) for namespace conventions and ClaudeSessionID type rules | Session-scoped key-value store |
+| `SessionData` | `map[string]any` | See [Session data.md](./data.md) for namespace conventions and ClaudeSessionID type rules | Session-scoped key-value store |
 | `Error` | `*AgentError` or `*RuntimeError` (nullable) | Nullable; non-nil iff `Status == "failed"` | First fatal error (first-error-wins) |
 
 ## Invariants
@@ -82,8 +82,8 @@ SessionMetadata is not invoked; it is constructed as part of Session initializat
 
 ## Related
 
-- [Session](./session/session.md) - Embeds SessionMetadata and provides mutation methods
-- [AgentError](./agent_error.md), [RuntimeError](./runtime_error.md) - Possible types for the Error field
-- [SessionMetadataStore](../storage/session_metadata_store.md) - Handles persistence of SessionMetadata
-- [SessionInitializer](../runtime/session_initializer.md) - Constructs SessionMetadata as part of Session initialization
-- [ARCHITECTURE.md](../../ARCHITECTURE.md) - Session and workflow runtime architecture
+- [Session](./session.md) - Embeds SessionMetadata and provides mutation methods
+- [AgentError](../agent_error.md), [RuntimeError](../runtime_error.md) - Possible types for the Error field
+- [SessionMetadataStore](../../storage/session_metadata_store.md) - Handles persistence of SessionMetadata
+- [SessionInitializer](../../runtime/session_initializer.md) - Constructs SessionMetadata as part of Session initialization
+- [ARCHITECTURE.md](../../../ARCHITECTURE.md) - Session and workflow runtime architecture

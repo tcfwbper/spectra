@@ -2,7 +2,7 @@
 
 ## Overview
 
-SessionMetadataStore manages persistent storage of [SessionMetadata](../entities/session_metadata.md) for a single session. It reads and writes the `session.json` file in pretty-printed JSON format, ensuring metadata is written atomically with file-level write locks. SessionMetadataStore serializes the SessionMetadata struct (ID, WorkflowName, Status, CreatedAt, UpdatedAt, CurrentState, SessionData, Error) and does not serialize EventHistory, which is persisted separately by [EventStore](./event_store.md). SessionMetadataStore does not manage the parent session directory; it expects the directory to exist before writing metadata.
+SessionMetadataStore manages persistent storage of [SessionMetadata](../entities/session/session_metadata.md) for a single session. It reads and writes the `session.json` file in pretty-printed JSON format, ensuring metadata is written atomically with file-level write locks. SessionMetadataStore serializes the SessionMetadata struct (ID, WorkflowName, Status, CreatedAt, UpdatedAt, CurrentState, SessionData, Error) and does not serialize EventHistory, which is persisted separately by [EventStore](./event_store.md). SessionMetadataStore does not manage the parent session directory; it expects the directory to exist before writing metadata.
 
 **Persistence Role**: SessionMetadataStore provides best-effort, last-write-wins persistence for user inspection and debugging. The Read operation is intended for external tools only (e.g., `spectra clear`, `spectra status`). The running Runtime must never read from SessionMetadataStore to determine behavior; the in-memory Session entity is the authoritative source of truth.
 
@@ -39,7 +39,7 @@ SessionMetadataStore manages persistent storage of [SessionMetadata](../entities
 
 | Field | Type | Constraints | Required |
 |-------|------|-------------|----------|
-| SessionMetadata | SessionMetadata struct | Valid [SessionMetadata](../entities/session_metadata.md) structure (ID, WorkflowName, Status, CreatedAt, UpdatedAt, CurrentState, SessionData, Error) | Yes |
+| SessionMetadata | SessionMetadata struct | Valid [SessionMetadata](../entities/session/session_metadata.md) structure (ID, WorkflowName, Status, CreatedAt, UpdatedAt, CurrentState, SessionData, Error) | Yes |
 
 ## Outputs
 
@@ -62,7 +62,7 @@ SessionMetadataStore manages persistent storage of [SessionMetadata](../entities
 
 | Field | Type | Description |
 |-------|------|-------------|
-| SessionMetadata | SessionMetadata struct | [SessionMetadata](../entities/session_metadata.md) structure populated from the file |
+| SessionMetadata | SessionMetadata struct | [SessionMetadata](../entities/session/session_metadata.md) structure populated from the file |
 
 **Error Cases**:
 
@@ -164,7 +164,7 @@ SessionMetadataStore manages persistent storage of [SessionMetadata](../entities
 
 ## Related
 
-- [SessionMetadata](../entities/session_metadata.md) - Defines the SessionMetadata structure that is persisted
+- [SessionMetadata](../entities/session/session_metadata.md) - Defines the SessionMetadata structure that is persisted
 - [Session](../entities/session/session.md) - Embeds SessionMetadata and defines the full Session lifecycle
 - [EventStore](./event_store.md) - Manages EventHistory separately from SessionMetadata
 - [FileAccessor](./file_accessor.md) - Used to access `session.json` with preparation callback

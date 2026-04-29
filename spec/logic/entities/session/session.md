@@ -2,7 +2,7 @@
 
 ## Overview
 
-A `Session` represents a single execution instance of a workflow. It composes [SessionMetadata](../session_metadata.md) (the persistable state: `ID`, `WorkflowName`, `Status`, `CreatedAt`, `UpdatedAt`, `CurrentState`, `SessionData`, `Error`) with the runtime-only state: the chronological event log (`EventHistory`), a read-write lock, and a termination notifier. A session is created by [SessionInitializer](../../runtime/session_initializer.md) when `spectra run` is invoked and persists until it reaches a terminal status (`"completed"` or `"failed"`).
+A `Session` represents a single execution instance of a workflow. It composes [SessionMetadata](./session_metadata.md) (the persistable state: `ID`, `WorkflowName`, `Status`, `CreatedAt`, `UpdatedAt`, `CurrentState`, `SessionData`, `Error`) with the runtime-only state: the chronological event log (`EventHistory`), a read-write lock, and a termination notifier. A session is created by [SessionInitializer](../../runtime/session_initializer.md) when `spectra run` is invoked and persists until it reaches a terminal status (`"completed"` or `"failed"`).
 
 SessionMetadata is embedded (anonymous field) in Session, making all metadata fields directly accessible on the Session instance (e.g., `session.ID`, `session.Status`) without requiring a `Metadata` accessor.
 
@@ -66,7 +66,7 @@ Session is not invoked directly by external inputs; its construction inputs are 
 
 ### Session Struct
 
-Session embeds [SessionMetadata](../session_metadata.md) as an anonymous field, plus runtime-only fields:
+Session embeds [SessionMetadata](./session_metadata.md) as an anonymous field, plus runtime-only fields:
 
 **Embedded from SessionMetadata**:
 
@@ -146,7 +146,7 @@ Cross-method edge cases are listed below. Per-method edge cases live in the corr
 ## Related
 
 - Per-method spec files (table at the top of this document).
-- [SessionMetadata](../session_metadata.md) - Embedded persistable state
+- [SessionMetadata](./session_metadata.md) - Embedded persistable state structure
 - [Event](../event.md), [AgentError](../agent_error.md), [RuntimeError](../runtime_error.md)
 - [SessionInitializer](../../runtime/session_initializer.md), [Runtime](../../runtime/runtime.md), [SessionFinalizer](../../runtime/session_finalizer.md)
 - [EventProcessor](../../runtime/event_processor.md), [TransitionToNode](../../runtime/transition_to_node.md)
