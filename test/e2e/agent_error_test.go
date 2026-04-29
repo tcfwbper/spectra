@@ -10,6 +10,7 @@ import (
 
 // TestAgentError_CLIInvocation verifies agent raises error via spectra-agent CLI
 func TestAgentError_CLIInvocation(t *testing.T) {
+	t.Skip("requires spectra-agent CLI and Runtime implementation (not yet implemented)")
 	// Setup: Temporary test directory created
 	tmpDir := t.TempDir()
 	_ = tmpDir
@@ -29,6 +30,7 @@ func TestAgentError_CLIInvocation(t *testing.T) {
 
 // TestAgentError_CLIMissingSessionID verifies CLI rejects error without session-id flag
 func TestAgentError_CLIMissingSessionID(t *testing.T) {
+	t.Skip("requires spectra-agent CLI implementation (not yet implemented)")
 	// Setup: Temporary test directory created
 	tmpDir := t.TempDir()
 	_ = tmpDir

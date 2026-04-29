@@ -1313,6 +1313,20 @@ exit_transitions:
 
 // Dependency Interaction
 
+func TestWorkflowDefinitionLoader_Load_UsesStorageLayout(t *testing.T) {
+	tmpDir := setupWorkflowTestDir(t)
+	mockLoader := NewMockAgentDefinitionLoader()
+	writeWorkflowYAML(t, tmpDir, "Simple", createMinimalValidWorkflowYAML("Simple"))
+
+	loader := NewWorkflowDefinitionLoader(tmpDir, mockLoader)
+	def, err := loader.Load("Simple")
+
+	require.NoError(t, err)
+	assert.NotNil(t, def)
+	expectedPath := GetWorkflowPath(tmpDir, "Simple")
+	assert.FileExists(t, expectedPath)
+}
+
 func TestWorkflowDefinitionLoader_Load_ReadsFromCorrectPath(t *testing.T) {
 	tmpDir := setupWorkflowTestDir(t)
 	mockLoader := NewMockAgentDefinitionLoader()

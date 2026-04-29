@@ -18,6 +18,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/tcfwbper/spectra/entities"
 	"github.com/tcfwbper/spectra/storage"
 )
 
@@ -48,8 +49,8 @@ const (
 
 // mockMessageHandler creates a simple success handler
 func mockMessageHandler() storage.MessageHandler {
-	return func(sessionUUID string, message storage.RuntimeMessage) storage.RuntimeResponse {
-		return storage.RuntimeResponse{Status: "success", Message: "ok"}
+	return func(sessionUUID string, message entities.RuntimeMessage) entities.RuntimeResponse {
+		return entities.RuntimeResponse{Status: "success", Message: "ok"}
 	}
 }
 
@@ -62,7 +63,7 @@ type recordingMessageHandler struct {
 
 type recordedInvocation struct {
 	SessionUUID string
-	Message     storage.RuntimeMessage
+	Message     entities.RuntimeMessage
 }
 
 func newRecordingMessageHandler(responseFunc storage.MessageHandler) *recordingMessageHandler {
@@ -72,7 +73,7 @@ func newRecordingMessageHandler(responseFunc storage.MessageHandler) *recordingM
 	}
 }
 
-func (r *recordingMessageHandler) Handle(sessionUUID string, message storage.RuntimeMessage) storage.RuntimeResponse {
+func (r *recordingMessageHandler) Handle(sessionUUID string, message entities.RuntimeMessage) entities.RuntimeResponse {
 	r.mu.Lock()
 	r.invocations = append(r.invocations, recordedInvocation{
 		SessionUUID: sessionUUID,
@@ -83,7 +84,7 @@ func (r *recordingMessageHandler) Handle(sessionUUID string, message storage.Run
 	if r.responseFunc != nil {
 		return r.responseFunc(sessionUUID, message)
 	}
-	return storage.RuntimeResponse{Status: "success", Message: "recorded"}
+	return entities.RuntimeResponse{Status: "success", Message: "recorded"}
 }
 
 func (r *recordingMessageHandler) GetInvocations() []recordedInvocation {
@@ -96,6 +97,14 @@ func (r *recordingMessageHandler) Count() int {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	return len(r.invocations)
+}
+
+// payloadMap unmarshals a json.RawMessage payload into a map for test assertions
+func payloadMap(t *testing.T, payload json.RawMessage) map[string]any {
+	t.Helper()
+	var m map[string]any
+	require.NoError(t, json.Unmarshal(payload, &m))
+	return m
 }
 
 // socketClient is a helper for connecting to and sending messages to the socket
@@ -335,7 +344,7 @@ func TestReceive_ValidEventMessage(t *testing.T) {
 	invocations := handler.GetInvocations()
 	require.Len(t, invocations, 1)
 	assert.Equal(t, "event", invocations[0].Message.Type)
-	assert.Equal(t, "test", invocations[0].Message.Payload["eventType"])
+	assert.Equal(t, "test", payloadMap(t, invocations[0].Message.Payload)["eventType"])
 }
 
 // TestReceive_ValidErrorMessage parses valid error message and invokes handler
@@ -369,7 +378,7 @@ func TestReceive_ValidErrorMessage(t *testing.T) {
 	invocations := handler.GetInvocations()
 	require.Len(t, invocations, 1)
 	assert.Equal(t, "error", invocations[0].Message.Type)
-	assert.Equal(t, "error msg", invocations[0].Message.Payload["message"])
+	assert.Equal(t, "error msg", payloadMap(t, invocations[0].Message.Payload)["message"])
 }
 
 // TestReceive_SessionUUIDExtracted extracts session UUID from socket path and passes to handler
@@ -435,7 +444,7 @@ func TestReceive_ComplexPayload(t *testing.T) {
 	time.Sleep(50 * time.Millisecond)
 	invocations := handler.GetInvocations()
 	require.Len(t, invocations, 1)
-	assert.NotNil(t, invocations[0].Message.Payload["nested"])
+	assert.NotNil(t, payloadMap(t, invocations[0].Message.Payload)["nested"])
 }
 
 // TestReceive_OptionalFields handles message with optional fields
@@ -458,7 +467,7 @@ func TestReceive_OptionalFields(t *testing.T) {
 	require.NoError(t, err)
 	defer client.Close()
 
-	err = client.SendMessage(`{"type":"event","payload":{"eventType":"test","claudeSessionID":"session-123"}}`)
+	err = client.SendMessage(`{"type":"event","claudeSessionID":"session-123","payload":{"eventType":"test"}}`)
 	require.NoError(t, err)
 
 	response, err := client.ReadResponse()
@@ -468,7 +477,7 @@ func TestReceive_OptionalFields(t *testing.T) {
 	time.Sleep(50 * time.Millisecond)
 	invocations := handler.GetInvocations()
 	require.Len(t, invocations, 1)
-	assert.Equal(t, "session-123", invocations[0].Message.Payload["claudeSessionID"])
+	assert.Equal(t, "session-123", invocations[0].Message.ClaudeSessionID)
 }
 
 // TestResponse_Success sends success response to client
@@ -479,8 +488,8 @@ func TestResponse_Success(t *testing.T) {
 
 	require.NoError(t, manager.CreateSocket())
 
-	successHandler := func(sessionUUID string, message storage.RuntimeMessage) storage.RuntimeResponse {
-		return storage.RuntimeResponse{Status: "success", Message: "ok"}
+	successHandler := func(sessionUUID string, message entities.RuntimeMessage) entities.RuntimeResponse {
+		return entities.RuntimeResponse{Status: "success", Message: "ok"}
 	}
 	_, _, err := manager.Listen(successHandler)
 	require.NoError(t, err)
@@ -509,8 +518,8 @@ func TestResponse_Error(t *testing.T) {
 
 	require.NoError(t, manager.CreateSocket())
 
-	errorHandler := func(sessionUUID string, message storage.RuntimeMessage) storage.RuntimeResponse {
-		return storage.RuntimeResponse{Status: "error", Message: "failed"}
+	errorHandler := func(sessionUUID string, message entities.RuntimeMessage) entities.RuntimeResponse {
+		return entities.RuntimeResponse{Status: "error", Message: "failed"}
 	}
 	_, _, err := manager.Listen(errorHandler)
 	require.NoError(t, err)
@@ -539,8 +548,8 @@ func TestResponse_EmptyMessage(t *testing.T) {
 
 	require.NoError(t, manager.CreateSocket())
 
-	emptyHandler := func(sessionUUID string, message storage.RuntimeMessage) storage.RuntimeResponse {
-		return storage.RuntimeResponse{Status: "success", Message: ""}
+	emptyHandler := func(sessionUUID string, message entities.RuntimeMessage) entities.RuntimeResponse {
+		return entities.RuntimeResponse{Status: "success", Message: ""}
 	}
 	_, _, err := manager.Listen(emptyHandler)
 	require.NoError(t, err)
@@ -628,9 +637,9 @@ func TestDeleteSocket_ClosesActiveConnections(t *testing.T) {
 	require.NoError(t, manager.CreateSocket())
 	defer manager.DeleteSocket()
 
-	slowHandler := func(sessionUUID string, message storage.RuntimeMessage) storage.RuntimeResponse {
+	slowHandler := func(sessionUUID string, message entities.RuntimeMessage) entities.RuntimeResponse {
 		time.Sleep(listenerShutdownMax)
-		return storage.RuntimeResponse{Status: "success", Message: "ok"}
+		return entities.RuntimeResponse{Status: "success", Message: "ok"}
 	}
 	_, _, err := manager.Listen(slowHandler)
 	require.NoError(t, err)
@@ -1055,7 +1064,7 @@ func TestReceive_ClaudeSessionIDNotString(t *testing.T) {
 	require.NoError(t, err)
 	defer client.Close()
 
-	err = client.SendMessage(`{"type":"event","payload":{"eventType":"test","claudeSessionID":123}}`)
+	err = client.SendMessage(`{"type":"event","claudeSessionID":123,"payload":{"eventType":"test"}}`)
 	require.NoError(t, err)
 
 	time.Sleep(50 * time.Millisecond)
@@ -1196,8 +1205,8 @@ func TestReceive_MessageWithUnicode(t *testing.T) {
 	time.Sleep(50 * time.Millisecond)
 	invocations := handler.GetInvocations()
 	require.Len(t, invocations, 1)
-	assert.Equal(t, "🎉", invocations[0].Message.Payload["emoji"])
-	assert.Equal(t, "中文", invocations[0].Message.Payload["cjk"])
+	assert.Equal(t, "🎉", payloadMap(t, invocations[0].Message.Payload)["emoji"])
+	assert.Equal(t, "中文", payloadMap(t, invocations[0].Message.Payload)["cjk"])
 }
 
 // TestReceive_MessageWithQuotes handles escaped quotes in payload
@@ -1522,9 +1531,9 @@ func TestListen_ConcurrentConnections(t *testing.T) {
 	defer manager.DeleteSocket()
 
 	var count int32
-	countingHandler := func(sessionUUID string, message storage.RuntimeMessage) storage.RuntimeResponse {
+	countingHandler := func(sessionUUID string, message entities.RuntimeMessage) entities.RuntimeResponse {
 		atomic.AddInt32(&count, 1)
-		return storage.RuntimeResponse{Status: "success", Message: "ok"}
+		return entities.RuntimeResponse{Status: "success", Message: "ok"}
 	}
 
 	_, _, err := manager.Listen(countingHandler)
@@ -1565,9 +1574,9 @@ func TestListen_ConnectionGoroutineIsolation(t *testing.T) {
 	require.NoError(t, manager.CreateSocket())
 	defer manager.DeleteSocket()
 
-	slowHandler := func(sessionUUID string, message storage.RuntimeMessage) storage.RuntimeResponse {
+	slowHandler := func(sessionUUID string, message entities.RuntimeMessage) entities.RuntimeResponse {
 		time.Sleep(slowHandlerDelay)
-		return storage.RuntimeResponse{Status: "success", Message: "ok"}
+		return entities.RuntimeResponse{Status: "success", Message: "ok"}
 	}
 
 	_, _, err := manager.Listen(slowHandler)
@@ -1639,9 +1648,9 @@ func TestDeleteSocket_DuringActiveConnections(t *testing.T) {
 
 	require.NoError(t, manager.CreateSocket())
 
-	slowHandler := func(sessionUUID string, message storage.RuntimeMessage) storage.RuntimeResponse {
+	slowHandler := func(sessionUUID string, message entities.RuntimeMessage) entities.RuntimeResponse {
 		time.Sleep(fastClientMaxWait)
-		return storage.RuntimeResponse{Status: "success", Message: "ok"}
+		return entities.RuntimeResponse{Status: "success", Message: "ok"}
 	}
 
 	_, _, err := manager.Listen(slowHandler)
@@ -1825,8 +1834,9 @@ func TestReceive_MessageHandlerRuntimeMessage(t *testing.T) {
 
 	msg := invocations[0].Message
 	assert.Equal(t, "event", msg.Type)
-	assert.Equal(t, "test", msg.Payload["eventType"])
-	assert.Equal(t, "msg", msg.Payload["message"])
+	payload := payloadMap(t, msg.Payload)
+	assert.Equal(t, "test", payload["eventType"])
+	assert.Equal(t, "msg", payload["message"])
 }
 
 // TestReceive_MessageHandlerResponseSerialized MessageHandler response correctly serialized to JSON
@@ -1837,8 +1847,8 @@ func TestReceive_MessageHandlerResponseSerialized(t *testing.T) {
 
 	require.NoError(t, manager.CreateSocket())
 
-	customHandler := func(sessionUUID string, message storage.RuntimeMessage) storage.RuntimeResponse {
-		return storage.RuntimeResponse{Status: "success", Message: "processed"}
+	customHandler := func(sessionUUID string, message entities.RuntimeMessage) entities.RuntimeResponse {
+		return entities.RuntimeResponse{Status: "success", Message: "processed"}
 	}
 
 	_, _, err := manager.Listen(customHandler)
@@ -1858,7 +1868,7 @@ func TestReceive_MessageHandlerResponseSerialized(t *testing.T) {
 	response, err := client.ReadResponse()
 	require.NoError(t, err)
 
-	var resp storage.RuntimeResponse
+	var resp entities.RuntimeResponse
 	err = json.Unmarshal([]byte(response), &resp)
 	require.NoError(t, err)
 	assert.Equal(t, "success", resp.Status)
@@ -1875,12 +1885,12 @@ func TestReceive_MessageHandlerSlow(t *testing.T) {
 	defer manager.DeleteSocket()
 
 	var count int32
-	slowHandler := func(sessionUUID string, message storage.RuntimeMessage) storage.RuntimeResponse {
+	slowHandler := func(sessionUUID string, message entities.RuntimeMessage) entities.RuntimeResponse {
 		n := atomic.AddInt32(&count, 1)
 		if n == 1 {
 			time.Sleep(verySlowHandlerDelay)
 		}
-		return storage.RuntimeResponse{Status: "success", Message: "ok"}
+		return entities.RuntimeResponse{Status: "success", Message: "ok"}
 	}
 
 	_, _, err := manager.Listen(slowHandler)
@@ -2037,11 +2047,12 @@ func TestReceive_NoMessageBuffering(t *testing.T) {
 	var order []int
 	var mu sync.Mutex
 
-	orderingHandler := func(sessionUUID string, message storage.RuntimeMessage) storage.RuntimeResponse {
+	orderingHandler := func(sessionUUID string, message entities.RuntimeMessage) entities.RuntimeResponse {
 		mu.Lock()
 		defer mu.Unlock()
 
-		if eventType, ok := message.Payload["eventType"].(string); ok {
+		payload := payloadMap(t, message.Payload)
+		if eventType, ok := payload["eventType"].(string); ok {
 			if eventType == "test1" {
 				order = append(order, 1)
 			} else if eventType == "test2" {
@@ -2050,7 +2061,7 @@ func TestReceive_NoMessageBuffering(t *testing.T) {
 				order = append(order, 3)
 			}
 		}
-		return storage.RuntimeResponse{Status: "success", Message: "ok"}
+		return entities.RuntimeResponse{Status: "success", Message: "ok"}
 	}
 
 	_, _, err := manager.Listen(orderingHandler)

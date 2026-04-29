@@ -8,24 +8,14 @@ import (
 	"net"
 	"os"
 	"sync"
+
+	"github.com/tcfwbper/spectra/entities"
 )
 
 const maxMessageSize = 10 * 1024 * 1024 // 10 MB
 
-// RuntimeMessage represents a message received from spectra-agent
-type RuntimeMessage struct {
-	Type    string         `json:"type"`
-	Payload map[string]any `json:"payload"`
-}
-
-// RuntimeResponse represents the response sent back to spectra-agent
-type RuntimeResponse struct {
-	Status  string `json:"status"`
-	Message string `json:"message"`
-}
-
 // MessageHandler is the callback function for processing messages
-type MessageHandler func(sessionUUID string, message RuntimeMessage) RuntimeResponse
+type MessageHandler func(sessionUUID string, message entities.RuntimeMessage) entities.RuntimeResponse
 
 // RuntimeSocketManager manages the runtime socket lifecycle for a session
 type RuntimeSocketManager struct {
@@ -139,14 +129,14 @@ func (m *RuntimeSocketManager) handleConnection(conn net.Conn, handler MessageHa
 	}
 
 	// Parse JSON message
-	var msg RuntimeMessage
+	var msg entities.RuntimeMessage
 	if err := json.Unmarshal(data, &msg); err != nil {
 		// Malformed JSON
 		return
 	}
 
 	// Validate message structure
-	if !m.validateMessage(&msg) {
+	if err := msg.Validate(); err != nil {
 		return
 	}
 
@@ -162,56 +152,6 @@ func (m *RuntimeSocketManager) handleConnection(conn net.Conn, handler MessageHa
 	// Send response with newline
 	responseData = append(responseData, '\n')
 	_, _ = conn.Write(responseData)
-}
-
-// validateMessage validates the message structure and required fields
-func (m *RuntimeSocketManager) validateMessage(msg *RuntimeMessage) bool {
-	// Check required fields
-	if msg.Type == "" {
-		return false
-	}
-
-	if msg.Payload == nil {
-		return false
-	}
-
-	// Validate message type
-	if msg.Type != "event" && msg.Type != "error" {
-		return false
-	}
-
-	// Validate type-specific requirements
-	if msg.Type == "event" {
-		eventType, ok := msg.Payload["eventType"]
-		if !ok {
-			return false
-		}
-		// eventType must be a string
-		if _, ok := eventType.(string); !ok {
-			return false
-		}
-	}
-
-	if msg.Type == "error" {
-		message, ok := msg.Payload["message"]
-		if !ok {
-			return false
-		}
-		// message must be a non-empty string
-		messageStr, ok := message.(string)
-		if !ok || messageStr == "" {
-			return false
-		}
-	}
-
-	// Validate claudeSessionID if present
-	if claudeSessionID, ok := msg.Payload["claudeSessionID"]; ok {
-		if _, ok := claudeSessionID.(string); !ok {
-			return false
-		}
-	}
-
-	return true
 }
 
 // DeleteSocket stops listening and removes the socket file

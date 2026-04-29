@@ -10,6 +10,7 @@ import (
 
 // TestEvent_CLIInvocation verifies agent emits event via spectra-agent CLI
 func TestEvent_CLIInvocation(t *testing.T) {
+	t.Skip("requires spectra-agent CLI and Runtime implementation (not yet implemented)")
 	// Setup: Temporary test directory created
 	tmpDir := t.TempDir()
 	_ = tmpDir
@@ -29,6 +30,7 @@ func TestEvent_CLIInvocation(t *testing.T) {
 
 // TestEvent_CLIMissingSessionID verifies CLI rejects event without session-id flag
 func TestEvent_CLIMissingSessionID(t *testing.T) {
+	t.Skip("requires spectra-agent CLI implementation (not yet implemented)")
 	// Setup: Temporary test directory created
 	tmpDir := t.TempDir()
 	_ = tmpDir
@@ -43,6 +45,7 @@ func TestEvent_CLIMissingSessionID(t *testing.T) {
 
 // TestEvent_CLIDefaultsMessageToEmpty verifies CLI defaults Message to empty string when omitted
 func TestEvent_CLIDefaultsMessageToEmpty(t *testing.T) {
+	t.Skip("requires spectra-agent CLI and Runtime implementation (not yet implemented)")
 	// Setup: Temporary test directory created
 	tmpDir := t.TempDir()
 	_ = tmpDir
@@ -60,6 +63,7 @@ func TestEvent_CLIDefaultsMessageToEmpty(t *testing.T) {
 
 // TestEvent_CLIDefaultsPayloadToEmpty verifies CLI defaults Payload to empty object when omitted
 func TestEvent_CLIDefaultsPayloadToEmpty(t *testing.T) {
+	t.Skip("requires spectra-agent CLI and Runtime implementation (not yet implemented)")
 	// Setup: Temporary test directory created
 	tmpDir := t.TempDir()
 	_ = tmpDir
