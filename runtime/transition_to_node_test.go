@@ -119,17 +119,26 @@ func (m *mockAgentInvokerForTransition) InvokeAgent(nodeName string, message str
 
 // captureStdout redirects os.Stdout to a pipe and returns a restore function
 // that restores os.Stdout and returns captured output.
+// A background goroutine drains the pipe continuously to prevent blocking on
+// large writes (Linux pipe buffer is ~64 KB).
 func captureStdout(t *testing.T) func() string {
 	t.Helper()
 	old := os.Stdout
 	r, w, err := os.Pipe()
 	require.NoError(t, err)
 	os.Stdout = w
+
+	var buf bytes.Buffer
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		_, _ = io.Copy(&buf, r)
+	}()
+
 	return func() string {
 		w.Close()
 		os.Stdout = old
-		var buf bytes.Buffer
-		_, _ = io.Copy(&buf, r)
+		<-done
 		r.Close()
 		return buf.String()
 	}
