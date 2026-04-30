@@ -116,11 +116,15 @@ transitions:
 
 11. **Transition Integrity**: All `Transition.FromNode` and `Transition.ToNode` must reference valid `Node.Name` values in `Nodes`.
 
-12. **Non-Exit Node Outgoing Transition**: Every node that is not targeted by any exit transition must have at least one outgoing transition (at least one `Transition` where `FromNode` equals the node's name). Nodes targeted by exit transitions (i.e., `to_node` of transitions defined in `ExitTransitions`) are exempt from this requirement.
+12. **Transition Uniqueness**: No two transitions in `Transitions` may share the same `from_node` and `event_type`. A duplicate `(from_node, event_type)` pair would create ambiguous routing, as only one transition may fire per event from a given node.
 
-13. **Event Type Validation**: All `Transition.EventType` values must be valid Event types (PascalCase, non-empty, workflow-specific).
+13. **Exit Transition Uniqueness**: No two exit transitions in `ExitTransitions` may be identical (same `from_node`, `event_type`, and `to_node`).
 
-14. **Built-in Workflow Copy Behavior**: During `spectra init`, built-in workflows are copied to `.spectra/workflows/` only if a file with the same name does not already exist. Existing files are skipped without error.
+14. **Non-Exit Node Outgoing Transition**: Every node that is not targeted by any exit transition must have at least one outgoing transition (at least one `Transition` where `FromNode` equals the node's name). Nodes targeted by exit transitions (i.e., `to_node` of transitions defined in `ExitTransitions`) are exempt from this requirement.
+
+15. **Event Type Validation**: All `Transition.EventType` values must be valid Event types (PascalCase, non-empty, workflow-specific).
+
+16. **Built-in Workflow Copy Behavior**: During `spectra init`, built-in workflows are copied to `.spectra/workflows/` only if a file with the same name does not already exist. Existing files are skipped without error.
 
 ## Edge Cases
 
@@ -147,6 +151,12 @@ transitions:
 
 - **Condition**: A non-entry node is unreachable (no incoming transitions).
   **Expected**: Runtime rejects the workflow definition with an error: "node '<name>' is unreachable (no incoming transitions)".
+
+- **Condition**: Two transitions in `Transitions` share the same `from_node` and `event_type` (e.g., two transitions both from node `"A"` on event `"Done"`).
+  **Expected**: Runtime rejects the workflow definition with an error: "duplicate transition for event '<event_type>' from node '<from_node>'".
+
+- **Condition**: Two exit transitions in `ExitTransitions` are identical (same `from_node`, `event_type`, and `to_node`).
+  **Expected**: Runtime rejects the workflow definition with an error: "duplicate exit transition (event_type: '<type>', from_node: '<from>', to_node: '<to>')".
 
 - **Condition**: A node not targeted by any exit transition has no outgoing transitions.
   **Expected**: Runtime rejects the workflow definition with an error: "node '<name>' has no outgoing transitions and is not an exit target".
