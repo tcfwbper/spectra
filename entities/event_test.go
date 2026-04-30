@@ -93,7 +93,7 @@ func TestEvent_EmittedBySetToCurrentState(t *testing.T) {
 
 	require.NoError(t, err)
 	require.NotNil(t, evt)
-	// EmittedBy is set by runtime from session's CurrentState; placeholder is ""
+	// EmittedBy is set by the runtime layer (EventProcessor) from session's CurrentState; empty at entity construction
 	assert.IsType(t, "", evt.EmittedBy)
 }
 
@@ -131,7 +131,7 @@ func TestEvent_EmptyType(t *testing.T) {
 
 // TestEvent_UndefinedType rejects Event with Type not defined in workflow
 func TestEvent_UndefinedType(t *testing.T) {
-	t.Skip("requires workflow definition lookup to validate event type against workflow-defined types (not yet implemented)")
+	t.Skip("event type validation against workflow definition is the runtime layer's responsibility (EventProcessor), not the entity constructor")
 	sessionID := uuid.New()
 
 	_, err := NewEvent(
@@ -236,7 +236,7 @@ func TestEvent_PayloadNull(t *testing.T) {
 
 // TestEvent_NonExistentSession rejects Event with non-existent SessionID
 func TestEvent_NonExistentSession(t *testing.T) {
-	t.Skip("requires session registry to validate SessionID references an existing session (not yet implemented)")
+	t.Skip("session existence validation is the runtime layer's responsibility (EventProcessor), not the entity constructor")
 	nonExistentID := uuid.New()
 
 	_, err := NewEvent(
@@ -252,7 +252,7 @@ func TestEvent_NonExistentSession(t *testing.T) {
 
 // TestEvent_InitializingSession rejects Event for session with Status=initializing
 func TestEvent_InitializingSession(t *testing.T) {
-	t.Skip("requires session registry to validate session status (not yet implemented)")
+	t.Skip("session status validation is the runtime layer's responsibility (EventProcessor), not the entity constructor")
 	sessionID := uuid.New()
 
 	_, err := NewEvent(
@@ -268,7 +268,7 @@ func TestEvent_InitializingSession(t *testing.T) {
 
 // TestEvent_CompletedSession rejects Event for session with Status=completed
 func TestEvent_CompletedSession(t *testing.T) {
-	t.Skip("requires session registry to validate session status (not yet implemented)")
+	t.Skip("session status validation is the runtime layer's responsibility (EventProcessor), not the entity constructor")
 	sessionID := uuid.New()
 
 	_, err := NewEvent(
@@ -284,7 +284,7 @@ func TestEvent_CompletedSession(t *testing.T) {
 
 // TestEvent_FailedSession rejects Event for session with Status=failed
 func TestEvent_FailedSession(t *testing.T) {
-	t.Skip("requires session registry to validate session status (not yet implemented)")
+	t.Skip("session status validation is the runtime layer's responsibility (EventProcessor), not the entity constructor")
 	sessionID := uuid.New()
 
 	_, err := NewEvent(
@@ -316,7 +316,7 @@ func TestEvent_TriggersStateTransition(t *testing.T) {
 
 // TestEvent_NoMatchingTransition verifies Event with no matching transition is rejected
 func TestEvent_NoMatchingTransition(t *testing.T) {
-	t.Skip("requires workflow transition lookup to validate event triggers a valid transition (not yet implemented)")
+	t.Skip("transition validation is the runtime layer's responsibility (TransitionEvaluator), not the entity constructor")
 	sessionID := uuid.New()
 
 	_, err := NewEvent(

@@ -22,7 +22,9 @@ type Event struct {
 // It validates that:
 // - Type is non-empty and follows PascalCase convention
 // - Payload is a valid JSON object (not primitive or array) if provided
-// - SessionID references an existing session (placeholder validation for now)
+//
+// Note: SessionID existence, session status, event type definition, and EmittedBy
+// assignment are validated/set by the runtime layer (EventProcessor), not here.
 func NewEvent(
 	eventType string,
 	message string,
@@ -60,10 +62,8 @@ func NewEvent(
 		return nil, fmt.Errorf("payload must be a JSON object")
 	}
 
-	// TODO: Validate SessionID references an existing session
-	// TODO: Set EmittedBy from session's CurrentState
-	// TODO: Validate event type is defined in workflow
-	// For now, we use placeholder values
+	// SessionID existence, session status, event type definition, and EmittedBy
+	// are validated/set by the runtime layer (EventProcessor), not the entity constructor.
 
 	return &Event{
 		ID:        uuid.New(),

@@ -158,7 +158,7 @@ func TestRuntimeError_InvalidDetailJSON(t *testing.T) {
 
 // TestRuntimeError_NonExistentSession rejects RuntimeError with non-existent SessionID
 func TestRuntimeError_NonExistentSession(t *testing.T) {
-	t.Skip("requires session registry to validate SessionID references an existing session (not yet implemented)")
+	t.Skip("session existence validation is the runtime layer's responsibility (ErrorProcessor), not the entity constructor")
 	nonExistentID := uuid.New()
 
 	_, err := NewRuntimeError(
@@ -176,7 +176,7 @@ func TestRuntimeError_NonExistentSession(t *testing.T) {
 
 // TestRuntimeError_FailedSessionID rejects RuntimeError for session with Status=failed
 func TestRuntimeError_FailedSessionID(t *testing.T) {
-	t.Skip("requires session registry to validate session status (not yet implemented)")
+	t.Skip("session status validation is the runtime layer's responsibility (ErrorProcessor), not the entity constructor")
 	sessionID := uuid.New()
 
 	_, err := NewRuntimeError(
@@ -194,7 +194,7 @@ func TestRuntimeError_FailedSessionID(t *testing.T) {
 
 // TestRuntimeError_CompletedSessionID rejects RuntimeError for session with Status=completed
 func TestRuntimeError_CompletedSessionID(t *testing.T) {
-	t.Skip("requires session registry to validate session status (not yet implemented)")
+	t.Skip("session status validation is the runtime layer's responsibility (ErrorProcessor), not the entity constructor")
 	sessionID := uuid.New()
 
 	_, err := NewRuntimeError(
