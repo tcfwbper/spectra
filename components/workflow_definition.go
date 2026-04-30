@@ -90,36 +90,60 @@ func NewWorkflowDefinition(name, description, entryNode string, exitTransitions 
 		return nil, fmt.Errorf("entry node '%s' not found", entryNode)
 	}
 	if entryNodeObj.GetType() != "human" {
-		return nil, fmt.Errorf("entry node '%s' must have type 'human', but has type '%s'", entryNode, entryNodeObj.GetType())
+		return nil, fmt.Errorf("entry node '%s' must have type 'human'", entryNode)
 	}
 
 	// Build transition map for validation
 	transitionMap := make(map[string]bool)
+	transitionDupMap := make(map[string]bool)
 	for _, t := range transitions {
 		key := fmt.Sprintf("%s|%s|%s", t.GetFromNode(), t.GetEventType(), t.GetToNode())
 		transitionMap[key] = true
 
+		// Validate no duplicate transitions (same from_node and event_type)
+		dupKey := fmt.Sprintf("%s|%s", t.GetFromNode(), t.GetEventType())
+		if transitionDupMap[dupKey] {
+			return nil, fmt.Errorf("duplicate transition for event '%s' from node '%s'", t.GetEventType(), t.GetFromNode())
+		}
+		transitionDupMap[dupKey] = true
+
 		// Validate transition nodes exist
 		if _, exists := nodeMap[t.GetFromNode()]; !exists {
-			return nil, fmt.Errorf("transition references undefined node: %s", t.GetFromNode())
+			return nil, fmt.Errorf("transition references undefined node '%s'", t.GetFromNode())
 		}
 		if _, exists := nodeMap[t.GetToNode()]; !exists {
-			return nil, fmt.Errorf("transition references undefined node: %s", t.GetToNode())
+			return nil, fmt.Errorf("transition references undefined node '%s'", t.GetToNode())
 		}
 	}
 
 	// Validate exit transitions
 	exitTargetNodes := make(map[string]bool)
+	exitTransitionDupMap := make(map[string]bool)
 	for _, et := range exitTransitions {
+		// Validate exit transition node references exist
+		if _, exists := nodeMap[et.GetFromNode()]; !exists {
+			return nil, fmt.Errorf("exit transition references non-existent node '%s'", et.GetFromNode())
+		}
+		if _, exists := nodeMap[et.GetToNode()]; !exists {
+			return nil, fmt.Errorf("exit transition references non-existent node '%s'", et.GetToNode())
+		}
+
 		key := fmt.Sprintf("%s|%s|%s", et.GetFromNode(), et.GetEventType(), et.GetToNode())
+
+		// Check for duplicate exit transitions
+		if exitTransitionDupMap[key] {
+			return nil, fmt.Errorf("duplicate exit transition (event_type: '%s', from_node: '%s', to_node: '%s')", et.GetEventType(), et.GetFromNode(), et.GetToNode())
+		}
+		exitTransitionDupMap[key] = true
+
 		if !transitionMap[key] {
-			return nil, fmt.Errorf("exit transition (from_node: %s, event_type: %s, to_node: %s) has no corresponding transition", et.GetFromNode(), et.GetEventType(), et.GetToNode())
+			return nil, fmt.Errorf("exit transition (from_node: '%s', event_type: '%s', to_node: '%s') has no corresponding transition definition", et.GetFromNode(), et.GetEventType(), et.GetToNode())
 		}
 
 		// Validate exit transition target is human
 		toNode := nodeMap[et.GetToNode()]
 		if toNode.GetType() != "human" {
-			return nil, fmt.Errorf("exit transition to_node '%s' must target a human node, but has type '%s'", et.GetToNode(), toNode.GetType())
+			return nil, fmt.Errorf("exit transition (from_node: '%s', event_type: '%s', to_node: '%s') must target a human node, but targets '%s' with type '%s'", et.GetFromNode(), et.GetEventType(), et.GetToNode(), et.GetToNode(), toNode.GetType())
 		}
 
 		exitTargetNodes[et.GetToNode()] = true

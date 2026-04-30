@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	"github.com/tcfwbper/spectra/components"
 )
 
 // TestExitTransition_ValidConstruction creates ExitTransition matching existing transition to human node
@@ -48,7 +49,19 @@ func TestExitTransition_NoMatchingTransition(t *testing.T) {
 	// Setup: Workflow with transition from "A" to "B" on "Event1" only
 	// Input: ExitTransition: FromNode="A", EventType="Event2", ToNode="B"
 	// Expected: Returns error; error message matches `/exit transition.*Event2.*no.*corresponding.*transition/i`
-	t.Skip("Transition correspondence validation happens at workflow level")
+	nodes := []*components.Node{
+		createNode(t, "A", "human", "", ""),
+		createNode(t, "B", "human", "", ""),
+	}
+	transitions := []*components.Transition{
+		createTransition(t, "A", "Event1", "B"),
+	}
+	exitTransitions := []*components.ExitTransition{
+		createExitTransition(t, "A", "Event2", "B"),
+	}
+
+	_, err := components.NewWorkflowDefinition("Test", "", "A", exitTransitions, nodes, transitions)
+	assertErrorMatches(t, err, `(?i)exit transition.*Event2.*no.*corresponding.*transition`)
 }
 
 // TestExitTransition_PartialMatchFromNode rejects ExitTransition where FromNode and EventType match but ToNode differs
@@ -56,7 +69,23 @@ func TestExitTransition_PartialMatchFromNode(t *testing.T) {
 	// Setup: Workflow with transition from "A" to "B" on "Event"
 	// Input: ExitTransition: FromNode="A", EventType="Event", ToNode="C"
 	// Expected: Returns error; error message matches `/exit transition.*no.*corresponding.*transition/i`
-	t.Skip("Transition correspondence validation happens at workflow level")
+	nodes := []*components.Node{
+		createNode(t, "A", "human", "", ""),
+		createNode(t, "B", "human", "", ""),
+		createNode(t, "C", "human", "", ""),
+	}
+	transitions := []*components.Transition{
+		createTransition(t, "A", "Event", "B"),
+		createTransition(t, "B", "Back", "A"),
+		createTransition(t, "A", "Go", "C"),
+		createTransition(t, "C", "Return", "A"),
+	}
+	exitTransitions := []*components.ExitTransition{
+		createExitTransition(t, "A", "Event", "C"),
+	}
+
+	_, err := components.NewWorkflowDefinition("Test", "", "A", exitTransitions, nodes, transitions)
+	assertErrorMatches(t, err, `(?i)exit transition.*no.*corresponding.*transition`)
 }
 
 // TestExitTransition_PartialMatchEventType rejects ExitTransition where FromNode and ToNode match but EventType differs
@@ -64,7 +93,20 @@ func TestExitTransition_PartialMatchEventType(t *testing.T) {
 	// Setup: Workflow with transition from "A" to "B" on "Event1"
 	// Input: ExitTransition: FromNode="A", EventType="Event2", ToNode="B"
 	// Expected: Returns error; error message matches `/exit transition.*no.*corresponding.*transition/i`
-	t.Skip("Transition correspondence validation happens at workflow level")
+	nodes := []*components.Node{
+		createNode(t, "A", "human", "", ""),
+		createNode(t, "B", "human", "", ""),
+	}
+	transitions := []*components.Transition{
+		createTransition(t, "A", "Event1", "B"),
+		createTransition(t, "B", "Back", "A"),
+	}
+	exitTransitions := []*components.ExitTransition{
+		createExitTransition(t, "A", "Event2", "B"),
+	}
+
+	_, err := components.NewWorkflowDefinition("Test", "", "A", exitTransitions, nodes, transitions)
+	assertErrorMatches(t, err, `(?i)exit transition.*no.*corresponding.*transition`)
 }
 
 // TestExitTransition_ToAgentNode rejects ExitTransition with ToNode referencing agent node
@@ -73,23 +115,62 @@ func TestExitTransition_ToAgentNode(t *testing.T) {
 	//        transition from "HumanApproval" to "ArchitectReviewer" on "Approved"
 	// Input: ExitTransition: FromNode="HumanApproval", EventType="Approved", ToNode="ArchitectReviewer"
 	// Expected: Returns error; error message matches `/exit transition.*must target.*human.*node.*ArchitectReviewer.*agent/i`
-	t.Skip("Node type validation happens at workflow level")
+	nodes := []*components.Node{
+		createNode(t, "HumanApproval", "human", "", ""),
+		createNode(t, "ArchitectReviewer", "agent", "Architect", ""),
+	}
+	transitions := []*components.Transition{
+		createTransition(t, "HumanApproval", "Approved", "ArchitectReviewer"),
+		createTransition(t, "ArchitectReviewer", "Done", "HumanApproval"),
+	}
+	exitTransitions := []*components.ExitTransition{
+		createExitTransition(t, "HumanApproval", "Approved", "ArchitectReviewer"),
+	}
+
+	_, err := components.NewWorkflowDefinition("Test", "", "HumanApproval", exitTransitions, nodes, transitions)
+	assertErrorMatches(t, err, `(?i)exit transition.*must target.*human.*node.*ArchitectReviewer.*agent`)
 }
 
 // TestExitTransition_FromNodeNonExistent rejects ExitTransition with non-existent FromNode
 func TestExitTransition_FromNodeNonExistent(t *testing.T) {
-	// Setup: Workflow with node "Reviewer" only
+	// Setup: Workflow with nodes "Reviewer" and "Start"; exit transition references non-existent from_node
 	// Input: FromNode="NonExistent", EventType="Event", ToNode="Reviewer"
 	// Expected: Returns error; error message matches `/exit transition.*non-existent.*node.*NonExistent/i`
-	t.Skip("Node existence validation happens at workflow level")
+	nodes := []*components.Node{
+		createNode(t, "Reviewer", "human", "", ""),
+		createNode(t, "Start", "human", "", ""),
+	}
+	transitions := []*components.Transition{
+		createTransition(t, "Start", "Go", "Reviewer"),
+		createTransition(t, "Reviewer", "Back", "Start"),
+	}
+	exitTransitions := []*components.ExitTransition{
+		createExitTransition(t, "NonExistent", "Event", "Reviewer"),
+	}
+
+	_, err := components.NewWorkflowDefinition("Test", "", "Start", exitTransitions, nodes, transitions)
+	assertErrorMatches(t, err, `(?i)exit transition.*non-existent.*node.*NonExistent`)
 }
 
 // TestExitTransition_ToNodeNonExistent rejects ExitTransition with non-existent ToNode
 func TestExitTransition_ToNodeNonExistent(t *testing.T) {
-	// Setup: Workflow with node "Approval" only
+	// Setup: Workflow with node "Approval" and "Start"; exit transition references non-existent to_node
 	// Input: FromNode="Approval", EventType="Event", ToNode="NonExistent"
 	// Expected: Returns error; error message matches `/exit transition.*non-existent.*node.*NonExistent/i`
-	t.Skip("Node existence validation happens at workflow level")
+	nodes := []*components.Node{
+		createNode(t, "Approval", "human", "", ""),
+		createNode(t, "Start", "human", "", ""),
+	}
+	transitions := []*components.Transition{
+		createTransition(t, "Start", "Go", "Approval"),
+		createTransition(t, "Approval", "Back", "Start"),
+	}
+	exitTransitions := []*components.ExitTransition{
+		createExitTransition(t, "Approval", "Event", "NonExistent"),
+	}
+
+	_, err := components.NewWorkflowDefinition("Test", "", "Start", exitTransitions, nodes, transitions)
+	assertErrorMatches(t, err, `(?i)exit transition.*non-existent.*node.*NonExistent`)
 }
 
 // TestExitTransition_EmptyEventType rejects ExitTransition with empty EventType
@@ -124,7 +205,21 @@ func TestExitTransition_Duplicate(t *testing.T) {
 	// Setup: Workflow with existing ExitTransition: FromNode="A", EventType="Done", ToNode="B" (both human nodes)
 	// Input: Add second ExitTransition: FromNode="A", EventType="Done", ToNode="B"
 	// Expected: Returns error; error message matches `/duplicate.*exit transition.*Done.*A.*B/i`
-	t.Skip("Duplicate detection happens at workflow level")
+	nodes := []*components.Node{
+		createNode(t, "A", "human", "", ""),
+		createNode(t, "B", "human", "", ""),
+	}
+	transitions := []*components.Transition{
+		createTransition(t, "A", "Done", "B"),
+		createTransition(t, "B", "Back", "A"),
+	}
+	exitTransitions := []*components.ExitTransition{
+		createExitTransition(t, "A", "Done", "B"),
+		createExitTransition(t, "A", "Done", "B"),
+	}
+
+	_, err := components.NewWorkflowDefinition("Test", "", "A", exitTransitions, nodes, transitions)
+	assertErrorMatches(t, err, `(?i)duplicate.*exit transition.*Done.*A.*B`)
 }
 
 // TestExitTransition_EmptyArray rejects workflow with empty ExitTransitions array
@@ -132,7 +227,18 @@ func TestExitTransition_EmptyArray(t *testing.T) {
 	// Setup: Workflow with nodes and transitions
 	// Input: ExitTransitions array is empty
 	// Expected: Returns error; error message matches `/at least one.*exit transition.*required/i`
-	t.Skip("Empty array validation happens at workflow level")
+	nodes := []*components.Node{
+		createNode(t, "A", "human", "", ""),
+		createNode(t, "B", "human", "", ""),
+	}
+	transitions := []*components.Transition{
+		createTransition(t, "A", "Go", "B"),
+		createTransition(t, "B", "Back", "A"),
+	}
+	exitTransitions := []*components.ExitTransition{}
+
+	_, err := components.NewWorkflowDefinition("Test", "", "A", exitTransitions, nodes, transitions)
+	assertErrorMatches(t, err, `(?i)at least one.*exit transition.*required`)
 }
 
 // TestExitTransition_TriggersCompletion verifies ExitTransition triggers workflow completion when traversed
@@ -141,7 +247,7 @@ func TestExitTransition_TriggersCompletion(t *testing.T) {
 	//        session at CurrentState="HumanApproval", Status="running"
 	// Input: Emit event: Type="Approved"
 	// Expected: Session CurrentState transitions to "HumanRequirement"; session Status set to "completed"; session terminates
-	t.Skip("Requires runtime and session components")
+	t.Skip("Tested in runtime package")
 }
 
 // TestExitTransition_StateUpdateBeforeCompletion verifies CurrentState updates to ToNode before Status changes to completed
@@ -150,7 +256,7 @@ func TestExitTransition_StateUpdateBeforeCompletion(t *testing.T) {
 	//        session at CurrentState="A", Status="running"
 	// Input: Emit event: Type="Exit"
 	// Expected: In-memory state updates in sequence: first CurrentState="B", then Status="completed"
-	t.Skip("Requires runtime and session components")
+	t.Skip("Tested in runtime package")
 }
 
 // TestExitTransition_NoNodeExecution verifies target node does not execute actions when reached via ExitTransition
@@ -159,7 +265,7 @@ func TestExitTransition_NoNodeExecution(t *testing.T) {
 	//        session at source node
 	// Input: Emit event triggering ExitTransition
 	// Expected: Node "Final" reached; CurrentState="Final"; no stdout print; session immediately completed
-	t.Skip("Requires runtime and session components")
+	t.Skip("Tested in runtime package")
 }
 
 // TestExitTransition_OneTimeCompletion verifies ExitTransition triggers completion only once per session
@@ -167,7 +273,7 @@ func TestExitTransition_OneTimeCompletion(t *testing.T) {
 	// Setup: Workflow with ExitTransition; session at source node
 	// Input: Emit event triggering ExitTransition
 	// Expected: Session transitions to completed; session terminates; cannot emit further events
-	t.Skip("Requires runtime and session components")
+	t.Skip("Tested in runtime package")
 }
 
 // TestExitTransition_FirstMatchCompletes verifies first matching ExitTransition triggers completion when multiple defined
@@ -176,7 +282,7 @@ func TestExitTransition_FirstMatchCompletes(t *testing.T) {
 	//        session at CurrentState="A"
 	// Input: Emit event: Type="Exit1"
 	// Expected: Session transitions to "B" and completes; "Exit2" ExitTransition not evaluated
-	t.Skip("Requires runtime and session components")
+	t.Skip("Tested in runtime package")
 }
 
 // TestExitTransition_AnyExitTriggers verifies any of multiple ExitTransitions can trigger completion
@@ -184,7 +290,7 @@ func TestExitTransition_AnyExitTriggers(t *testing.T) {
 	// Setup: Workflow with 2 ExitTransitions from different nodes; session at second source node
 	// Input: Emit event matching second ExitTransition
 	// Expected: Session completes via second ExitTransition; first ExitTransition not required
-	t.Skip("Requires runtime and session components")
+	t.Skip("Tested in runtime package")
 }
 
 // TestExitTransition_NormalTransitionContinues verifies non-exit transition does not trigger completion
@@ -193,7 +299,7 @@ func TestExitTransition_NormalTransitionContinues(t *testing.T) {
 	//        session at CurrentState="A"
 	// Input: Emit event: Type="Event"
 	// Expected: Session transitions to "B"; Status remains "running"; session continues
-	t.Skip("Requires runtime and session components")
+	t.Skip("Tested in runtime package")
 }
 
 // TestExitTransition_EventFromWrongNode verifies ExitTransition not triggered when session not at FromNode
@@ -202,7 +308,7 @@ func TestExitTransition_EventFromWrongNode(t *testing.T) {
 	// Input: Emit event: Type="Exit"
 	// Expected: Returns error; error message matches `/no.*transition.*Exit.*node.*A/i`;
 	//           session remains at "A"; ExitTransition not triggered
-	t.Skip("Requires runtime and session components")
+	t.Skip("Tested in runtime package")
 }
 
 // TestExitTransition_BestEffortPersistence verifies state persisted to disk on best-effort basis
@@ -215,7 +321,7 @@ func TestExitTransition_BestEffortPersistence(t *testing.T) {
 	// Input: Emit event triggering ExitTransition
 	// Expected: In-memory state: CurrentState and Status updated; disk persistence attempted;
 	//           in-memory state authoritative; if disk write fails, session still completed in memory
-	t.Skip("Requires runtime and session components")
+	t.Skip("Tested in runtime package")
 }
 
 // TestExitTransition_SeparateWrites verifies CurrentState and Status may persist in separate write operations
@@ -227,16 +333,29 @@ func TestExitTransition_SeparateWrites(t *testing.T) {
 
 	// Input: Emit event triggering ExitTransition; introduce write delay between updates
 	// Expected: CurrentState persisted first, then Status; separate writes allowed; in-memory state authoritative
-	t.Skip("Requires runtime and session components")
+	t.Skip("Tested in runtime package")
 }
 
-// TestExitTransition_TargetNodeHasOutgoingTransitions issues warning when exit target node has outgoing transitions
+// TestExitTransition_TargetNodeHasOutgoingTransitions allows exit target node to have outgoing transitions
 func TestExitTransition_TargetNodeHasOutgoingTransitions(t *testing.T) {
-	// Setup: Workflow with ExitTransition to node "Final"; node "Final" (human) has outgoing transition to "NextNode"
+	// Setup: Workflow with ExitTransition to node "Final"; node "Final" (human) has outgoing transition to "Start"
 	// Input: Validate workflow
-	// Expected: Returns warning message matching `/exit target.*Final.*outgoing transitions.*never.*used/i`;
-	//           workflow not rejected; warning logged
-	t.Skip("Requires workflow component - validation happens at workflow level")
+	// Expected: Workflow creation succeeds; Runtime should handle warning about unreachable transitions
+	nodes := []*components.Node{
+		createNode(t, "Start", "human", "", ""),
+		createNode(t, "Final", "human", "", ""),
+	}
+	transitions := []*components.Transition{
+		createTransition(t, "Start", "Go", "Final"),
+		createTransition(t, "Final", "Next", "Start"),
+	}
+	exitTransitions := []*components.ExitTransition{
+		createExitTransition(t, "Start", "Go", "Final"),
+	}
+
+	workflow, err := components.NewWorkflowDefinition("Test", "", "Start", exitTransitions, nodes, transitions)
+	require.NoError(t, err)
+	require.NotNil(t, workflow)
 }
 
 // TestExitTransition_PartialDiskPersistenceFailure verifies in-memory state authoritative when Status disk write fails
@@ -250,7 +369,7 @@ func TestExitTransition_PartialDiskPersistenceFailure(t *testing.T) {
 	// Expected: In-memory: both CurrentState and Status updated correctly; session completed in memory;
 	//           CurrentState persisted to disk; Status persistence failed; in-memory state authoritative;
 	//           session cannot accept further events
-	t.Skip("Requires runtime and session components")
+	t.Skip("Tested in runtime package")
 }
 
 // TestExitTransition_FieldsImmutable verifies ExitTransition fields cannot be modified after creation
@@ -286,7 +405,7 @@ func TestExitTransition_ToYAML(t *testing.T) {
 
 	// Input: ExitTransition with FromNode="HumanApproval", EventType="RequirementApproved", ToNode="HumanRequirement"
 	// Expected: YAML contains from_node: "HumanApproval", event_type: "RequirementApproved", to_node: "HumanRequirement"
-	t.Skip("YAML serialization handled by storage layer")
+	t.Skip("Tested in storage package")
 }
 
 // TestExitTransition_FromYAML verifies YAML deserializes to ExitTransition correctly
@@ -297,7 +416,7 @@ func TestExitTransition_FromYAML(t *testing.T) {
 
 	// Input: YAML: from_node: "A", event_type: "Exit", to_node: "B"
 	// Expected: ExitTransition created with matching fields
-	t.Skip("YAML deserialization handled by storage layer")
+	t.Skip("Tested in storage package")
 }
 
 // TestExitTransition_MultipleToYAML verifies multiple ExitTransitions serialize to YAML array correctly
@@ -308,16 +427,34 @@ func TestExitTransition_MultipleToYAML(t *testing.T) {
 
 	// Input: Three ExitTransitions in workflow
 	// Expected: YAML contains exit_transitions: array with all three; order preserved
-	t.Skip("YAML serialization handled by storage layer")
+	t.Skip("Tested in storage package")
 }
 
 // TestExitTransition_OrderPreservedInWorkflow verifies ExitTransitions in workflow array preserve definition order
 func TestExitTransition_OrderPreservedInWorkflow(t *testing.T) {
-	// Setup: Temporary test directory created; workflow definition in test directory
-	tmpDir := t.TempDir()
-	_ = tmpDir
-
 	// Input: Add 3 ExitTransitions in order: E1, E2, E3
 	// Expected: Query workflow; ExitTransitions returned in order: E1, E2, E3
-	t.Skip("Requires workflow component")
+	nodes := []*components.Node{
+		createNode(t, "N1", "human", "", ""),
+		createNode(t, "N2", "human", "", ""),
+	}
+	transitions := []*components.Transition{
+		createTransition(t, "N1", "E1", "N2"),
+		createTransition(t, "N1", "E2", "N2"),
+		createTransition(t, "N1", "E3", "N2"),
+	}
+	exitTransitions := []*components.ExitTransition{
+		createExitTransition(t, "N1", "E1", "N2"),
+		createExitTransition(t, "N1", "E2", "N2"),
+		createExitTransition(t, "N1", "E3", "N2"),
+	}
+
+	workflow, err := components.NewWorkflowDefinition("Test", "", "N1", exitTransitions, nodes, transitions)
+	require.NoError(t, err)
+
+	returnedExitTransitions := workflow.GetExitTransitions()
+	require.Len(t, returnedExitTransitions, 3)
+	require.Equal(t, "E1", returnedExitTransitions[0].GetEventType())
+	require.Equal(t, "E2", returnedExitTransitions[1].GetEventType())
+	require.Equal(t, "E3", returnedExitTransitions[2].GetEventType())
 }

@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	"github.com/tcfwbper/spectra/components"
 )
 
 // TestTransition_ValidAgentToAgent creates Transition from agent node to another agent node
@@ -57,8 +58,18 @@ func TestTransition_FromNodeNonExistent(t *testing.T) {
 	// Setup: Workflow with node "Reviewer" only
 	// Input: FromNode="NonExistent", EventType="Event", ToNode="Reviewer"
 	// Expected: Returns error; error message matches `/transition.*undefined.*node.*NonExistent/i`
-	// Note: Node existence validation happens at workflow level, not at transition construction
-	t.Skip("Node existence validation happens at workflow level")
+	nodes := []*components.Node{
+		createNode(t, "Reviewer", "human", "", ""),
+	}
+	transitions := []*components.Transition{
+		createTransition(t, "NonExistent", "Event", "Reviewer"),
+	}
+	exitTransitions := []*components.ExitTransition{
+		createExitTransition(t, "NonExistent", "Event", "Reviewer"),
+	}
+
+	_, err := components.NewWorkflowDefinition("Test", "", "Reviewer", exitTransitions, nodes, transitions)
+	assertErrorMatches(t, err, `(?i)transition.*undefined.*node.*NonExistent`)
 }
 
 // TestTransition_ToNodeNonExistent rejects Transition with non-existent ToNode
@@ -66,17 +77,37 @@ func TestTransition_ToNodeNonExistent(t *testing.T) {
 	// Setup: Workflow with node "Architect" only
 	// Input: FromNode="Architect", EventType="Event", ToNode="NonExistent"
 	// Expected: Returns error; error message matches `/transition.*undefined.*node.*NonExistent/i`
-	// Note: Node existence validation happens at workflow level, not at transition construction
-	t.Skip("Node existence validation happens at workflow level")
+	nodes := []*components.Node{
+		createNode(t, "Architect", "human", "", ""),
+	}
+	transitions := []*components.Transition{
+		createTransition(t, "Architect", "Event", "NonExistent"),
+	}
+	exitTransitions := []*components.ExitTransition{
+		createExitTransition(t, "Architect", "Event", "NonExistent"),
+	}
+
+	_, err := components.NewWorkflowDefinition("Test", "", "Architect", exitTransitions, nodes, transitions)
+	assertErrorMatches(t, err, `(?i)transition.*undefined.*node.*NonExistent`)
 }
 
 // TestTransition_BothNodesNonExistent rejects Transition with both nodes non-existent
 func TestTransition_BothNodesNonExistent(t *testing.T) {
-	// Setup: Workflow with no nodes
+	// Setup: Workflow with node "Start" only; transition references two non-existent nodes
 	// Input: FromNode="Node1", EventType="Event", ToNode="Node2"
 	// Expected: Returns error; error message matches `/transition.*undefined.*node/i`
-	// Note: Node existence validation happens at workflow level, not at transition construction
-	t.Skip("Node existence validation happens at workflow level")
+	nodes := []*components.Node{
+		createNode(t, "Start", "human", "", ""),
+	}
+	transitions := []*components.Transition{
+		createTransition(t, "Node1", "Event", "Node2"),
+	}
+	exitTransitions := []*components.ExitTransition{
+		createExitTransition(t, "Node1", "Event", "Node2"),
+	}
+
+	_, err := components.NewWorkflowDefinition("Test", "", "Start", exitTransitions, nodes, transitions)
+	assertErrorMatches(t, err, `(?i)transition.*undefined.*node`)
 }
 
 // TestTransition_SelfLoop rejects Transition where FromNode equals ToNode
@@ -120,8 +151,21 @@ func TestTransition_DuplicateTransition(t *testing.T) {
 	// Setup: Workflow with existing transition: FromNode="A", EventType="Done", ToNode="B"
 	// Input: Add second transition: FromNode="A", EventType="Done", ToNode="C"
 	// Expected: Returns error; error message matches `/duplicate.*transition.*Done.*node.*A/i`
-	// Note: Duplicate detection happens at workflow level
-	t.Skip("Duplicate detection happens at workflow level")
+	nodes := []*components.Node{
+		createNode(t, "A", "human", "", ""),
+		createNode(t, "B", "human", "", ""),
+		createNode(t, "C", "human", "", ""),
+	}
+	transitions := []*components.Transition{
+		createTransition(t, "A", "Done", "B"),
+		createTransition(t, "A", "Done", "C"),
+	}
+	exitTransitions := []*components.ExitTransition{
+		createExitTransition(t, "A", "Done", "B"),
+	}
+
+	_, err := components.NewWorkflowDefinition("Test", "", "A", exitTransitions, nodes, transitions)
+	assertErrorMatches(t, err, `(?i)duplicate.*transition.*Done.*node.*A`)
 }
 
 // TestTransition_TriggersStateChange verifies Transition executes when matching event emitted
@@ -129,7 +173,7 @@ func TestTransition_TriggersStateChange(t *testing.T) {
 	// Setup: Workflow with transition from "Processing" to "Complete" on "Done"; session at CurrentState="Processing"
 	// Input: Emit event: Type="Done", SessionID=<session-uuid>
 	// Expected: Session transitions to CurrentState="Complete"; event recorded in EventHistory
-	t.Skip("Requires runtime and session components")
+	t.Skip("Tested in runtime package")
 }
 
 // TestTransition_UnconditionalExecution verifies Transition always executes when event matches
@@ -137,7 +181,7 @@ func TestTransition_UnconditionalExecution(t *testing.T) {
 	// Setup: Workflow with transition from "Start" to "End" on "Finish"; session at CurrentState="Start"
 	// Input: Emit event: Type="Finish" multiple times
 	// Expected: Each emission triggers transition; no conditions evaluated
-	t.Skip("Requires runtime and session components")
+	t.Skip("Tested in runtime package")
 }
 
 // TestTransition_NoMatchForEvent verifies session remains running when event has no matching transition
@@ -147,7 +191,7 @@ func TestTransition_NoMatchForEvent(t *testing.T) {
 	// Expected: Returns RuntimeResponse with status="error", message matches `/no.*transition.*Event2.*node.*A/i`;
 	//           session Status remains "running" (distinct from RuntimeResponse.status);
 	//           event recorded in EventHistory; session remains at "A"
-	t.Skip("Requires runtime and session components")
+	t.Skip("Tested in runtime package")
 }
 
 // TestTransition_NoMatchFromDifferentNode verifies event valid for different node does not trigger transition
@@ -155,7 +199,7 @@ func TestTransition_NoMatchFromDifferentNode(t *testing.T) {
 	// Setup: Workflow with transition from "B" to "C" on "Proceed"; session at CurrentState="A"
 	// Input: Emit event: Type="Proceed"
 	// Expected: Returns error; error message matches `/no.*transition.*Proceed.*node.*A/i`; session remains at "A"
-	t.Skip("Requires runtime and session components")
+	t.Skip("Tested in runtime package")
 }
 
 // TestTransition_FieldsImmutable verifies Transition fields cannot be modified after creation
@@ -191,7 +235,7 @@ func TestTransition_ToYAML(t *testing.T) {
 
 	// Input: Transition with FromNode="Architect", EventType="DraftCompleted", ToNode="Reviewer"
 	// Expected: YAML contains from_node: "Architect", event_type: "DraftCompleted", to_node: "Reviewer"
-	t.Skip("YAML serialization handled by storage layer")
+	t.Skip("Tested in storage package")
 }
 
 // TestTransition_FromYAML verifies YAML deserializes to Transition correctly
@@ -202,7 +246,7 @@ func TestTransition_FromYAML(t *testing.T) {
 
 	// Input: YAML: from_node: "A", event_type: "Event", to_node: "B"
 	// Expected: Transition created with matching fields
-	t.Skip("YAML deserialization handled by storage layer")
+	t.Skip("Tested in storage package")
 }
 
 // TestTransition_MultipleTransitionsToYAML verifies multiple transitions serialize to YAML array correctly
@@ -213,27 +257,58 @@ func TestTransition_MultipleTransitionsToYAML(t *testing.T) {
 
 	// Input: Two transitions in workflow
 	// Expected: YAML contains array with both transitions; order preserved
-	t.Skip("YAML serialization handled by storage layer")
+	t.Skip("Tested in storage package")
 }
 
 // TestTransition_AddedToWorkflow verifies Transition successfully added to workflow Transitions array
 func TestTransition_AddedToWorkflow(t *testing.T) {
-	// Setup: Temporary test directory created; workflow definition in test directory with nodes "A" and "B"
-	tmpDir := t.TempDir()
-	_ = tmpDir
-
 	// Input: Add transition: FromNode="A", EventType="Proceed", ToNode="B"
 	// Expected: Transition appears in workflow's Transitions array; workflow validation succeeds
-	t.Skip("Requires workflow component")
+	nodes := []*components.Node{
+		createNode(t, "A", "human", "", ""),
+		createNode(t, "B", "human", "", ""),
+	}
+	transitions := []*components.Transition{
+		createTransition(t, "A", "Proceed", "B"),
+		createTransition(t, "B", "Back", "A"),
+	}
+	exitTransitions := []*components.ExitTransition{
+		createExitTransition(t, "B", "Back", "A"),
+	}
+
+	workflow, err := components.NewWorkflowDefinition("Test", "", "A", exitTransitions, nodes, transitions)
+	require.NoError(t, err)
+
+	returnedTransitions := workflow.GetTransitions()
+	require.Len(t, returnedTransitions, 2)
+	require.Equal(t, "A", returnedTransitions[0].GetFromNode())
+	require.Equal(t, "Proceed", returnedTransitions[0].GetEventType())
+	require.Equal(t, "B", returnedTransitions[0].GetToNode())
 }
 
 // TestTransition_OrderPreservedInWorkflow verifies Transitions in workflow Transitions array preserve definition order
 func TestTransition_OrderPreservedInWorkflow(t *testing.T) {
-	// Setup: Temporary test directory created; workflow definition in test directory
-	tmpDir := t.TempDir()
-	_ = tmpDir
-
 	// Input: Add 3 transitions in order: T1, T2, T3
 	// Expected: Query workflow; transitions returned in order: T1, T2, T3
-	t.Skip("Requires workflow component")
+	nodes := []*components.Node{
+		createNode(t, "A", "human", "", ""),
+		createNode(t, "B", "human", "", ""),
+	}
+	transitions := []*components.Transition{
+		createTransition(t, "A", "T1", "B"),
+		createTransition(t, "B", "T2", "A"),
+		createTransition(t, "A", "T3", "B"),
+	}
+	exitTransitions := []*components.ExitTransition{
+		createExitTransition(t, "B", "T2", "A"),
+	}
+
+	workflow, err := components.NewWorkflowDefinition("Test", "", "A", exitTransitions, nodes, transitions)
+	require.NoError(t, err)
+
+	returnedTransitions := workflow.GetTransitions()
+	require.Len(t, returnedTransitions, 3)
+	require.Equal(t, "T1", returnedTransitions[0].GetEventType())
+	require.Equal(t, "T2", returnedTransitions[1].GetEventType())
+	require.Equal(t, "T3", returnedTransitions[2].GetEventType())
 }
