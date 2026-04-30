@@ -10,6 +10,7 @@ import (
 	"runtime"
 	"strings"
 	"sync"
+	"syscall"
 	"testing"
 	"time"
 
@@ -76,6 +77,9 @@ func mockSocketServer(t *testing.T, socketPath string, response string) (net.Lis
 			go func(c net.Conn) {
 				defer c.Close()
 				scanner := bufio.NewScanner(c)
+				// Set a larger buffer to handle large payloads (up to 10MB)
+				buf := make([]byte, 4096)
+				scanner.Buffer(buf, 10*1024*1024)
 				if scanner.Scan() {
 					c.Write([]byte(response))
 				}
@@ -105,6 +109,9 @@ func mockCapturingSocketServer(t *testing.T, socketPath string, response string)
 			go func(c net.Conn) {
 				defer c.Close()
 				scanner := bufio.NewScanner(c)
+				// Set a larger buffer to handle large payloads (up to 10MB)
+				buf := make([]byte, 4096)
+				scanner.Buffer(buf, 10*1024*1024)
 				if scanner.Scan() {
 					captured.add(scanner.Text())
 					c.Write([]byte(response))
@@ -412,10 +419,8 @@ func TestSocketClient_ConnectionRefused(t *testing.T) {
 	socketPath := storage.GetRuntimeSocketPath(projectRoot, sessionID)
 
 	// Create a socket file but no server listening
-	// Use a listener that we immediately close to leave a socket file
-	listener, err := net.Listen("unix", socketPath)
-	require.NoError(t, err)
-	listener.Close()
+	// Create socket with bind but without listen to simulate connection refused
+	createSocketFileWithoutListener(t, socketPath)
 
 	client := spectra_agent.NewSocketClient()
 	msg := newTestEventMessage(t)
@@ -519,7 +524,9 @@ func TestSocketClient_SendMessageIOError(t *testing.T) {
 
 	assert.Equal(t, 2, exitCode)
 	assert.Error(t, err)
-	assert.Regexp(t, `Error: failed to send message:`, err.Error())
+	// Due to socket buffering, the write may succeed and read may fail instead
+	// Both indicate transport errors, so we accept either message
+	assert.Regexp(t, `Error: failed to (send message|read response):`, err.Error())
 }
 
 // --- Validation Failures — Read Errors ---
@@ -939,4 +946,29 @@ func countOpenFDs(t *testing.T) int {
 		t.Skipf("Cannot read /proc/self/fd: %v", err)
 	}
 	return len(entries)
+}
+
+// createSocketFileWithoutListener creates a socket file using bind without listen,
+// which causes connection refused errors when clients try to connect.
+func createSocketFileWithoutListener(t *testing.T, socketPath string) {
+	t.Helper()
+
+	// Remove old socket if exists
+	os.Remove(socketPath)
+
+	// Create a socket file using low-level syscall
+	fd, err := syscall.Socket(syscall.AF_UNIX, syscall.SOCK_STREAM, 0)
+	require.NoError(t, err)
+
+	// Bind to create the socket file (but don't listen)
+	sockaddr := &syscall.SockaddrUnix{Name: socketPath}
+	err = syscall.Bind(fd, sockaddr)
+	require.NoError(t, err)
+
+	// Note: We intentionally don't call syscall.Listen() to simulate connection refused
+	// The cleanup will close the fd
+	t.Cleanup(func() {
+		syscall.Close(fd)
+		os.Remove(socketPath)
+	})
 }
