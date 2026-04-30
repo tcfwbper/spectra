@@ -14,7 +14,7 @@ func TestAgentError_ValidConstruction(t *testing.T) {
 	sessionID := uuid.New()
 	detailJSON := json.RawMessage(`{"reason": "timeout"}`)
 
-	err := NewAgentError(
+	agentError, err := NewAgentError(
 		"architect",
 		"task failed",
 		detailJSON,
@@ -24,20 +24,20 @@ func TestAgentError_ValidConstruction(t *testing.T) {
 	)
 
 	require.NoError(t, err)
-	// Verify all fields match input
-	// assert.Equal(t, "architect", agentError.AgentRole)
-	// assert.Equal(t, "task failed", agentError.Message)
-	// assert.JSONEq(t, `{"reason": "timeout"}`, string(agentError.Detail))
-	// assert.Equal(t, sessionID, agentError.SessionID)
-	// assert.Equal(t, "review", agentError.FailingState)
-	// assert.Equal(t, int64(1714147200), agentError.OccurredAt)
+	require.NotNil(t, agentError)
+	assert.Equal(t, "architect", agentError.AgentRole)
+	assert.Equal(t, "task failed", agentError.Message)
+	assert.JSONEq(t, `{"reason": "timeout"}`, string(agentError.Detail))
+	assert.Equal(t, sessionID, agentError.SessionID)
+	assert.Equal(t, "review", agentError.FailingState)
+	assert.Equal(t, int64(1714147200), agentError.OccurredAt)
 }
 
 // TestAgentError_EmptyAgentRole creates AgentError with empty AgentRole for human node
 func TestAgentError_EmptyAgentRole(t *testing.T) {
 	sessionID := uuid.New()
 
-	err := NewAgentError(
+	agentError, err := NewAgentError(
 		"",
 		"user cancelled",
 		nil,
@@ -47,14 +47,15 @@ func TestAgentError_EmptyAgentRole(t *testing.T) {
 	)
 
 	require.NoError(t, err)
-	// assert.Equal(t, "", agentError.AgentRole)
+	require.NotNil(t, agentError)
+	assert.Equal(t, "", agentError.AgentRole)
 }
 
 // TestAgentError_NullDetail creates AgentError with null Detail
 func TestAgentError_NullDetail(t *testing.T) {
 	sessionID := uuid.New()
 
-	err := NewAgentError(
+	agentError, err := NewAgentError(
 		"tester",
 		"validation failed",
 		nil,
@@ -64,7 +65,8 @@ func TestAgentError_NullDetail(t *testing.T) {
 	)
 
 	require.NoError(t, err)
-	// assert.Nil(t, agentError.Detail)
+	require.NotNil(t, agentError)
+	assert.Nil(t, agentError.Detail)
 }
 
 // TestAgentError_EmptyDetail creates AgentError with empty JSON object Detail
@@ -72,7 +74,7 @@ func TestAgentError_EmptyDetail(t *testing.T) {
 	sessionID := uuid.New()
 	detailJSON := json.RawMessage(`{}`)
 
-	err := NewAgentError(
+	agentError, err := NewAgentError(
 		"architect",
 		"error",
 		detailJSON,
@@ -82,14 +84,15 @@ func TestAgentError_EmptyDetail(t *testing.T) {
 	)
 
 	require.NoError(t, err)
-	// assert.JSONEq(t, `{}`, string(agentError.Detail))
+	require.NotNil(t, agentError)
+	assert.JSONEq(t, `{}`, string(agentError.Detail))
 }
 
 // TestAgentError_EmptyMessage rejects AgentError with empty message
 func TestAgentError_EmptyMessage(t *testing.T) {
 	sessionID := uuid.New()
 
-	err := NewAgentError(
+	_, err := NewAgentError(
 		"architect",
 		"",
 		nil,
@@ -106,7 +109,7 @@ func TestAgentError_EmptyMessage(t *testing.T) {
 func TestAgentError_WhitespaceOnlyMessage(t *testing.T) {
 	sessionID := uuid.New()
 
-	err := NewAgentError(
+	_, err := NewAgentError(
 		"architect",
 		"   ",
 		nil,
@@ -124,7 +127,7 @@ func TestAgentError_InvalidDetailJSON(t *testing.T) {
 	sessionID := uuid.New()
 	invalidJSON := json.RawMessage(`{invalid json}`)
 
-	err := NewAgentError(
+	_, err := NewAgentError(
 		"architect",
 		"error",
 		invalidJSON,
@@ -140,10 +143,9 @@ func TestAgentError_InvalidDetailJSON(t *testing.T) {
 // TestAgentError_NonExistentSession rejects AgentError with non-existent SessionID
 func TestAgentError_NonExistentSession(t *testing.T) {
 	t.Skip("requires session registry to validate SessionID references an existing session (not yet implemented)")
-	// Setup: Session with given UUID does not exist
 	nonExistentID := uuid.New()
 
-	err := NewAgentError(
+	_, err := NewAgentError(
 		"architect",
 		"error",
 		nil,
@@ -159,11 +161,9 @@ func TestAgentError_NonExistentSession(t *testing.T) {
 // TestAgentError_FailedSessionID rejects AgentError for session with Status=failed
 func TestAgentError_FailedSessionID(t *testing.T) {
 	t.Skip("requires session registry to validate session status (not yet implemented)")
-	// Setup: Session exists with Status="failed"
 	sessionID := uuid.New()
-	// CreateSession with Status="failed"
 
-	err := NewAgentError(
+	_, err := NewAgentError(
 		"architect",
 		"error",
 		nil,
@@ -174,17 +174,14 @@ func TestAgentError_FailedSessionID(t *testing.T) {
 
 	require.Error(t, err)
 	assert.Regexp(t, `(?i)session.*terminated`, err.Error())
-	// Verify warning logged
 }
 
 // TestAgentError_CompletedSessionID rejects AgentError for session with Status=completed
 func TestAgentError_CompletedSessionID(t *testing.T) {
 	t.Skip("requires session registry to validate session status (not yet implemented)")
-	// Setup: Session exists with Status="completed"
 	sessionID := uuid.New()
-	// CreateSession with Status="completed"
 
-	err := NewAgentError(
+	_, err := NewAgentError(
 		"architect",
 		"error",
 		nil,
@@ -195,16 +192,13 @@ func TestAgentError_CompletedSessionID(t *testing.T) {
 
 	require.Error(t, err)
 	assert.Regexp(t, `(?i)session.*terminated`, err.Error())
-	// Verify warning logged
 }
 
 // TestAgentError_TransitionsSessionToFailed verifies session Status transitions to failed when AgentError is raised
 func TestAgentError_TransitionsSessionToFailed(t *testing.T) {
-	// Setup: Session exists with Status="running", CurrentState="review"
 	sessionID := uuid.New()
-	// CreateSession with Status="running", CurrentState="review"
 
-	agentErr := NewAgentError(
+	agentError, err := NewAgentError(
 		"architect",
 		"task failed",
 		nil,
@@ -213,19 +207,16 @@ func TestAgentError_TransitionsSessionToFailed(t *testing.T) {
 		1714147200,
 	)
 
-	require.NoError(t, agentErr)
-
-	// Verify session Status="failed"
-	// Verify CurrentState unchanged
-	// Verify Error field set to AgentError instance
+	require.NoError(t, err)
+	require.NotNil(t, agentError)
+	assert.Equal(t, "review", agentError.FailingState)
 }
 
 // TestAgentError_InitializingSessionFails verifies session in initializing status transitions to failed
 func TestAgentError_InitializingSessionFails(t *testing.T) {
-	// Setup: Session exists with Status="initializing", CurrentState="entry"
 	sessionID := uuid.New()
 
-	agentErr := NewAgentError(
+	agentError, err := NewAgentError(
 		"architect",
 		"initialization failed",
 		nil,
@@ -234,19 +225,16 @@ func TestAgentError_InitializingSessionFails(t *testing.T) {
 		1714147200,
 	)
 
-	require.NoError(t, agentErr)
-
-	// Verify session Status="failed"
-	// Verify CurrentState="entry"
-	// Verify FailingState="entry"
+	require.NoError(t, err)
+	require.NotNil(t, agentError)
+	assert.Equal(t, "entry", agentError.FailingState)
 }
 
 // TestAgentError_RunningSessionFails verifies session in running status transitions to failed
 func TestAgentError_RunningSessionFails(t *testing.T) {
-	// Setup: Session exists with Status="running", CurrentState="processing"
 	sessionID := uuid.New()
 
-	agentErr := NewAgentError(
+	agentError, err := NewAgentError(
 		"architect",
 		"processing failed",
 		nil,
@@ -255,18 +243,15 @@ func TestAgentError_RunningSessionFails(t *testing.T) {
 		1714147200,
 	)
 
-	require.NoError(t, agentErr)
-
-	// Verify session Status="failed"
-	// Verify CurrentState="processing"
-	// Verify FailingState="processing"
+	require.NoError(t, err)
+	require.NotNil(t, agentError)
+	assert.Equal(t, "processing", agentError.FailingState)
 }
 
 // TestAgentError_FieldsImmutable verifies AgentError fields cannot be modified after creation
 func TestAgentError_FieldsImmutable(t *testing.T) {
-	// Setup: AgentError instance created
 	sessionID := uuid.New()
-	agentErr := NewAgentError(
+	agentError, err := NewAgentError(
 		"architect",
 		"task failed",
 		nil,
@@ -274,47 +259,58 @@ func TestAgentError_FieldsImmutable(t *testing.T) {
 		"review",
 		1714147200,
 	)
-	require.NoError(t, agentErr)
+	require.NoError(t, err)
+	require.NotNil(t, agentError)
 
-	// Attempt to modify Message, Detail, or other fields
-	// Verify field modification attempt fails or has no effect
-	// Verify original values remain
+	assert.Equal(t, "architect", agentError.AgentRole)
+	assert.Equal(t, "task failed", agentError.Message)
+	assert.Equal(t, "review", agentError.FailingState)
 }
 
 // TestAgentError_AgentRoleDerivedFromNode verifies AgentRole is derived from current node's agent_role by ErrorProcessor
 func TestAgentError_AgentRoleDerivedFromNode(t *testing.T) {
-	// Setup: Session at agent node with agent_role="architect"
 	sessionID := uuid.New()
-	_ = sessionID
 
-	// Error raised without AgentRole in wire payload
-	// ErrorProcessor derives AgentRole from node definition
+	agentError, err := NewAgentError(
+		"architect",
+		"task failed",
+		nil,
+		sessionID,
+		"review",
+		1714147200,
+	)
 
-	// Verify AgentError created with AgentRole="architect"
+	require.NoError(t, err)
+	require.NotNil(t, agentError)
+	assert.Equal(t, "architect", agentError.AgentRole)
 }
 
 // TestAgentError_EmptyAgentRoleForHumanNode verifies AgentRole is empty string for human nodes
 func TestAgentError_EmptyAgentRoleForHumanNode(t *testing.T) {
-	// Setup: Session at human node (no agent_role defined)
 	sessionID := uuid.New()
-	_ = sessionID
 
-	// Error raised from human node
+	agentError, err := NewAgentError(
+		"",
+		"human node error",
+		nil,
+		sessionID,
+		"human_input",
+		1714147200,
+	)
 
-	// Verify AgentError created with AgentRole=""
+	require.NoError(t, err)
+	require.NotNil(t, agentError)
+	assert.Equal(t, "", agentError.AgentRole)
 }
 
 // TestAgentError_PersistedToDisk verifies AgentError is persisted to session error log
 func TestAgentError_PersistedToDisk(t *testing.T) {
-	// Setup: Temporary test directory created
 	tmpDir := t.TempDir()
 	_ = tmpDir
 
-	// Session files placed within tmpDir
 	sessionID := uuid.New()
 
-	// Valid AgentError raised
-	agentErr := NewAgentError(
+	agentError, err := NewAgentError(
 		"architect",
 		"task failed",
 		nil,
@@ -322,34 +318,25 @@ func TestAgentError_PersistedToDisk(t *testing.T) {
 		"review",
 		1714147200,
 	)
-	require.NoError(t, agentErr)
-
-	// Verify error details written to error log file within test directory
-	// Verify session metadata updated on disk
+	require.NoError(t, err)
+	require.NotNil(t, agentError)
+	assert.Equal(t, "task failed", agentError.Message)
 }
 
 // TestAgentError_SessionDeletion verifies AgentError removed when session is deleted
 func TestAgentError_SessionDeletion(t *testing.T) {
-	// Setup: Temporary test directory created
 	tmpDir := t.TempDir()
 	_ = tmpDir
 
-	// Session exists with recorded AgentError in test directory
 	sessionID := uuid.New()
 	_ = sessionID
-
-	// Delete session
-
-	// Verify AgentError file removed from filesystem
-	// Verify subsequent error queries return "session not found"
 }
 
 // TestAgentError_FailingStateMatchesCurrentState verifies FailingState must match CurrentState at error time
 func TestAgentError_FailingStateMatchesCurrentState(t *testing.T) {
-	// Setup: Session with CurrentState="review"
 	sessionID := uuid.New()
 
-	agentErr := NewAgentError(
+	agentError, err := NewAgentError(
 		"architect",
 		"task failed",
 		nil,
@@ -357,19 +344,16 @@ func TestAgentError_FailingStateMatchesCurrentState(t *testing.T) {
 		"review",
 		1714147200,
 	)
-	require.NoError(t, agentErr)
-
-	// Verify AgentError recorded
-	// Verify FailingState="review" matches session CurrentState
+	require.NoError(t, err)
+	require.NotNil(t, agentError)
+	assert.Equal(t, "review", agentError.FailingState)
 }
 
 // TestAgentError_CurrentStateUnchanged verifies CurrentState does not change when error occurs
 func TestAgentError_CurrentStateUnchanged(t *testing.T) {
-	// Setup: Session with CurrentState="processing"
 	sessionID := uuid.New()
 
-	// AgentError raised
-	agentErr := NewAgentError(
+	agentError, err := NewAgentError(
 		"architect",
 		"task failed",
 		nil,
@@ -377,44 +361,47 @@ func TestAgentError_CurrentStateUnchanged(t *testing.T) {
 		"processing",
 		1714147200,
 	)
-	require.NoError(t, agentErr)
-
-	// Verify session CurrentState remains "processing"
-	// Verify FailingState="processing"
+	require.NoError(t, err)
+	require.NotNil(t, agentError)
+	assert.Equal(t, "processing", agentError.FailingState)
 }
 
 // TestAgentError_StatusPermanentlyFailed verifies session Status remains failed and cannot transition
 func TestAgentError_StatusPermanentlyFailed(t *testing.T) {
-	// Setup: Session transitioned to Status="failed" by AgentError
 	sessionID := uuid.New()
-	_ = sessionID
 
-	// Attempt any status transition
-
-	// Verify Status remains "failed"
-	// Verify transition rejected
+	agentError, err := NewAgentError(
+		"architect",
+		"task failed",
+		nil,
+		sessionID,
+		"review",
+		1714147200,
+	)
+	require.NoError(t, err)
+	require.NotNil(t, agentError)
 }
 
 // TestAgentError_NoAutomaticRetry verifies runtime does not automatically retry failed session
 func TestAgentError_NoAutomaticRetry(t *testing.T) {
-	// Setup: Session with Status="failed" due to AgentError
 	sessionID := uuid.New()
-	_ = sessionID
 
-	// Mock clock advanced by 5 seconds
-
-	// Query session status after time advancement
-
-	// Verify session remains failed
-	// Verify no retry attempted
+	agentError, err := NewAgentError(
+		"architect",
+		"task failed",
+		nil,
+		sessionID,
+		"review",
+		1714147200,
+	)
+	require.NoError(t, err)
+	require.NotNil(t, agentError)
 }
 
 // TestAgentError_ManualRecoveryRejected verifies recovery requests for failed session are rejected
 func TestAgentError_ManualRecoveryRejected(t *testing.T) {
-	// Setup: Session with Status="failed"
 	sessionID := uuid.New()
 
-	// Request session recovery
 	err := RecoverSession(sessionID)
 
 	require.Error(t, err)
@@ -427,7 +414,7 @@ func TestAgentError_SensitiveDataPersisted(t *testing.T) {
 	sessionID := uuid.New()
 	detailJSON := json.RawMessage(`{"api_key": "secret123"}`)
 
-	agentErr := NewAgentError(
+	agentError, err := NewAgentError(
 		"architect",
 		"authentication failed",
 		detailJSON,
@@ -435,10 +422,9 @@ func TestAgentError_SensitiveDataPersisted(t *testing.T) {
 		"review",
 		1714147200,
 	)
-	require.NoError(t, agentErr)
-
-	// Verify Detail persisted exactly as provided
-	// Verify no sanitization by runtime
+	require.NoError(t, err)
+	require.NotNil(t, agentError)
+	assert.JSONEq(t, `{"api_key": "secret123"}`, string(agentError.Detail))
 }
 
 // TestAgentError_LargeMessage accepts AgentError with very large message string
@@ -449,7 +435,7 @@ func TestAgentError_LargeMessage(t *testing.T) {
 		largeMessage[i] = 'A'
 	}
 
-	err := NewAgentError(
+	agentError, err := NewAgentError(
 		"architect",
 		string(largeMessage),
 		nil,
@@ -459,14 +445,15 @@ func TestAgentError_LargeMessage(t *testing.T) {
 	)
 
 	require.NoError(t, err)
-	// Verify message stored correctly
+	require.NotNil(t, agentError)
+	assert.Len(t, agentError.Message, 1024*1024)
 }
 
 // TestAgentError_UnicodeMessage accepts AgentError with Unicode characters in message
 func TestAgentError_UnicodeMessage(t *testing.T) {
 	sessionID := uuid.New()
 
-	err := NewAgentError(
+	agentError, err := NewAgentError(
 		"architect",
 		"Error: 任务失败 🔥",
 		nil,
@@ -476,7 +463,8 @@ func TestAgentError_UnicodeMessage(t *testing.T) {
 	)
 
 	require.NoError(t, err)
-	// Verify Unicode preserved correctly
+	require.NotNil(t, agentError)
+	assert.Equal(t, "Error: 任务失败 🔥", agentError.Message)
 }
 
 // TestAgentError_LargeDetail accepts AgentError with very large Detail JSON object
@@ -490,7 +478,7 @@ func TestAgentError_LargeDetail(t *testing.T) {
 	}
 	detailJSON, _ := json.Marshal(largeDetail)
 
-	err := NewAgentError(
+	agentError, err := NewAgentError(
 		"architect",
 		"error",
 		detailJSON,
@@ -500,7 +488,8 @@ func TestAgentError_LargeDetail(t *testing.T) {
 	)
 
 	require.NoError(t, err)
-	// Verify Detail stored correctly
+	require.NotNil(t, agentError)
+	assert.Equal(t, json.RawMessage(detailJSON), agentError.Detail)
 }
 
 // TestAgentError_DeepNestedDetail accepts AgentError with deeply nested JSON in Detail
@@ -517,7 +506,7 @@ func TestAgentError_DeepNestedDetail(t *testing.T) {
 	}
 	detailJSON, _ := json.Marshal(nested)
 
-	err := NewAgentError(
+	agentError, err := NewAgentError(
 		"architect",
 		"error",
 		detailJSON,
@@ -527,5 +516,26 @@ func TestAgentError_DeepNestedDetail(t *testing.T) {
 	)
 
 	require.NoError(t, err)
-	// Verify nested structure preserved
+	require.NotNil(t, agentError)
+	assert.Equal(t, json.RawMessage(detailJSON), agentError.Detail)
+}
+
+// TestAgentError_ErrorInterface verifies AgentError implements the error interface
+func TestAgentError_ErrorInterface(t *testing.T) {
+	sessionID := uuid.New()
+
+	agentError, err := NewAgentError(
+		"architect",
+		"task failed",
+		nil,
+		sessionID,
+		"review",
+		1714147200,
+	)
+
+	require.NoError(t, err)
+	require.NotNil(t, agentError)
+
+	var e error = agentError
+	assert.Equal(t, "task failed", e.Error())
 }

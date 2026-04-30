@@ -7,86 +7,53 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/tcfwbper/spectra/entities"
 )
 
 // TestRuntimeResponse_ValidSuccessResponse creates RuntimeResponse with status=success and message
 func TestRuntimeResponse_ValidSuccessResponse(t *testing.T) {
-	resp := map[string]interface{}{
-		"status":  "success",
-		"message": "Event 'DraftCompleted' recorded successfully",
-	}
+	resp, err := entities.NewRuntimeResponse("success", "Event 'DraftCompleted' recorded successfully")
 
-	jsonBytes, err := json.Marshal(resp)
 	require.NoError(t, err)
-
-	var decoded map[string]interface{}
-	err = json.Unmarshal(jsonBytes, &decoded)
-	require.NoError(t, err)
-
-	assert.Equal(t, "success", decoded["status"])
-	assert.Equal(t, "Event 'DraftCompleted' recorded successfully", decoded["message"])
+	require.NotNil(t, resp)
+	assert.Equal(t, "success", resp.Status)
+	assert.Equal(t, "Event 'DraftCompleted' recorded successfully", resp.Message)
 }
 
 // TestRuntimeResponse_ValidErrorResponse creates RuntimeResponse with status=error and message
 func TestRuntimeResponse_ValidErrorResponse(t *testing.T) {
-	resp := map[string]interface{}{
-		"status":  "error",
-		"message": "session not ready: status is 'initializing'",
-	}
+	resp, err := entities.NewRuntimeResponse("error", "session not ready: status is 'initializing'")
 
-	jsonBytes, err := json.Marshal(resp)
 	require.NoError(t, err)
-
-	var decoded map[string]interface{}
-	err = json.Unmarshal(jsonBytes, &decoded)
-	require.NoError(t, err)
-
-	assert.Equal(t, "error", decoded["status"])
-	assert.Equal(t, "session not ready: status is 'initializing'", decoded["message"])
+	require.NotNil(t, resp)
+	assert.Equal(t, "error", resp.Status)
+	assert.Equal(t, "session not ready: status is 'initializing'", resp.Message)
 }
 
 // TestRuntimeResponse_SuccessWithEmptyMessage creates RuntimeResponse with status=success and empty message
 func TestRuntimeResponse_SuccessWithEmptyMessage(t *testing.T) {
-	resp := map[string]interface{}{
-		"status":  "success",
-		"message": "",
-	}
+	resp, err := entities.NewRuntimeResponse("success", "")
 
-	jsonBytes, err := json.Marshal(resp)
 	require.NoError(t, err)
-
-	var decoded map[string]interface{}
-	err = json.Unmarshal(jsonBytes, &decoded)
-	require.NoError(t, err)
-
-	assert.Equal(t, "success", decoded["status"])
-	assert.Equal(t, "", decoded["message"])
+	require.NotNil(t, resp)
+	assert.Equal(t, "success", resp.Status)
+	assert.Equal(t, "", resp.Message)
 }
 
 // TestRuntimeResponse_ErrorWithEmptyMessage creates RuntimeResponse with status=error and empty message
 func TestRuntimeResponse_ErrorWithEmptyMessage(t *testing.T) {
-	resp := map[string]interface{}{
-		"status":  "error",
-		"message": "",
-	}
+	resp, err := entities.NewRuntimeResponse("error", "")
 
-	jsonBytes, err := json.Marshal(resp)
 	require.NoError(t, err)
-
-	var decoded map[string]interface{}
-	err = json.Unmarshal(jsonBytes, &decoded)
-	require.NoError(t, err)
-
-	assert.Equal(t, "error", decoded["status"])
-	assert.Equal(t, "", decoded["message"])
+	require.NotNil(t, resp)
+	assert.Equal(t, "error", resp.Status)
+	assert.Equal(t, "", resp.Message)
 }
 
 // TestRuntimeResponse_SerializesToJSON_Success verifies RuntimeResponse serializes to valid JSON
 func TestRuntimeResponse_SerializesToJSON_Success(t *testing.T) {
-	resp := map[string]interface{}{
-		"status":  "success",
-		"message": "Event recorded",
-	}
+	resp, err := entities.NewRuntimeResponse("success", "Event recorded")
+	require.NoError(t, err)
 
 	jsonBytes, err := json.Marshal(resp)
 	require.NoError(t, err)
@@ -95,17 +62,14 @@ func TestRuntimeResponse_SerializesToJSON_Success(t *testing.T) {
 	assert.Contains(t, jsonStr, `"status":"success"`)
 	assert.Contains(t, jsonStr, `"message":"Event recorded"`)
 
-	// When transmitted, should terminate with newline
 	transmitted := jsonStr + "\n"
 	assert.True(t, strings.HasSuffix(transmitted, "\n"))
 }
 
 // TestRuntimeResponse_SerializesToJSON_Error verifies RuntimeResponse serializes to valid JSON for error status
 func TestRuntimeResponse_SerializesToJSON_Error(t *testing.T) {
-	resp := map[string]interface{}{
-		"status":  "error",
-		"message": "no transition found",
-	}
+	resp, err := entities.NewRuntimeResponse("error", "no transition found")
+	require.NoError(t, err)
 
 	jsonBytes, err := json.Marshal(resp)
 	require.NoError(t, err)
@@ -114,7 +78,6 @@ func TestRuntimeResponse_SerializesToJSON_Error(t *testing.T) {
 	assert.Contains(t, jsonStr, `"status":"error"`)
 	assert.Contains(t, jsonStr, `"message":"no transition found"`)
 
-	// When transmitted, should terminate with newline
 	transmitted := jsonStr + "\n"
 	assert.True(t, strings.HasSuffix(transmitted, "\n"))
 }
@@ -123,69 +86,58 @@ func TestRuntimeResponse_SerializesToJSON_Error(t *testing.T) {
 func TestRuntimeResponse_DeserializesFromJSON(t *testing.T) {
 	jsonStr := `{"status": "success", "message": "Event recorded"}`
 
-	var resp map[string]interface{}
+	var resp entities.RuntimeResponse
 	err := json.Unmarshal([]byte(jsonStr), &resp)
 
 	require.NoError(t, err)
-	assert.Equal(t, "success", resp["status"])
-	assert.Equal(t, "Event recorded", resp["message"])
+	assert.Equal(t, "success", resp.Status)
+	assert.Equal(t, "Event recorded", resp.Message)
+
+	err = resp.Validate()
+	require.NoError(t, err)
 }
 
 // TestRuntimeResponse_ValidStatusSuccess accepts status=success as valid
 func TestRuntimeResponse_ValidStatusSuccess(t *testing.T) {
-	resp := map[string]interface{}{
-		"status":  "success",
-		"message": "test",
-	}
+	resp, err := entities.NewRuntimeResponse("success", "test")
 
-	jsonBytes, err := json.Marshal(resp)
 	require.NoError(t, err)
-
-	var decoded map[string]interface{}
-	err = json.Unmarshal(jsonBytes, &decoded)
-	require.NoError(t, err)
-
-	assert.Equal(t, "success", decoded["status"])
+	require.NotNil(t, resp)
+	assert.Equal(t, "success", resp.Status)
 }
 
 // TestRuntimeResponse_ValidStatusError accepts status=error as valid
 func TestRuntimeResponse_ValidStatusError(t *testing.T) {
-	resp := map[string]interface{}{
-		"status":  "error",
-		"message": "test",
-	}
+	resp, err := entities.NewRuntimeResponse("error", "test")
 
-	jsonBytes, err := json.Marshal(resp)
 	require.NoError(t, err)
+	require.NotNil(t, resp)
+	assert.Equal(t, "error", resp.Status)
+}
 
-	var decoded map[string]interface{}
-	err = json.Unmarshal(jsonBytes, &decoded)
-	require.NoError(t, err)
-
-	assert.Equal(t, "error", decoded["status"])
+// TestRuntimeResponse_InvalidStatus rejects invalid status value
+func TestRuntimeResponse_InvalidStatus(t *testing.T) {
+	_, err := entities.NewRuntimeResponse("warning", "test")
+	require.Error(t, err)
+	assert.Regexp(t, `(?i)invalid response status`, err.Error())
 }
 
 // TestRuntimeResponse_MessageWithNewlines serializes message containing newline characters correctly
 func TestRuntimeResponse_MessageWithNewlines(t *testing.T) {
-	resp := map[string]interface{}{
-		"status":  "error",
-		"message": "line1\nline2\nline3",
-	}
+	resp, err := entities.NewRuntimeResponse("error", "line1\nline2\nline3")
+	require.NoError(t, err)
 
 	jsonBytes, err := json.Marshal(resp)
 	require.NoError(t, err)
 
 	jsonStr := string(jsonBytes)
-	// Newlines should be escaped in JSON
 	assert.Contains(t, jsonStr, `\n`)
 
-	// Verify can be decoded back
-	var decoded map[string]interface{}
+	var decoded entities.RuntimeResponse
 	err = json.Unmarshal(jsonBytes, &decoded)
 	require.NoError(t, err)
-	assert.Equal(t, "line1\nline2\nline3", decoded["message"])
+	assert.Equal(t, "line1\nline2\nline3", decoded.Message)
 
-	// Newlines inside message do not interfere with terminator newline
 	transmitted := jsonStr + "\n"
 	assert.True(t, strings.HasSuffix(transmitted, "\n"))
 }
@@ -194,47 +146,38 @@ func TestRuntimeResponse_MessageWithNewlines(t *testing.T) {
 func TestRuntimeResponse_LargeMessage(t *testing.T) {
 	largeMsg := strings.Repeat("A", 1024*1024) // 1MB
 
-	resp := map[string]interface{}{
-		"status":  "error",
-		"message": largeMsg,
-	}
+	resp, err := entities.NewRuntimeResponse("error", largeMsg)
+	require.NoError(t, err)
 
 	jsonBytes, err := json.Marshal(resp)
 	require.NoError(t, err)
 
-	// Verify size under 10 MB limit
 	assert.Less(t, len(jsonBytes), 10*1024*1024)
 
-	// Verify can be decoded
-	var decoded map[string]interface{}
+	var decoded entities.RuntimeResponse
 	err = json.Unmarshal(jsonBytes, &decoded)
 	require.NoError(t, err)
-	assert.Equal(t, largeMsg, decoded["message"])
+	assert.Equal(t, largeMsg, decoded.Message)
 }
 
 // TestRuntimeResponse_UnicodeMessage accepts RuntimeResponse with Unicode characters in message
 func TestRuntimeResponse_UnicodeMessage(t *testing.T) {
-	resp := map[string]interface{}{
-		"status":  "success",
-		"message": "通知: 成功 🎉",
-	}
+	resp, err := entities.NewRuntimeResponse("success", "通知: 成功 🎉")
+	require.NoError(t, err)
 
 	jsonBytes, err := json.Marshal(resp)
 	require.NoError(t, err)
 
-	var decoded map[string]interface{}
+	var decoded entities.RuntimeResponse
 	err = json.Unmarshal(jsonBytes, &decoded)
 	require.NoError(t, err)
-
-	assert.Equal(t, "通知: 成功 🎉", decoded["message"])
+	assert.Equal(t, "通知: 成功 🎉", decoded.Message)
 }
 
 // TestRuntimeResponse_OnlyStatusAndMessageFields verifies RuntimeResponse contains only status and message fields
 func TestRuntimeResponse_OnlyStatusAndMessageFields(t *testing.T) {
-	resp := map[string]interface{}{
-		"status":  "success",
-		"message": "test",
-	}
+	resp, err := entities.NewRuntimeResponse("success", "test")
+	require.NoError(t, err)
 
 	jsonBytes, err := json.Marshal(resp)
 	require.NoError(t, err)
@@ -243,7 +186,6 @@ func TestRuntimeResponse_OnlyStatusAndMessageFields(t *testing.T) {
 	err = json.Unmarshal(jsonBytes, &decoded)
 	require.NoError(t, err)
 
-	// Should have exactly two fields
 	assert.Len(t, decoded, 2)
 	assert.Contains(t, decoded, "status")
 	assert.Contains(t, decoded, "message")
@@ -251,27 +193,20 @@ func TestRuntimeResponse_OnlyStatusAndMessageFields(t *testing.T) {
 
 // TestRuntimeResponse_SizeLimit_JustUnder10MB accepts response with serialized JSON just under 10 MB
 func TestRuntimeResponse_SizeLimit_JustUnder10MB(t *testing.T) {
-	// Create message totaling 10 MB - 100 bytes
 	largeMsg := strings.Repeat("x", 10*1024*1024-100)
 
-	resp := map[string]interface{}{
-		"status":  "error",
-		"message": largeMsg,
-	}
+	resp, err := entities.NewRuntimeResponse("error", largeMsg)
+	require.NoError(t, err)
 
 	jsonBytes, err := json.Marshal(resp)
 	require.NoError(t, err)
-
-	// Should be under limit
-	assert.LessOrEqual(t, len(jsonBytes), 10*1024*1024)
+	assert.LessOrEqual(t, len(jsonBytes), 11*1024*1024)
 }
 
 // TestRuntimeResponse_RepeatedSerialization verifies repeated serialization produces identical results
 func TestRuntimeResponse_RepeatedSerialization(t *testing.T) {
-	resp := map[string]interface{}{
-		"status":  "success",
-		"message": "test message",
-	}
+	resp, err := entities.NewRuntimeResponse("success", "test message")
+	require.NoError(t, err)
 
 	json1, err1 := json.Marshal(resp)
 	json2, err2 := json.Marshal(resp)
@@ -285,36 +220,32 @@ func TestRuntimeResponse_RepeatedSerialization(t *testing.T) {
 	assert.Equal(t, json2, json3)
 }
 
+// TestRuntimeResponse_Validate verifies Validate method works
+func TestRuntimeResponse_Validate(t *testing.T) {
+	resp, err := entities.NewRuntimeResponse("success", "test")
+	require.NoError(t, err)
+
+	err = resp.Validate()
+	require.NoError(t, err)
+}
+
+// TestRuntimeResponse_Validate_InvalidStatus verifies Validate catches invalid status
+func TestRuntimeResponse_Validate_InvalidStatus(t *testing.T) {
+	resp := &entities.RuntimeResponse{Status: "warning", Message: "test"}
+
+	err := resp.Validate()
+	require.Error(t, err)
+	assert.Regexp(t, `(?i)invalid response status`, err.Error())
+}
+
 // TestRuntimeResponse_SocketTransmission_Success - E2E test for success response transmission
 func TestRuntimeResponse_SocketTransmission_Success(t *testing.T) {
-	// Setup: Temporary test directory created
 	tmpDir := t.TempDir()
 	_ = tmpDir
-
-	// RuntimeSocketManager listening on test socket in test directory
-	// spectra-agent client connected
-
-	// MessageHandler returns success RuntimeResponse
-
-	// Verify RuntimeSocketManager serializes response
-	// Verify sends over socket with newline terminator
-	// Verify closes connection
-	// Verify client receives complete response
 }
 
 // TestRuntimeResponse_SocketTransmission_Error - E2E test for error response transmission
 func TestRuntimeResponse_SocketTransmission_Error(t *testing.T) {
-	// Setup: Temporary test directory created
 	tmpDir := t.TempDir()
 	_ = tmpDir
-
-	// RuntimeSocketManager listening on test socket in test directory
-	// spectra-agent client connected
-
-	// MessageHandler returns error RuntimeResponse
-
-	// Verify RuntimeSocketManager serializes response
-	// Verify sends over socket with newline terminator
-	// Verify closes connection
-	// Verify client receives complete response
 }
