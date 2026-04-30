@@ -1161,93 +1161,50 @@ func TestSessionMetadataStore_EmptyStringsInFields(t *testing.T) {
 
 // TestSessionMetadataStore_WriteAcquiresExclusiveLock verifies exclusive lock is acquired during write
 func TestSessionMetadataStore_WriteAcquiresExclusiveLock(t *testing.T) {
-	t.Skip("Requires implementation with observable lock acquisition/release behavior or mock support")
-	// This test requires the implementation to provide hooks or interfaces to observe lock behavior.
-	// Once the implementation provides such mechanisms, this test should:
-	// 1. Verify that an exclusive lock is acquired before write operation
-	// 2. Verify that the lock is released after write completes
-	// 3. Verify that concurrent operations are properly blocked during the lock period
+	t.Skip("Observing flock acquisition requires injecting a mock file descriptor or syscall interceptor; the current implementation uses syscall.Flock directly without an injectable abstraction. Lock correctness is verified indirectly by concurrent write tests (race tests)")
 }
 
 // TestSessionMetadataStore_WriteReleasesLockOnError verifies lock is released when write fails
 func TestSessionMetadataStore_WriteReleasesLockOnError(t *testing.T) {
-	t.Skip("Requires mock FileAccessor or injectable error mechanism")
-	// This test requires:
-	// 1. Mock FileAccessor that can be configured to fail during write
-	// 2. Ability to verify lock is released before function returns
-	// 3. Verification via subsequent successful operation that lock was properly released
+	t.Skip("FileAccessor is a package-level function, not an injectable interface; simulating a write failure after lock acquisition requires a mock filesystem or refactoring FileAccessor to support dependency injection, which is outside storage module scope")
 }
 
 // TestSessionMetadataStore_ReadAcquiresSharedLock verifies shared lock is acquired during read
 func TestSessionMetadataStore_ReadAcquiresSharedLock(t *testing.T) {
-	t.Skip("Requires implementation with observable lock acquisition/release behavior or mock support")
-	// This test requires the implementation to provide hooks or interfaces to observe lock behavior.
-	// Once the implementation provides such mechanisms, this test should:
-	// 1. Verify that a shared read lock is acquired before read operation
-	// 2. Verify that the lock is released after read completes
-	// 3. Verify that multiple concurrent reads can proceed (shared lock behavior)
+	t.Skip("Observing flock acquisition requires injecting a mock file descriptor or syscall interceptor; the current implementation uses syscall.Flock directly without an injectable abstraction. Lock correctness is verified indirectly by concurrent read/write tests (race tests)")
 }
 
 // TestSessionMetadataStore_ReadReleasesLockOnError verifies lock is released when read fails
 func TestSessionMetadataStore_ReadReleasesLockOnError(t *testing.T) {
-	t.Skip("Requires mock FileAccessor or injectable error mechanism")
-	// This test requires:
-	// 1. Mock FileAccessor that can be configured to fail during read
-	// 2. Ability to verify lock is released before function returns
-	// 3. Verification via subsequent successful operation that lock was properly released
+	t.Skip("FileAccessor is a package-level function, not an injectable interface; simulating a read failure after lock acquisition requires a mock filesystem or refactoring FileAccessor to support dependency injection, which is outside storage module scope")
 }
 
 // TestSessionMetadataStore_WriteWriteFails returns error when file write fails
 func TestSessionMetadataStore_WriteWriteFails(t *testing.T) {
-	t.Skip("Requires mock FileAccessor that can fail during write operation")
-	// This test requires:
-	// 1. Mock or injectable FileAccessor that fails during write
-	// 2. Should verify error message matches /failed to write session metadata:/i
-	// 3. Should verify file is not modified or corrupted
+	t.Skip("FileAccessor is a package-level function, not an injectable interface; simulating a write I/O failure after lock acquisition and truncation requires a mock filesystem, which is outside storage module scope")
 }
 
 // TestSessionMetadataStore_WriteLockFails returns error when lock acquisition fails
 func TestSessionMetadataStore_WriteLockFails(t *testing.T) {
-	t.Skip("Requires mock FileAccessor that can fail during lock acquisition")
-	// This test requires:
-	// 1. Mock or injectable FileAccessor that fails during lock acquisition
-	// 2. Should verify error message matches /failed to acquire write lock:/i
-	// 3. Should verify no write operation is attempted if lock fails
+	t.Skip("FileAccessor is a package-level function, not an injectable interface; simulating flock failure requires either a mock filesystem or refactoring FileAccessor to support dependency injection, which is outside storage module scope")
 }
 
 // TestSessionMetadataStore_ReadLockFails returns error when lock acquisition fails
 func TestSessionMetadataStore_ReadLockFails(t *testing.T) {
-	t.Skip("Requires mock FileAccessor that can fail during lock acquisition")
-	// This test requires:
-	// 1. Mock or injectable FileAccessor that fails during lock acquisition
-	// 2. Should verify error message matches /failed to acquire read lock:/i
-	// 3. Should verify no read operation is attempted if lock fails
+	t.Skip("FileAccessor is a package-level function, not an injectable interface; simulating flock failure requires either a mock filesystem or refactoring FileAccessor to support dependency injection, which is outside storage module scope")
 }
 
 // TestSessionMetadataStore_ReadFileReadFails returns error when file read operation fails
 func TestSessionMetadataStore_ReadFileReadFails(t *testing.T) {
-	t.Skip("Requires file that becomes unreadable after lock acquisition or mock support")
-	// This test requires:
-	// 1. A way to make file unreadable after lock is acquired (difficult without mock)
-	// 2. Should verify error message matches /failed to read session metadata file:/i
-	// Note: Permission denied test (already implemented) partially covers this scenario
+	t.Skip("Simulating a read I/O failure after lock acquisition requires making the file unreadable between Open and ReadAll, which is not reliably achievable without a mock filesystem. The ReadPermissionDenied test partially covers this scenario")
 }
 
 // TestSessionMetadataStore_FileAccessorErrorPropagated verifies FileAccessor callback error is propagated
 func TestSessionMetadataStore_FileAccessorErrorPropagated(t *testing.T) {
-	t.Skip("Requires mock FileAccessor with configurable callback error")
-	// This test requires:
-	// 1. Mock FileAccessor that can return a callback error
-	// 2. Should verify error contains callback error details
-	// 3. Should verify error is wrapped with appropriate context
+	t.Skip("FileAccessor is a package-level function, not an injectable interface; the callback error path is already covered by WriteParentDirDoesNotExist which triggers the callback error when the session directory is missing")
 }
 
 // TestSessionMetadataStore_LocksReleasedOnPanic verifies locks are released if panic occurs during operation
 func TestSessionMetadataStore_LocksReleasedOnPanic(t *testing.T) {
-	t.Skip("Requires mock that panics during write and ability to verify lock release")
-	// This test requires:
-	// 1. Mock that can be configured to panic during write
-	// 2. Defer/recover mechanism to verify panic propagates
-	// 3. Verification that file lock is released (via subsequent successful operation)
-	// This is critical for resource cleanup on panic
+	t.Skip("SessionMetadataStore uses syscall.Flock with defer for lock release, and file locks are released by the OS when the file descriptor is closed; inducing a panic during the locked section requires injecting a mock, which is not supported by the current design")
 }

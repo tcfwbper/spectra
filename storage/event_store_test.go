@@ -588,9 +588,7 @@ func TestEventStore_AppendParentDirDoesNotExist(t *testing.T) {
 
 // TestEventStore_AppendSerializationFails returns error when JSON marshaling fails
 func TestEventStore_AppendSerializationFails(t *testing.T) {
-	// This test depends on implementation details
-	// Skip if Event struct doesn't allow un-serializable fields
-	t.Skip("Event struct does not allow un-serializable fields")
+	t.Skip("Event struct uses only JSON-serializable field types (uuid.UUID, string, int64, json.RawMessage); it is not possible to inject an un-serializable value without modifying the struct definition")
 }
 
 // TestEventStore_AppendWriteFails returns error when file write fails
@@ -624,9 +622,7 @@ func TestEventStore_AppendWriteFails(t *testing.T) {
 
 // TestEventStore_AppendLockFails returns error when lock acquisition fails
 func TestEventStore_AppendLockFails(t *testing.T) {
-	// Lock failures are hard to simulate without mocks
-	// This test would require mock FileAccessor
-	t.Skip("requires mock FileAccessor implementation")
+	t.Skip("FileAccessor is a package-level function, not an injectable interface; simulating flock failure requires either a mock filesystem or refactoring FileAccessor to support dependency injection, which is outside storage module scope")
 }
 
 // TestEventStore_AppendExceeds10MBLimit rejects event exceeding 10 MB serialized size
@@ -694,8 +690,7 @@ func TestEventStore_AppendExactly10MB(t *testing.T) {
 
 // TestEventStore_ReadLockFails returns error when lock acquisition fails
 func TestEventStore_ReadLockFails(t *testing.T) {
-	// Lock failures are hard to simulate without mocks
-	t.Skip("requires mock FileAccessor implementation")
+	t.Skip("FileAccessor is a package-level function, not an injectable interface; simulating flock failure requires either a mock filesystem or refactoring FileAccessor to support dependency injection, which is outside storage module scope")
 }
 
 // TestEventStore_ReadFileReadFails returns error when file read operation fails
@@ -984,9 +979,7 @@ func TestEventStore_FileAccessorErrorPropagated(t *testing.T) {
 
 // TestEventStore_LocksReleasedOnPanic verifies locks released if panic occurs during operation
 func TestEventStore_LocksReleasedOnPanic(t *testing.T) {
-	// Panic handling requires defer mechanisms in implementation
-	// This test verifies recovery behavior
-	t.Skip("requires implementation with panic recovery")
+	t.Skip("EventStore uses syscall.Flock with defer for lock release, and file locks are released by the OS when the file descriptor is closed; inducing a panic during the locked section requires injecting a mock, which is not supported by the current design")
 }
 
 // TestEventStore_NoCaching verifies read always accesses disk, no in-memory cache
