@@ -23,7 +23,9 @@ type AgentError struct {
 // It validates that:
 // - Message is non-empty and not just whitespace
 // - Detail is valid JSON if provided
-// - SessionID references an existing session (placeholder validation for now)
+//
+// Note: SessionID existence and session status are validated by the runtime layer
+// (ErrorProcessor), not here.
 func NewAgentError(
 	agentRole string,
 	message string,
@@ -48,9 +50,8 @@ func NewAgentError(
 		}
 	}
 
-	// TODO: Validate SessionID references an existing session
-	// This would require access to session storage
-	// For now, we accept any UUID and let the runtime handle session validation
+	// SessionID existence and session status are validated by the runtime layer
+	// (ErrorProcessor), not the entity constructor.
 
 	return &AgentError{
 		AgentRole:    agentRole,
