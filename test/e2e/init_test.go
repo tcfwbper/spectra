@@ -353,6 +353,11 @@ func TestInit_SpectraDirCreationFails(t *testing.T) {
 	}
 
 	tmpDir := t.TempDir()
+
+	// Pre-create .gitignore so Phase 0 succeeds and Phase 1 (directory creation) can be tested
+	gitignorePath := filepath.Join(tmpDir, ".gitignore")
+	require.NoError(t, os.WriteFile(gitignorePath, []byte(".spectra\n"), 0644))
+
 	require.NoError(t, os.Chmod(tmpDir, 0555))
 	t.Cleanup(func() { os.Chmod(tmpDir, 0755) })
 
