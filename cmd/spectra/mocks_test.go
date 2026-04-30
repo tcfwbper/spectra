@@ -1,4 +1,4 @@
-package spectra
+package main
 
 import "io"
 
