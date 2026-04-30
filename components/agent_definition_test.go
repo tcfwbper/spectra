@@ -703,3 +703,55 @@ func TestAgentDefinition_ImplementsInterface(t *testing.T) {
 	_ = agent.GetAllowedTools()
 	_ = agent.GetDisallowedTools()
 }
+
+// TestAgentDefinition_ReferencedByNode verifies AgentDefinition successfully referenced by workflow Node
+func TestAgentDefinition_ReferencedByNode(t *testing.T) {
+	// Setup: Temporary test directory created; AgentDefinition file at <test-dir>/.spectra/agents/Architect.yaml;
+	//        workflow definition with agent Node referencing AgentRole="Architect"
+	tmpDir := t.TempDir()
+	agentsDir := filepath.Join(tmpDir, ".spectra", "agents")
+	err := os.MkdirAll(agentsDir, 0755)
+	require.NoError(t, err)
+	specDir := filepath.Join(tmpDir, "spec")
+	err = os.MkdirAll(specDir, 0755)
+	require.NoError(t, err)
+
+	yamlContent := `role: "Architect"
+model: "opus"
+effort: "high"
+system_prompt: "You are an architect"
+agent_root: "spec"
+allowed_tools:
+  - "Read(*)"
+disallowed_tools: []
+`
+	yamlPath := filepath.Join(agentsDir, "Architect.yaml")
+	err = os.WriteFile(yamlPath, []byte(yamlContent), 0644)
+	require.NoError(t, err)
+
+	// Load agent and verify it exists
+	agent, err := components.LoadAgentDefinition(yamlPath)
+	require.NoError(t, err)
+	require.Equal(t, "Architect", agent.GetRole())
+
+	// Input: Load workflow and validate nodes; Node with AgentRole="Architect" references valid AgentDefinition
+	nodes := []*components.Node{
+		createNode(t, "Start", "human", "", ""),
+		createNode(t, "ArchitectNode", "agent", "Architect", "AI architect drafts spec"),
+	}
+	transitions := []*components.Transition{
+		createTransition(t, "Start", "Go", "ArchitectNode"),
+		createTransition(t, "ArchitectNode", "Done", "Start"),
+	}
+	exitTransitions := []*components.ExitTransition{
+		createExitTransition(t, "ArchitectNode", "Done", "Start"),
+	}
+
+	// Expected: Node with AgentRole="Architect" references valid AgentDefinition; workflow validation succeeds
+	workflow, err := components.NewWorkflowDefinition("Test", "", "Start", exitTransitions, nodes, transitions)
+	require.NoError(t, err)
+
+	archNode := workflow.GetNodes()[1]
+	require.Equal(t, "Architect", archNode.GetAgentRole())
+	require.Equal(t, agent.GetRole(), archNode.GetAgentRole())
+}

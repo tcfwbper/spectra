@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	"github.com/tcfwbper/spectra/components"
 )
 
 // TestNode_ValidAgentNode creates Node with type agent and valid agent role
@@ -150,8 +151,7 @@ func TestNode_NonExistentAgentRole(t *testing.T) {
 	// Setup: Agent definition for "NonExistent" does not exist
 	// Input: Name="TestNode", Type="agent", AgentRole="NonExistent"
 	// Expected: Returns error; error message matches `/agent.*NonExistent.*not found/i`
-	// Note: This test requires workflow-level validation with agent loader
-	// For now, just create the node successfully (agent existence check happens at workflow level)
+	// Agent existence validation is the responsibility of storage.AgentDefinitionLoader
 	node := createNode(t, "TestNode", "agent", "NonExistent", "")
 	require.Equal(t, "NonExistent", node.GetAgentRole())
 }
@@ -169,40 +169,98 @@ func TestNode_DuplicateName(t *testing.T) {
 	// Setup: Workflow already contains node with Name="Reviewer"
 	// Input: Add second node with Name="Reviewer"
 	// Expected: Returns error; error message matches `/duplicate.*node.*name.*Reviewer/i`
-	t.Skip("Requires workflow component - validation happens at workflow level")
+	nodes := []*components.Node{
+		createNode(t, "Start", "human", "", ""),
+		createNode(t, "Reviewer", "human", "", ""),
+		createNode(t, "Reviewer", "agent", "Architect", ""),
+	}
+	transitions := []*components.Transition{
+		createTransition(t, "Start", "Go", "Reviewer"),
+		createTransition(t, "Reviewer", "Done", "Start"),
+	}
+	exitTransitions := []*components.ExitTransition{
+		createExitTransition(t, "Reviewer", "Done", "Start"),
+	}
+
+	_, err := components.NewWorkflowDefinition("Test", "", "Start", exitTransitions, nodes, transitions)
+	assertErrorMatches(t, err, `(?i)duplicate.*node.*name.*Reviewer`)
 }
 
 // TestNode_AddedToWorkflow verifies Node successfully added to workflow Nodes array
 func TestNode_AddedToWorkflow(t *testing.T) {
 	// Setup: Temporary test directory created; empty workflow definition in test directory
-	tmpDir := t.TempDir()
-	_ = tmpDir
 
 	// Input: Add node with Name="TestNode", Type="human"
 	// Expected: Node appears in workflow's Nodes array; workflow validation succeeds
-	t.Skip("Requires workflow component")
+	nodes := []*components.Node{
+		createNode(t, "Start", "human", "", ""),
+		createNode(t, "TestNode", "human", "", ""),
+	}
+	transitions := []*components.Transition{
+		createTransition(t, "Start", "Go", "TestNode"),
+		createTransition(t, "TestNode", "Done", "Start"),
+	}
+	exitTransitions := []*components.ExitTransition{
+		createExitTransition(t, "TestNode", "Done", "Start"),
+	}
+
+	workflow, err := components.NewWorkflowDefinition("Test", "", "Start", exitTransitions, nodes, transitions)
+	require.NoError(t, err)
+
+	returnedNodes := workflow.GetNodes()
+	require.Len(t, returnedNodes, 2)
+	require.Equal(t, "TestNode", returnedNodes[1].GetName())
 }
 
 // TestNode_MultipleNodesInWorkflow verifies multiple nodes coexist in workflow
 func TestNode_MultipleNodesInWorkflow(t *testing.T) {
-	// Setup: Temporary test directory created; workflow definition in test directory
-	tmpDir := t.TempDir()
-	_ = tmpDir
-
 	// Input: Add nodes: Name="Agent1" (agent), Name="Human1" (human), Name="Agent2" (agent)
 	// Expected: All three nodes in workflow's Nodes array; all unique
-	t.Skip("Requires workflow component")
+	nodes := []*components.Node{
+		createNode(t, "Human1", "human", "", ""),
+		createNode(t, "Agent1", "agent", "Architect", ""),
+		createNode(t, "Agent2", "agent", "Reviewer", ""),
+	}
+	transitions := []*components.Transition{
+		createTransition(t, "Human1", "Go", "Agent1"),
+		createTransition(t, "Agent1", "Next", "Agent2"),
+		createTransition(t, "Agent2", "Done", "Human1"),
+	}
+	exitTransitions := []*components.ExitTransition{
+		createExitTransition(t, "Agent2", "Done", "Human1"),
+	}
+
+	workflow, err := components.NewWorkflowDefinition("Test", "", "Human1", exitTransitions, nodes, transitions)
+	require.NoError(t, err)
+
+	returnedNodes := workflow.GetNodes()
+	require.Len(t, returnedNodes, 3)
+	require.Equal(t, "Human1", returnedNodes[0].GetName())
+	require.Equal(t, "Agent1", returnedNodes[1].GetName())
+	require.Equal(t, "Agent2", returnedNodes[2].GetName())
 }
 
-// TestNode_UnreachableNode issues warning for node with no incoming or outgoing transitions
+// TestNode_UnreachableNode returns error for node with no incoming transitions (unreachable)
 func TestNode_UnreachableNode(t *testing.T) {
-	// Setup: Temporary test directory created; workflow definition in test directory with node "Isolated" having no transitions
-	tmpDir := t.TempDir()
-	_ = tmpDir
-
+	// Setup: Workflow definition with node "Isolated" having no incoming transitions
 	// Input: Validate workflow
-	// Expected: Returns warning message matching `/unreachable.*node.*Isolated/i`; workflow not rejected
-	t.Skip("Requires workflow component - validation happens at workflow level")
+	// Expected: Returns error message matching `/unreachable.*node.*Isolated/i`; workflow rejected
+	nodes := []*components.Node{
+		createNode(t, "Start", "human", "", ""),
+		createNode(t, "End", "human", "", ""),
+		createNode(t, "Isolated", "human", "", ""),
+	}
+	transitions := []*components.Transition{
+		createTransition(t, "Start", "Go", "End"),
+		createTransition(t, "End", "Done", "Start"),
+		createTransition(t, "Isolated", "Back", "Start"),
+	}
+	exitTransitions := []*components.ExitTransition{
+		createExitTransition(t, "End", "Done", "Start"),
+	}
+
+	_, err := components.NewWorkflowDefinition("Test", "", "Start", exitTransitions, nodes, transitions)
+	assertErrorMatches(t, err, `(?i)unreachable.*node.*Isolated`)
 }
 
 // TestNode_FieldsImmutable verifies Node fields cannot be modified after creation
@@ -240,7 +298,7 @@ func TestNode_AgentNodeToYAML(t *testing.T) {
 
 	// Input: Node with Name="Reviewer", Type="agent", AgentRole="Reviewer", Description="Reviews"
 	// Expected: YAML contains name: "Reviewer", type: "agent", agent_role: "Reviewer", description: "Reviews"
-	t.Skip("YAML serialization handled by storage layer")
+	t.Skip("Tested in storage package")
 }
 
 // TestNode_HumanNodeToYAML verifies Human Node serializes to YAML correctly
@@ -251,7 +309,7 @@ func TestNode_HumanNodeToYAML(t *testing.T) {
 
 	// Input: Node with Name="Approval", Type="human", Description="Approves"
 	// Expected: YAML contains name: "Approval", type: "human", description: "Approves"; no agent_role field
-	t.Skip("YAML serialization handled by storage layer")
+	t.Skip("Tested in storage package")
 }
 
 // TestNode_YAMLToAgentNode verifies YAML deserializes to agent Node correctly
@@ -262,7 +320,7 @@ func TestNode_YAMLToAgentNode(t *testing.T) {
 
 	// Input: YAML: name: "Reviewer", type: "agent", agent_role: "Reviewer"
 	// Expected: Node created with matching fields
-	t.Skip("YAML deserialization handled by storage layer")
+	t.Skip("Tested in storage package")
 }
 
 // TestNode_YAMLToHumanNode verifies YAML deserializes to human Node correctly
@@ -273,5 +331,5 @@ func TestNode_YAMLToHumanNode(t *testing.T) {
 
 	// Input: YAML: name: "Approval", type: "human"
 	// Expected: Node created with Type="human", AgentRole=""
-	t.Skip("YAML deserialization handled by storage layer")
+	t.Skip("Tested in storage package")
 }

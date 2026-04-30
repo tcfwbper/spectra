@@ -1067,3 +1067,26 @@ func TestWorkflowDefinition_ExitTransitionOrderPreserved(t *testing.T) {
 	require.Equal(t, "E2", returnedExitTransitions[1].GetEventType())
 	require.Equal(t, "E3", returnedExitTransitions[2].GetEventType())
 }
+
+// TestWorkflowDefinition_ExitTargetWithOutgoingWarning allows exit target node to have outgoing transitions
+func TestWorkflowDefinition_ExitTargetWithOutgoingWarning(t *testing.T) {
+	// Setup: Workflow with exit transition to "Final"; "Final" has outgoing transition to "Start"
+	nodes := []*components.Node{
+		createNode(t, "Start", "human", "", ""),
+		createNode(t, "Final", "human", "", ""),
+	}
+	transitions := []*components.Transition{
+		createTransition(t, "Start", "Go", "Final"),
+		createTransition(t, "Final", "Back", "Start"),
+	}
+	exitTransitions := []*components.ExitTransition{
+		createExitTransition(t, "Start", "Go", "Final"),
+	}
+
+	// Input: Validate workflow
+	workflow, err := components.NewWorkflowDefinition("Test", "", "Start", exitTransitions, nodes, transitions)
+
+	// Expected: Workflow creation succeeds; Runtime should handle warning about unreachable transitions
+	require.NoError(t, err)
+	require.NotNil(t, workflow)
+}
