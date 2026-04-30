@@ -798,9 +798,30 @@ func TestCreateSocket_PermissionDenied(t *testing.T) {
 
 // TestCreateSocket_PathTooLong returns error when socket path exceeds platform limit
 func TestCreateSocket_PathTooLong(t *testing.T) {
-	// TODO(test-infra): Implement test with deeply nested directory structure
-	// Unix socket paths typically limited to ~108 characters on some systems
-	t.Skip("Testing path length limits requires very long directory structures")
+	if runtime.GOOS == "windows" {
+		t.Skip("Skipping Unix socket path length test on Windows")
+	}
+
+	sessionUUID := "123e4567-e89b-12d3-a456-426614174000"
+
+	tmpDir, err := os.MkdirTemp("", "s")
+	require.NoError(t, err)
+	t.Cleanup(func() { os.RemoveAll(tmpDir) })
+
+	// Unix socket paths limited to 107 usable characters (sun_path is 108 bytes including null)
+	projectRoot := tmpDir
+	socketSuffix := filepath.Join(".spectra", "sessions", sessionUUID, "runtime.sock")
+	for len(filepath.Join(projectRoot, socketSuffix)) <= 107 {
+		projectRoot = filepath.Join(projectRoot, "pad")
+	}
+
+	sessionDir := filepath.Join(projectRoot, ".spectra", "sessions", sessionUUID)
+	require.NoError(t, os.MkdirAll(sessionDir, 0755))
+
+	manager := storage.NewRuntimeSocketManager(projectRoot, sessionUUID)
+	err = manager.CreateSocket()
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "failed to create runtime socket:")
 }
 
 // TestListen_SocketNotCreated returns error when called before CreateSocket
@@ -818,14 +839,12 @@ func TestListen_SocketNotCreated(t *testing.T) {
 
 // TestListen_BindFails returns error when socket bind fails
 func TestListen_BindFails(t *testing.T) {
-	// TODO(test-infra): Implement with mock net.Listener or filesystem manipulation
-	t.Skip("Simulating bind failure requires complex mocking")
+	t.Skip("Listen delegates to net.Listener.Accept, not bind; bind failure is covered by CreateSocket tests. Simulating post-bind failure requires injecting a mock net.Listener, which is not supported by the current RuntimeSocketManager design")
 }
 
 // TestListen_InitialBindFailure returns nil channels when initial bind/listen fails
 func TestListen_InitialBindFailure(t *testing.T) {
-	// TODO(test-infra): Implement by holding socket in another process before test
-	t.Skip("Simulating initial bind failure requires complex mocking")
+	t.Skip("Listen requires CreateSocket to succeed first; initial bind failure is handled in CreateSocket. Simulating post-creation listener failure requires injecting a mock net.Listener, which is not supported by the current RuntimeSocketManager design")
 }
 
 // TestReceive_MalformedJSON rejects message with invalid JSON
@@ -1134,14 +1153,95 @@ func TestReceive_MessageExceeds10MBLimit(t *testing.T) {
 
 // TestReceive_MessageExactly10MB accepts message at exactly 10 MB limit
 func TestReceive_MessageExactly10MB(t *testing.T) {
-	// TODO(performance): Implement with streaming or test in separate slow test suite
-	t.Skip("Creating exact 10MB message is slow and may timeout")
+	if testing.Short() {
+		t.Skip("Skipping large message test in short mode")
+	}
+
+	sessionUUID := "123e4567-e89b-12d3-a456-426614174000"
+	projectRoot := setupTestFixture(t, sessionUUID)
+	manager := storage.NewRuntimeSocketManager(projectRoot, sessionUUID)
+
+	require.NoError(t, manager.CreateSocket())
+	defer manager.DeleteSocket()
+
+	handler := newRecordingMessageHandler(mockMessageHandler())
+	_, _, err := manager.Listen(handler.Handle)
+	require.NoError(t, err)
+
+	socketPath := storage.GetRuntimeSocketPath(projectRoot, sessionUUID)
+	require.NoError(t, waitForSocket(socketPath, listenerShutdownMax))
+
+	// Build a message that totals exactly 10 MB (10*1024*1024 bytes) when serialized
+	// Template: {"type":"event","payload":{"eventType":"test","data":"<padded>"}}
+	prefix := `{"type":"event","payload":{"eventType":"test","data":"`
+	suffix := `"}}`
+	overhead := len(prefix) + len(suffix)
+	dataSize := messageSizeLimit - overhead
+	data := strings.Repeat("a", dataSize)
+	msg := prefix + data + suffix
+
+	require.Equal(t, messageSizeLimit, len(msg))
+
+	client, err := connectToSocket(socketPath)
+	require.NoError(t, err)
+	defer client.Close()
+
+	err = client.SendMessage(msg)
+	require.NoError(t, err)
+
+	response, err := client.ReadResponse()
+	require.NoError(t, err)
+	assert.Contains(t, response, `"status":"success"`)
+
+	assert.Eventually(t, func() bool {
+		return handler.Count() == 1
+	}, longProcessingWait, 10*time.Millisecond, "Handler should be invoked for exactly 10MB message")
 }
 
 // TestReceive_MessageJustUnder10MB accepts message just under 10 MB limit
 func TestReceive_MessageJustUnder10MB(t *testing.T) {
-	// TODO(performance): Implement with streaming or test in separate slow test suite
-	t.Skip("Creating near-10MB message is slow and may timeout")
+	if testing.Short() {
+		t.Skip("Skipping large message test in short mode")
+	}
+
+	sessionUUID := "123e4567-e89b-12d3-a456-426614174000"
+	projectRoot := setupTestFixture(t, sessionUUID)
+	manager := storage.NewRuntimeSocketManager(projectRoot, sessionUUID)
+
+	require.NoError(t, manager.CreateSocket())
+	defer manager.DeleteSocket()
+
+	handler := newRecordingMessageHandler(mockMessageHandler())
+	_, _, err := manager.Listen(handler.Handle)
+	require.NoError(t, err)
+
+	socketPath := storage.GetRuntimeSocketPath(projectRoot, sessionUUID)
+	require.NoError(t, waitForSocket(socketPath, listenerShutdownMax))
+
+	// Build a message that totals 10 MB - 1 byte
+	prefix := `{"type":"event","payload":{"eventType":"test","data":"`
+	suffix := `"}}`
+	overhead := len(prefix) + len(suffix)
+	dataSize := messageSizeLimit - 1 - overhead
+	data := strings.Repeat("a", dataSize)
+	msg := prefix + data + suffix
+
+	require.Equal(t, messageSizeLimit-1, len(msg))
+
+	client, err := connectToSocket(socketPath)
+	require.NoError(t, err)
+	defer client.Close()
+
+	err = client.SendMessage(msg)
+	require.NoError(t, err)
+
+	response, err := client.ReadResponse()
+	require.NoError(t, err)
+	assert.Contains(t, response, `"status":"success"`)
+
+	assert.Eventually(t, func() bool {
+		return handler.Count() == 1
+	}, longProcessingWait, 10*time.Millisecond, "Handler should be invoked for just-under-10MB message")
 }
 
 // TestReceive_MessageWithNewlines handles escaped newlines in message field
@@ -1414,20 +1514,57 @@ func TestReceive_ClientClosesAfterMessage(t *testing.T) {
 
 // TestReceive_ReadTimeout handles read timeout (if implemented)
 func TestReceive_ReadTimeout(t *testing.T) {
-	// TODO(feature): Implement once read timeout is added to RuntimeSocketManager
-	t.Skip("Read timeout behavior depends on implementation")
+	t.Skip("RuntimeSocketManager does not implement read timeouts; this is responsibility of a future enhancement if needed")
 }
 
 // TestResponse_SendFailsIOError handles I/O error when sending response
 func TestResponse_SendFailsIOError(t *testing.T) {
-	// TODO(test-infra): Implement by closing client before response is sent
-	t.Skip("Simulating I/O error during send requires complex mocking")
+	sessionUUID := "123e4567-e89b-12d3-a456-426614174000"
+	projectRoot := setupTestFixture(t, sessionUUID)
+	manager := storage.NewRuntimeSocketManager(projectRoot, sessionUUID)
+
+	require.NoError(t, manager.CreateSocket())
+	defer manager.DeleteSocket()
+
+	slowHandler := func(sessionUUID string, message entities.RuntimeMessage) entities.RuntimeResponse {
+		time.Sleep(slowHandlerDelay)
+		return entities.RuntimeResponse{Status: "success", Message: "ok"}
+	}
+
+	_, _, err := manager.Listen(slowHandler)
+	require.NoError(t, err)
+
+	socketPath := storage.GetRuntimeSocketPath(projectRoot, sessionUUID)
+	require.NoError(t, waitForSocket(socketPath, listenerShutdownMax))
+
+	client, err := connectToSocket(socketPath)
+	require.NoError(t, err)
+
+	err = client.SendMessage(`{"type":"event","payload":{"eventType":"test"}}`)
+	require.NoError(t, err)
+
+	// Close client before handler finishes, causing response write to fail
+	client.Close()
+
+	// Wait for handler to complete without crashing
+	time.Sleep(slowHandlerDelay + longProcessingWait)
+
+	// Verify server still accepts new connections (did not crash)
+	client2, err := connectToSocket(socketPath)
+	require.NoError(t, err)
+	defer client2.Close()
+
+	err = client2.SendMessage(`{"type":"event","payload":{"eventType":"test2"}}`)
+	require.NoError(t, err)
+
+	response, err := client2.ReadResponse()
+	require.NoError(t, err)
+	assert.Contains(t, response, `"status":"success"`)
 }
 
 // TestListen_AcceptLoopFails delivers asynchronous listener error via channel
 func TestListen_AcceptLoopFails(t *testing.T) {
-	// TODO(test-infra): Implement by corrupting socket file during accept loop
-	t.Skip("Simulating accept loop failure requires complex mocking")
+	t.Skip("RuntimeSocketManager treats all Accept errors as graceful shutdown signals; injecting a non-close Accept failure requires a mock net.Listener, which is not supported by the current design")
 }
 
 // TestListen_ListenerErrChannelBuffered error channel has capacity 1 and is never closed
@@ -1470,14 +1607,12 @@ func TestListen_ListenerDoneSignalsShutdown(t *testing.T) {
 
 // TestDeleteSocket_RemovalFailsWarning logs warning when socket removal fails but does not error
 func TestDeleteSocket_RemovalFailsWarning(t *testing.T) {
-	// TODO(test-infra): Implement by setting immutable flag or using mock filesystem
-	t.Skip("Simulating filesystem errors requires platform-specific setup")
+	t.Skip("DeleteSocket swallows os.Remove errors internally and returns nil; verifying the warning log requires injecting a logger or mock filesystem, which is not supported by the current RuntimeSocketManager design")
 }
 
 // TestDeleteSocket_ProceedsAfterFailure continues gracefully even if removal fails
 func TestDeleteSocket_ProceedsAfterFailure(t *testing.T) {
-	// TODO(test-infra): Implement by making socket file undeletable during test
-	t.Skip("Simulating filesystem errors requires platform-specific setup")
+	t.Skip("DeleteSocket swallows os.Remove errors internally and returns nil; verifying graceful continuation after removal failure requires injecting a mock filesystem, which is not supported by the current RuntimeSocketManager design")
 }
 
 // TestReceive_MalformedMessageIsolation malformed message on one connection does not affect others

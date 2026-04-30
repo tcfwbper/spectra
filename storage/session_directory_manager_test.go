@@ -120,7 +120,7 @@ func TestCreateSessionDirectory_PermissionDenied(t *testing.T) {
 
 // TestCreateSessionDirectory_DiskFull returns error when directory creation fails due to disk full
 func TestCreateSessionDirectory_DiskFull(t *testing.T) {
-	t.Skip("Simulating disk full is platform-specific and requires special setup")
+	t.Skip("Simulating disk full requires a platform-specific filesystem setup (e.g., a tiny tmpfs mount), which is outside the scope of unit tests for the storage module")
 }
 
 // TestCreateSessionDirectory_EmptyUUID attempts to create directory with empty UUID (malformed path)
@@ -177,7 +177,7 @@ func TestSessionDirectoryManager_RelativeProjectRoot(t *testing.T) {
 
 // TestCreateSessionDirectory_PathExceedsLimit returns error when full path exceeds platform maximum
 func TestCreateSessionDirectory_PathExceedsLimit(t *testing.T) {
-	t.Skip("Testing path length limits requires very long directory structures")
+	t.Skip("Linux PATH_MAX is 4096 bytes; creating a path that exceeds this limit requires deeply nested directories which is slow and fragile across platforms. The OS returns ENAMETOOLONG which SessionDirectoryManager propagates as-is")
 }
 
 // TestSessionDirectoryManager_NoStateCaching tests manager is stateless; each call performs fresh filesystem checks
