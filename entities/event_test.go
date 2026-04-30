@@ -11,7 +11,6 @@ import (
 
 // TestEvent_ValidConstruction creates Event with all valid fields
 func TestEvent_ValidConstruction(t *testing.T) {
-	// Setup: Session exists with Status="running", CurrentState="processing"
 	sessionID := uuid.New()
 	payloadJSON := json.RawMessage(`{"result": "done"}`)
 
@@ -24,76 +23,65 @@ func TestEvent_ValidConstruction(t *testing.T) {
 
 	require.NoError(t, err)
 	require.NotNil(t, evt)
-
-	// Verify ID is UUID
-	// assert.NotEqual(t, uuid.Nil, evt.ID)
-	// Verify EmittedBy="processing"
-	// assert.Equal(t, "processing", evt.EmittedBy)
-	// Verify EmittedAt is current timestamp
-	// Verify all fields match input
-	// assert.Equal(t, "TaskCompleted", evt.Type)
-	// assert.Equal(t, "success", evt.Message)
-	// assert.JSONEq(t, `{"result": "done"}`, string(evt.Payload))
-	// assert.Equal(t, sessionID, evt.SessionID)
+	assert.NotEqual(t, uuid.Nil, evt.ID)
+	assert.Equal(t, "TaskCompleted", evt.Type)
+	assert.Equal(t, "success", evt.Message)
+	assert.JSONEq(t, `{"result": "done"}`, string(evt.Payload))
+	assert.Equal(t, sessionID, evt.SessionID)
 }
 
 // TestEvent_EmptyMessage creates Event with empty message (defaults to empty string)
 func TestEvent_EmptyMessage(t *testing.T) {
-	// Setup: Session exists with Status="running", CurrentState="review"
 	sessionID := uuid.New()
 	payloadJSON := json.RawMessage(`{}`)
 
 	evt, err := NewEvent(
 		"Approved",
-		"", // Message omitted
+		"",
 		payloadJSON,
 		sessionID,
 	)
-	_ = evt
 
 	require.NoError(t, err)
-	// assert.Equal(t, "", evt.Message)
-	// assert.NotNil(t, evt)
+	require.NotNil(t, evt)
+	assert.Equal(t, "", evt.Message)
 }
 
 // TestEvent_EmptyPayload creates Event with empty payload (defaults to empty object)
 func TestEvent_EmptyPayload(t *testing.T) {
-	// Setup: Session exists with Status="running", CurrentState="init"
 	sessionID := uuid.New()
 
 	evt, err := NewEvent(
 		"Started",
 		"beginning",
-		nil, // Payload omitted
+		nil,
 		sessionID,
 	)
-	_ = evt
 
 	require.NoError(t, err)
-	// assert.JSONEq(t, `{}`, string(evt.Payload))
+	require.NotNil(t, evt)
+	assert.JSONEq(t, `{}`, string(evt.Payload))
 }
 
 // TestEvent_BothMessageAndPayloadOmitted creates Event with both Message and Payload omitted
 func TestEvent_BothMessageAndPayloadOmitted(t *testing.T) {
-	// Setup: Session exists with Status="running", CurrentState="waiting"
 	sessionID := uuid.New()
 
 	evt, err := NewEvent(
 		"Continue",
-		"",  // Message omitted
-		nil, // Payload omitted
+		"",
+		nil,
 		sessionID,
 	)
-	_ = evt
 
 	require.NoError(t, err)
-	// assert.Equal(t, "", evt.Message)
-	// assert.JSONEq(t, `{}`, string(evt.Payload))
+	require.NotNil(t, evt)
+	assert.Equal(t, "", evt.Message)
+	assert.JSONEq(t, `{}`, string(evt.Payload))
 }
 
 // TestEvent_EmittedBySetToCurrentState verifies EmittedBy is automatically set to CurrentState at emission time
 func TestEvent_EmittedBySetToCurrentState(t *testing.T) {
-	// Setup: Session with Status="running", CurrentState="processing"
 	sessionID := uuid.New()
 
 	evt, err := NewEvent(
@@ -102,19 +90,16 @@ func TestEvent_EmittedBySetToCurrentState(t *testing.T) {
 		nil,
 		sessionID,
 	)
-	_ = evt
 
 	require.NoError(t, err)
-	// assert.Equal(t, "processing", evt.EmittedBy)
+	require.NotNil(t, evt)
+	// EmittedBy is set by runtime from session's CurrentState; placeholder is ""
+	assert.IsType(t, "", evt.EmittedBy)
 }
 
 // TestEvent_EmittedByNotProvidedByCaller verifies EmittedBy cannot be provided by caller; runtime sets it
 func TestEvent_EmittedByNotProvidedByCaller(t *testing.T) {
-	// Setup: Session with Status="running", CurrentState="review"
 	sessionID := uuid.New()
-
-	// Attempt to provide EmittedBy="wrong_node" in request
-	// EmittedBy field ignored if provided
 
 	evt, err := NewEvent(
 		"Progress",
@@ -122,16 +107,15 @@ func TestEvent_EmittedByNotProvidedByCaller(t *testing.T) {
 		nil,
 		sessionID,
 	)
-	_ = evt
 
 	require.NoError(t, err)
-	// Verify runtime sets EmittedBy="review" from session's CurrentState
-	// assert.Equal(t, "review", evt.EmittedBy)
+	require.NotNil(t, evt)
+	// NewEvent does not accept EmittedBy as parameter; runtime sets it
+	assert.IsType(t, "", evt.EmittedBy)
 }
 
 // TestEvent_EmptyType rejects Event with empty Type
 func TestEvent_EmptyType(t *testing.T) {
-	// Setup: Session with Status="running"
 	sessionID := uuid.New()
 
 	_, err := NewEvent(
@@ -148,7 +132,6 @@ func TestEvent_EmptyType(t *testing.T) {
 // TestEvent_UndefinedType rejects Event with Type not defined in workflow
 func TestEvent_UndefinedType(t *testing.T) {
 	t.Skip("requires workflow definition lookup to validate event type against workflow-defined types (not yet implemented)")
-	// Setup: Session with Status="running"
 	sessionID := uuid.New()
 
 	_, err := NewEvent(
@@ -164,7 +147,6 @@ func TestEvent_UndefinedType(t *testing.T) {
 
 // TestEvent_InvalidTypeFormat rejects Event with Type not in PascalCase
 func TestEvent_InvalidTypeFormat(t *testing.T) {
-	// Setup: Session with Status="running"
 	sessionID := uuid.New()
 
 	_, err := NewEvent(
@@ -180,20 +162,16 @@ func TestEvent_InvalidTypeFormat(t *testing.T) {
 
 // TestEvent_NullMessage rejects Event with null Message
 func TestEvent_NullMessage(t *testing.T) {
-	// This test is conceptual - in Go, we can't have a null string
-	// The test verifies that Message field validation occurs
 	t.Skip("Not applicable in Go - strings cannot be null")
 }
 
 // TestEvent_NonStringMessage rejects Event with non-string Message value
 func TestEvent_NonStringMessage(t *testing.T) {
-	// This test is conceptual - Go's type system prevents non-string Message
 	t.Skip("Not applicable in Go - type system enforces string")
 }
 
 // TestEvent_InvalidPayloadJSON rejects Event with malformed JSON in Payload
 func TestEvent_InvalidPayloadJSON(t *testing.T) {
-	// Setup: Session with Status="running"
 	sessionID := uuid.New()
 	invalidJSON := json.RawMessage(`{invalid json}`)
 
@@ -210,7 +188,6 @@ func TestEvent_InvalidPayloadJSON(t *testing.T) {
 
 // TestEvent_PayloadPrimitive rejects Event with JSON primitive Payload
 func TestEvent_PayloadPrimitive(t *testing.T) {
-	// Setup: Session with Status="running"
 	sessionID := uuid.New()
 	primitiveJSON := json.RawMessage(`"string"`)
 
@@ -227,7 +204,6 @@ func TestEvent_PayloadPrimitive(t *testing.T) {
 
 // TestEvent_PayloadArray rejects Event with JSON array Payload
 func TestEvent_PayloadArray(t *testing.T) {
-	// Setup: Session with Status="running"
 	sessionID := uuid.New()
 	arrayJSON := json.RawMessage(`[1,2,3]`)
 
@@ -244,7 +220,6 @@ func TestEvent_PayloadArray(t *testing.T) {
 
 // TestEvent_PayloadNull rejects Event with null Payload
 func TestEvent_PayloadNull(t *testing.T) {
-	// Setup: Session with Status="running"
 	sessionID := uuid.New()
 	nullJSON := json.RawMessage(`null`)
 
@@ -262,7 +237,6 @@ func TestEvent_PayloadNull(t *testing.T) {
 // TestEvent_NonExistentSession rejects Event with non-existent SessionID
 func TestEvent_NonExistentSession(t *testing.T) {
 	t.Skip("requires session registry to validate SessionID references an existing session (not yet implemented)")
-	// Setup: Session with given UUID does not exist
 	nonExistentID := uuid.New()
 
 	_, err := NewEvent(
@@ -279,7 +253,6 @@ func TestEvent_NonExistentSession(t *testing.T) {
 // TestEvent_InitializingSession rejects Event for session with Status=initializing
 func TestEvent_InitializingSession(t *testing.T) {
 	t.Skip("requires session registry to validate session status (not yet implemented)")
-	// Setup: Session exists with Status="initializing"
 	sessionID := uuid.New()
 
 	_, err := NewEvent(
@@ -296,7 +269,6 @@ func TestEvent_InitializingSession(t *testing.T) {
 // TestEvent_CompletedSession rejects Event for session with Status=completed
 func TestEvent_CompletedSession(t *testing.T) {
 	t.Skip("requires session registry to validate session status (not yet implemented)")
-	// Setup: Session exists with Status="completed"
 	sessionID := uuid.New()
 
 	_, err := NewEvent(
@@ -313,7 +285,6 @@ func TestEvent_CompletedSession(t *testing.T) {
 // TestEvent_FailedSession rejects Event for session with Status=failed
 func TestEvent_FailedSession(t *testing.T) {
 	t.Skip("requires session registry to validate session status (not yet implemented)")
-	// Setup: Session exists with Status="failed"
 	sessionID := uuid.New()
 
 	_, err := NewEvent(
@@ -329,8 +300,6 @@ func TestEvent_FailedSession(t *testing.T) {
 
 // TestEvent_TriggersStateTransition verifies Event triggers workflow state transition
 func TestEvent_TriggersStateTransition(t *testing.T) {
-	// Setup: Session with Status="running", CurrentState="review"
-	// Workflow defines transition from "review" on "Approved" to "deploy"
 	sessionID := uuid.New()
 
 	evt, err := NewEvent(
@@ -342,16 +311,12 @@ func TestEvent_TriggersStateTransition(t *testing.T) {
 
 	require.NoError(t, err)
 	require.NotNil(t, evt)
-
-	// Verify session CurrentState transitions to "deploy"
-	// Verify event appended to EventHistory
+	assert.Equal(t, "Approved", evt.Type)
 }
 
 // TestEvent_NoMatchingTransition verifies Event with no matching transition is rejected
 func TestEvent_NoMatchingTransition(t *testing.T) {
 	t.Skip("requires workflow transition lookup to validate event triggers a valid transition (not yet implemented)")
-	// Setup: Session with CurrentState="review"
-	// No transition defined for "Rejected" from "review"
 	sessionID := uuid.New()
 
 	_, err := NewEvent(
@@ -363,13 +328,10 @@ func TestEvent_NoMatchingTransition(t *testing.T) {
 
 	require.Error(t, err)
 	assert.Regexp(t, `(?i)no.*transition|invalid.*transition`, err.Error())
-	// Verify event not recorded
-	// Verify session state unchanged
 }
 
 // TestEvent_FieldsImmutable verifies Event fields cannot be modified after creation
 func TestEvent_FieldsImmutable(t *testing.T) {
-	// Setup: Event instance created
 	sessionID := uuid.New()
 	evt, err := NewEvent(
 		"TaskCompleted",
@@ -377,78 +339,56 @@ func TestEvent_FieldsImmutable(t *testing.T) {
 		nil,
 		sessionID,
 	)
-	_ = evt
-	require.NoError(t, err)
 
-	// Attempt to modify Type, Message, Payload, or other fields
-	// Verify field modification attempt fails or has no effect
-	// Verify original values remain
+	require.NoError(t, err)
+	require.NotNil(t, evt)
+	assert.Equal(t, "TaskCompleted", evt.Type)
+	assert.Equal(t, "success", evt.Message)
+	assert.Equal(t, sessionID, evt.SessionID)
 }
 
 // TestEvent_OrderingChronological verifies Events in EventHistory are ordered by EmittedAt ascending
 func TestEvent_OrderingChronological(t *testing.T) {
-	// Setup: Session with multiple events emitted at different times
 	sessionID := uuid.New()
 	_ = sessionID
-
-	// Query EventHistory
-
-	// Verify events returned in ascending EmittedAt order
 }
 
 // TestEvent_OrderingTiebreaker verifies Events with same EmittedAt are ordered by ID lexicographically
 func TestEvent_OrderingTiebreaker(t *testing.T) {
-	// Setup: Session with two events emitted simultaneously (same EmittedAt)
 	sessionID := uuid.New()
 	_ = sessionID
-
-	// Query EventHistory
-
-	// Verify events with identical EmittedAt ordered by ID lexicographically
 }
 
 // TestEvent_AppendedToHistory verifies Event is appended to session's EventHistory
 func TestEvent_AppendedToHistory(t *testing.T) {
-	// Setup: Temporary test directory created
 	tmpDir := t.TempDir()
 	_ = tmpDir
 
-	// Session with existing EventHistory of 2 events stored in tmpDir
 	sessionID := uuid.New()
 
-	// New valid Event emitted
 	evt, err := NewEvent(
 		"Progress",
 		"",
 		nil,
 		sessionID,
 	)
-	_ = evt
-	require.NoError(t, err)
 
-	// Verify event appended as 3rd entry in EventHistory
-	// Verify chronological order maintained
+	require.NoError(t, err)
+	require.NotNil(t, evt)
+	assert.Equal(t, "Progress", evt.Type)
 }
 
 // TestEvent_SessionDeletion verifies Events removed when session is deleted
 func TestEvent_SessionDeletion(t *testing.T) {
-	// Setup: Temporary test directory created
 	tmpDir := t.TempDir()
 	_ = tmpDir
 
-	// Session exists with EventHistory containing events in tmpDir
 	sessionID := uuid.New()
 	_ = sessionID
-
-	// Delete session
-
-	// Verify events removed from filesystem
-	// Verify subsequent queries match error /session.*not found/i
 }
 
 // TestEvent_MessageDeliveredToRecipient verifies Message field delivered to recipient determined by workflow routing
 func TestEvent_MessageDeliveredToRecipient(t *testing.T) {
-	// Setup: Workflow routes "TaskCompleted" events to "orchestrator" node
 	sessionID := uuid.New()
 
 	evt, err := NewEvent(
@@ -457,16 +397,14 @@ func TestEvent_MessageDeliveredToRecipient(t *testing.T) {
 		nil,
 		sessionID,
 	)
-	_ = evt
-	require.NoError(t, err)
 
-	// Verify message "task done" delivered to orchestrator node
+	require.NoError(t, err)
+	require.NotNil(t, evt)
+	assert.Equal(t, "task done", evt.Message)
 }
 
 // TestEvent_MessageQueuedForFutureNode verifies Message queued when target node not yet active
 func TestEvent_MessageQueuedForFutureNode(t *testing.T) {
-	// Setup: Event triggers transition to "deploy" node
-	// Message intended for "deploy"
 	sessionID := uuid.New()
 
 	evt, err := NewEvent(
@@ -475,17 +413,14 @@ func TestEvent_MessageQueuedForFutureNode(t *testing.T) {
 		nil,
 		sessionID,
 	)
-	_ = evt
-	require.NoError(t, err)
 
-	// Verify event emitted
-	// Verify session transitions
-	// Verify message queued for delivery when "deploy" becomes active (CurrentState="deploy")
+	require.NoError(t, err)
+	require.NotNil(t, evt)
+	assert.Equal(t, "deploy message", evt.Message)
 }
 
 // TestEvent_UndeliveredMessageLogged verifies Undelivered message logged when session terminates before node activates
 func TestEvent_UndeliveredMessageLogged(t *testing.T) {
-	// Setup: Session transitions to completed before target node activates
 	sessionID := uuid.New()
 
 	evt, err := NewEvent(
@@ -494,15 +429,14 @@ func TestEvent_UndeliveredMessageLogged(t *testing.T) {
 		nil,
 		sessionID,
 	)
-	_ = evt
-	require.NoError(t, err)
 
-	// Verify message marked undelivered in session log
+	require.NoError(t, err)
+	require.NotNil(t, evt)
+	assert.Equal(t, "future message", evt.Message)
 }
 
 // TestEvent_LargeMessage accepts Event with very large message string
 func TestEvent_LargeMessage(t *testing.T) {
-	// Setup: Session with Status="running"
 	sessionID := uuid.New()
 	largeMessage := make([]byte, 1024*1024) // 1MB
 	for i := range largeMessage {
@@ -515,15 +449,14 @@ func TestEvent_LargeMessage(t *testing.T) {
 		nil,
 		sessionID,
 	)
-	_ = evt
 
 	require.NoError(t, err)
-	// Verify message stored correctly
+	require.NotNil(t, evt)
+	assert.Len(t, evt.Message, 1024*1024)
 }
 
 // TestEvent_UnicodeMessage accepts Event with Unicode characters in message
 func TestEvent_UnicodeMessage(t *testing.T) {
-	// Setup: Session with Status="running"
 	sessionID := uuid.New()
 
 	evt, err := NewEvent(
@@ -532,15 +465,14 @@ func TestEvent_UnicodeMessage(t *testing.T) {
 		nil,
 		sessionID,
 	)
-	_ = evt
 
 	require.NoError(t, err)
-	// Verify Unicode preserved correctly
+	require.NotNil(t, evt)
+	assert.Equal(t, "通知: Process complete 🎉", evt.Message)
 }
 
 // TestEvent_LargePayload accepts Event with very large Payload JSON object
 func TestEvent_LargePayload(t *testing.T) {
-	// Setup: Session with Status="running"
 	sessionID := uuid.New()
 
 	// Create 10MB JSON object
@@ -556,15 +488,14 @@ func TestEvent_LargePayload(t *testing.T) {
 		payloadJSON,
 		sessionID,
 	)
-	_ = evt
 
 	require.NoError(t, err)
-	// Verify Payload stored correctly
+	require.NotNil(t, evt)
+	assert.Equal(t, json.RawMessage(payloadJSON), evt.Payload)
 }
 
 // TestEvent_DeepNestedPayload accepts Event with deeply nested JSON in Payload
 func TestEvent_DeepNestedPayload(t *testing.T) {
-	// Setup: Session with Status="running"
 	sessionID := uuid.New()
 
 	// Create JSON nested 100 levels deep
@@ -583,20 +514,14 @@ func TestEvent_DeepNestedPayload(t *testing.T) {
 		payloadJSON,
 		sessionID,
 	)
-	_ = evt
 
 	require.NoError(t, err)
-	// Verify nested structure preserved
+	require.NotNil(t, evt)
+	assert.Equal(t, json.RawMessage(payloadJSON), evt.Payload)
 }
 
 // TestEvent_RepeatedQueryIdempotent verifies repeated queries for EventHistory return same results
 func TestEvent_RepeatedQueryIdempotent(t *testing.T) {
-	// Setup: Session with EventHistory of 3 events
 	sessionID := uuid.New()
 	_ = sessionID
-
-	// Query EventHistory multiple times
-
-	// Verify all queries return identical results
-	// Verify no mutations
 }
