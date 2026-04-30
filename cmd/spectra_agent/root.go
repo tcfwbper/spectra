@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/spf13/cobra"
 	"github.com/tcfwbper/spectra/storage"
@@ -19,10 +20,12 @@ type CommandOption func(*rootCommandConfig)
 
 // rootCommandConfig holds configuration for the root command.
 type rootCommandConfig struct {
-	finder           func(string) (string, error)
-	eventEmitHandler SubcommandHandler
-	errorHandler     SubcommandHandler
-	socketClient     interface{ WasCalled() bool }
+	finder              func(string) (string, error)
+	eventEmitHandler    SubcommandHandler
+	errorHandler        SubcommandHandler
+	socketClient        interface{ WasCalled() bool }
+	mockSocketClient    interface{}
+	socketClientTimeout time.Duration
 }
 
 // WithEventEmitHandler sets the event emit handler.
@@ -147,15 +150,15 @@ func newRootCommandWithConfig(cfg *rootCommandConfig) *RootCommand {
 	cmd.PersistentFlags().StringVar(&rc.sessionID, "session-id", "", "Session UUID (required)")
 
 	// Add subcommands
-	rc.addEventCommand(cmd)
-	rc.addErrorCommand(cmd)
+	rc.addEventCommand(cmd, cfg)
+	rc.addErrorCommand(cmd, cfg)
 
 	rc.Command = cmd
 	return rc
 }
 
 // addEventCommand adds the event subcommand.
-func (rc *RootCommand) addEventCommand(parent *cobra.Command) {
+func (rc *RootCommand) addEventCommand(parent *cobra.Command, cfg *rootCommandConfig) {
 	eventCmd := &cobra.Command{
 		Use:   "event",
 		Short: "Emit events to the workflow runtime",
@@ -174,41 +177,55 @@ func (rc *RootCommand) addEventCommand(parent *cobra.Command) {
 		Short: "Emit an event",
 		Args:  cobra.ArbitraryArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
+			var handler SubcommandHandler
 			if rc.config.eventEmitHandler != nil {
-				exitCode := rc.config.eventEmitHandler.Execute()
-				if exitCode != 0 {
-					return &exitCodeError{code: exitCode}
-				}
-				return nil
+				handler = rc.config.eventEmitHandler
+			} else {
+				// Create default handler
+				handler = NewEventEmitCommandHandler(cmd, args, rc.sessionID, rc.projectRoot, cfg)
 			}
-			return fmt.Errorf("Error: event emit handler not implemented")
+			exitCode := handler.Execute()
+			if exitCode != 0 {
+				return &exitCodeError{code: exitCode}
+			}
+			return nil
 		},
 	}
 
-	// Add --message flag for emit subcommand
+	// Add flags for emit subcommand
 	emitCmd.Flags().String("message", "", "Message to include with event")
+	emitCmd.Flags().String("payload", "", "JSON payload for event")
+	emitCmd.Flags().String("claude-session-id", "", "Claude session ID")
 
 	eventCmd.AddCommand(emitCmd)
 	parent.AddCommand(eventCmd)
 }
 
 // addErrorCommand adds the error subcommand.
-func (rc *RootCommand) addErrorCommand(parent *cobra.Command) {
+func (rc *RootCommand) addErrorCommand(parent *cobra.Command, cfg *rootCommandConfig) {
 	errorCmd := &cobra.Command{
 		Use:   "error [message]",
 		Short: "Report unrecoverable errors to the workflow runtime",
 		Args:  cobra.ArbitraryArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
+			var handler SubcommandHandler
 			if rc.config.errorHandler != nil {
-				exitCode := rc.config.errorHandler.Execute()
-				if exitCode != 0 {
-					return &exitCodeError{code: exitCode}
-				}
-				return nil
+				handler = rc.config.errorHandler
+			} else {
+				// Create default handler
+				handler = NewErrorCommandHandler(cmd, args, rc.sessionID, rc.projectRoot, cfg)
 			}
-			return fmt.Errorf("Error: error handler not implemented")
+			exitCode := handler.Execute()
+			if exitCode != 0 {
+				return &exitCodeError{code: exitCode}
+			}
+			return nil
 		},
 	}
+
+	// Add flags for error subcommand
+	errorCmd.Flags().String("detail", "", "JSON detail object or null")
+	errorCmd.Flags().String("claude-session-id", "", "Claude session ID")
 
 	parent.AddCommand(errorCmd)
 }
@@ -226,7 +243,7 @@ func (rc *RootCommand) Execute() int {
 		if !strings.HasPrefix(errMsg, "Error: ") {
 			errMsg = "Error: " + errMsg
 		}
-		_, _ = fmt.Fprintf(rc.Command.ErrOrStderr(), "%s\n", errMsg)
+		_, _ = fmt.Fprintf(rc.ErrOrStderr(), "%s\n", errMsg)
 		return 1
 	}
 	return 0
