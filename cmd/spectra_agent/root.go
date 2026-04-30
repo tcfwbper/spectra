@@ -1,4 +1,4 @@
-package spectra_agent
+package main
 
 import (
 	"fmt"
