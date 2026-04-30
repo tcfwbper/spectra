@@ -471,7 +471,7 @@ func TestRootCommand_DuplicateSessionIDFlag(t *testing.T) {
 		"event", "emit", "MyEvent", "--session-id", sessionID1, "--session-id", sessionID2,
 	})
 
-	assert.Equal(t, 1, exitCode)
+	assert.Equal(t, 2, exitCode)
 	assert.NotEmpty(t, stderr)
 }
 

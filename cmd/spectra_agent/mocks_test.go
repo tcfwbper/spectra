@@ -1,6 +1,9 @@
 package spectra_agent
 
 import (
+	"sync"
+	"time"
+
 	"github.com/tcfwbper/spectra/entities"
 )
 
@@ -36,6 +39,98 @@ func (m *MockSocketClient) Send(sessionID, projectRoot string, msg entities.Runt
 // WasCalled returns whether Send was called.
 func (m *MockSocketClient) WasCalled() bool {
 	return m.called
+}
+
+// CapturingMockSocketClient is a mock SocketClient that captures Send parameters.
+type CapturingMockSocketClient struct {
+	mu          sync.Mutex
+	called      bool
+	callCount   int
+	sessionID   string
+	projectRoot string
+	message     entities.RuntimeMessage
+	resp        *RuntimeResponse
+	exitCode    int
+	err         error
+}
+
+// NewCapturingMockSocketClient creates a CapturingMockSocketClient with a success response.
+func NewCapturingMockSocketClient() *CapturingMockSocketClient {
+	return &CapturingMockSocketClient{
+		resp:     &RuntimeResponse{Status: "success", Message: "ok"},
+		exitCode: 0,
+		err:      nil,
+	}
+}
+
+// NewCapturingMockSocketClientWithResponse creates a CapturingMockSocketClient with a custom response.
+func NewCapturingMockSocketClientWithResponse(resp *RuntimeResponse, exitCode int, err error) *CapturingMockSocketClient {
+	return &CapturingMockSocketClient{
+		resp:     resp,
+		exitCode: exitCode,
+		err:      err,
+	}
+}
+
+// Send captures call parameters and returns the configured response.
+func (m *CapturingMockSocketClient) Send(sessionID, projectRoot string, msg entities.RuntimeMessage) (*RuntimeResponse, int, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.called = true
+	m.callCount++
+	m.sessionID = sessionID
+	m.projectRoot = projectRoot
+	m.message = msg
+	return m.resp, m.exitCode, m.err
+}
+
+// WasCalled returns whether Send was called.
+func (m *CapturingMockSocketClient) WasCalled() bool {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.called
+}
+
+// CallCount returns how many times Send was called.
+func (m *CapturingMockSocketClient) CallCount() int {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.callCount
+}
+
+// SessionID returns the captured session ID.
+func (m *CapturingMockSocketClient) SessionID() string {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.sessionID
+}
+
+// ProjectRoot returns the captured project root.
+func (m *CapturingMockSocketClient) ProjectRoot() string {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.projectRoot
+}
+
+// Message returns the captured RuntimeMessage.
+func (m *CapturingMockSocketClient) Message() entities.RuntimeMessage {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.message
+}
+
+// WithSocketClientTimeout returns a CommandOption that sets a custom SocketClient timeout.
+func WithSocketClientTimeout(timeout time.Duration) CommandOption {
+	return func(cfg *rootCommandConfig) {
+		cfg.socketClientTimeout = timeout
+	}
+}
+
+// WithMockSocketClient returns a CommandOption that injects a mock SocketClient.
+func WithMockSocketClient(client *CapturingMockSocketClient) CommandOption {
+	return func(cfg *rootCommandConfig) {
+		cfg.mockSocketClient = client
+	}
 }
 
 // MockSubcommandHandler is a mock implementation for testing subcommand handlers.
