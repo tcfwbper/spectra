@@ -2,6 +2,7 @@ package spectra
 
 import (
 	"fmt"
+	"os"
 
 	"github.com/spf13/cobra"
 )
@@ -99,8 +100,15 @@ func NewRootCommandWithHandlers(opts ...HandlerOption) *RootCommand {
 			if cfg.initHandler != nil {
 				exitCode = cfg.initHandler.Execute()
 			} else {
-				// Default implementation would go here
-				exitCode = 0
+				// Default implementation
+				cwd, err := os.Getwd()
+				if err != nil {
+					fmt.Fprintf(cmd.ErrOrStderr(), "Error: failed to get current directory: %v\n", err)
+					return &exitError{code: 1}
+				}
+				copier := NewBuiltinResourceCopier(builtinWorkflows, builtinAgents, builtinSpecFiles)
+				handler := NewInitHandlerWithOutput(cwd, copier, cmd.OutOrStdout(), cmd.ErrOrStderr())
+				exitCode = handler.Execute()
 			}
 			if exitCode != 0 {
 				return &exitError{code: exitCode}

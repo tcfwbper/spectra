@@ -335,6 +335,7 @@ func TestCopyWorkflows_WriteFailsSecondFile(t *testing.T) {
 
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to write built-in file")
+	assert.Len(t, warnings, 1, "should have one warning for skipped first file")
 	// First file remains on disk
 	_, statErr := os.Stat(firstPath)
 	assert.NoError(t, statErr)
