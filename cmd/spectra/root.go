@@ -119,22 +119,28 @@ func NewRootCommandWithHandlers(opts ...HandlerOption) *RootCommand {
 	rootCmd.AddCommand(initCmd)
 
 	// Add run subcommand
-	runCmd := &cobra.Command{
-		Use:   "run",
-		Short: "Run a workflow",
-		RunE: func(cmd *cobra.Command, args []string) error {
-			var exitCode int
-			if cfg.runHandler != nil {
-				exitCode = cfg.runHandler.Execute()
-			} else {
-				// Default implementation would go here
-				exitCode = 0
+	var runCmd *cobra.Command
+	if cfg.runHandler != nil {
+		// Use test handler wrapper to get options
+		if wrapper, ok := cfg.runHandler.(*runHandlerWrapper); ok {
+			runCmd = newRunCommand(wrapper.opts)
+		} else {
+			// Fallback for legacy test handlers
+			runCmd = &cobra.Command{
+				Use:   "run",
+				Short: "Run a workflow",
+				RunE: func(cmd *cobra.Command, args []string) error {
+					exitCode := cfg.runHandler.Execute()
+					if exitCode != 0 {
+						return &exitError{code: exitCode}
+					}
+					return nil
+				},
 			}
-			if exitCode != 0 {
-				return &exitError{code: exitCode}
-			}
-			return nil
-		},
+		}
+	} else {
+		// Default implementation
+		runCmd = newRunCommand(nil)
 	}
 	rootCmd.AddCommand(runCmd)
 
