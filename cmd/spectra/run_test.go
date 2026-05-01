@@ -44,16 +44,13 @@ func setupRunTestFixtureNoSpectra(t *testing.T) string {
 	return t.TempDir()
 }
 
-// executeRunCommand creates and executes the run command with given args, mocked finder and runtime,
+// executeRunCommand creates and executes the run command with given args, mocked runtime,
 // and working directory. Returns stdout, stderr, and exit code.
-func executeRunCommand(t *testing.T, workDir string, args []string, finder *spectra.MockSpectraFinder, runtime *spectra.MockRuntime) (string, string, int) {
+func executeRunCommand(t *testing.T, workDir string, args []string, runtime *spectra.MockRuntime) (string, string, int) {
 	t.Helper()
 	var stdout, stderr bytes.Buffer
 
 	opts := []spectra.RunHandlerOption{}
-	if finder != nil {
-		opts = append(opts, spectra.WithSpectraFinder(finder))
-	}
 	if runtime != nil {
 		opts = append(opts, spectra.WithRuntime(runtime))
 	}
@@ -82,32 +79,27 @@ func executeRunCommand(t *testing.T, workDir string, args []string, finder *spec
 // TestRunCommand_PositionalArgument executes workflow when workflow name is provided as positional argument.
 func TestRunCommand_PositionalArgument(t *testing.T) {
 	projectRoot := setupRunTestFixture(t, "TestWorkflow")
-	finder := spectra.NewMockSpectraFinder(projectRoot, nil)
 	runtime := spectra.NewMockRuntime(0)
 
-	_, _, exitCode := executeRunCommand(t, projectRoot, []string{"TestWorkflow"}, finder, runtime)
+	_, _, exitCode := executeRunCommand(t, projectRoot, []string{"TestWorkflow"}, runtime)
 
 	assert.Equal(t, 0, exitCode)
 	assert.True(t, runtime.RunCalled(), "Runtime.Run should be called")
-	assert.Equal(t, projectRoot, runtime.ProjectRoot())
 	assert.Equal(t, "TestWorkflow", runtime.WorkflowName())
 }
 
-// TestRunCommand_PositionalArgumentFromSubdirectory locates project root from subdirectory and executes workflow.
+// TestRunCommand_PositionalArgumentFromSubdirectory executes workflow from subdirectory (Runtime handles project root location).
 func TestRunCommand_PositionalArgumentFromSubdirectory(t *testing.T) {
 	projectRoot := setupRunTestFixture(t, "SimpleSdd")
 	subdir := filepath.Join(projectRoot, "subdir", "nested")
 	require.NoError(t, os.MkdirAll(subdir, 0755))
 
-	finder := spectra.NewMockSpectraFinder(projectRoot, nil)
 	runtime := spectra.NewMockRuntime(0)
 
-	_, _, exitCode := executeRunCommand(t, subdir, []string{"SimpleSdd"}, finder, runtime)
+	_, _, exitCode := executeRunCommand(t, subdir, []string{"SimpleSdd"}, runtime)
 
 	assert.Equal(t, 0, exitCode)
-	assert.True(t, finder.WasCalled(), "SpectraFinder should be called")
 	assert.True(t, runtime.RunCalled(), "Runtime.Run should be called")
-	assert.Equal(t, projectRoot, runtime.ProjectRoot())
 	assert.Equal(t, "SimpleSdd", runtime.WorkflowName())
 }
 
@@ -118,24 +110,21 @@ func TestRunCommand_PositionalArgumentFromSubdirectory(t *testing.T) {
 // TestRunCommand_FlagArgument executes workflow when workflow name is provided via --workflow flag.
 func TestRunCommand_FlagArgument(t *testing.T) {
 	projectRoot := setupRunTestFixture(t, "MyWorkflow")
-	finder := spectra.NewMockSpectraFinder(projectRoot, nil)
 	runtime := spectra.NewMockRuntime(0)
 
-	_, _, exitCode := executeRunCommand(t, projectRoot, []string{"--workflow", "MyWorkflow"}, finder, runtime)
+	_, _, exitCode := executeRunCommand(t, projectRoot, []string{"--workflow", "MyWorkflow"}, runtime)
 
 	assert.Equal(t, 0, exitCode)
 	assert.True(t, runtime.RunCalled(), "Runtime.Run should be called")
-	assert.Equal(t, projectRoot, runtime.ProjectRoot())
 	assert.Equal(t, "MyWorkflow", runtime.WorkflowName())
 }
 
 // TestRunCommand_FlagPrecedenceOverPositional flag takes precedence when both flag and positional argument are provided.
 func TestRunCommand_FlagPrecedenceOverPositional(t *testing.T) {
 	projectRoot := setupRunTestFixture(t, "FlagWorkflow")
-	finder := spectra.NewMockSpectraFinder(projectRoot, nil)
 	runtime := spectra.NewMockRuntime(0)
 
-	_, _, exitCode := executeRunCommand(t, projectRoot, []string{"--workflow", "FlagWorkflow", "PositionalWorkflow"}, finder, runtime)
+	_, _, exitCode := executeRunCommand(t, projectRoot, []string{"--workflow", "FlagWorkflow", "PositionalWorkflow"}, runtime)
 
 	assert.Equal(t, 0, exitCode)
 	assert.True(t, runtime.RunCalled(), "Runtime.Run should be called")
@@ -151,7 +140,7 @@ func TestRunCommand_HelpFlag(t *testing.T) {
 	tmpDir := setupRunTestFixtureNoSpectra(t)
 	runtime := spectra.NewMockRuntime(0)
 
-	stdout, _, exitCode := executeRunCommand(t, tmpDir, []string{"--help"}, nil, runtime)
+	stdout, _, exitCode := executeRunCommand(t, tmpDir, []string{"--help"}, runtime)
 
 	assert.Equal(t, 0, exitCode)
 	assert.Contains(t, stdout, "Run a workflow")
@@ -169,12 +158,11 @@ func TestRunCommand_HelpFlag(t *testing.T) {
 // TestRunCommand_ForwardsStdout forwards Runtime stdout to command stdout.
 func TestRunCommand_ForwardsStdout(t *testing.T) {
 	projectRoot := setupRunTestFixture(t, "Test")
-	finder := spectra.NewMockSpectraFinder(projectRoot, nil)
 	runtime := spectra.NewMockRuntimeWithStdout(0, func(w io.Writer) {
 		fmt.Fprint(w, "workflow output\n")
 	})
 
-	stdout, _, exitCode := executeRunCommand(t, projectRoot, []string{"Test"}, finder, runtime)
+	stdout, _, exitCode := executeRunCommand(t, projectRoot, []string{"Test"}, runtime)
 
 	assert.Equal(t, 0, exitCode)
 	assert.Contains(t, stdout, "workflow output\n")
@@ -183,12 +171,11 @@ func TestRunCommand_ForwardsStdout(t *testing.T) {
 // TestRunCommand_ForwardsStderr forwards Runtime stderr to command stderr.
 func TestRunCommand_ForwardsStderr(t *testing.T) {
 	projectRoot := setupRunTestFixture(t, "Test")
-	finder := spectra.NewMockSpectraFinder(projectRoot, nil)
 	runtime := spectra.NewMockRuntimeWithStderr(1, func(w io.Writer) {
 		fmt.Fprint(w, "workflow error\n")
 	})
 
-	_, stderr, exitCode := executeRunCommand(t, projectRoot, []string{"Test"}, finder, runtime)
+	_, stderr, exitCode := executeRunCommand(t, projectRoot, []string{"Test"}, runtime)
 
 	assert.Equal(t, 1, exitCode)
 	assert.Contains(t, stderr, "workflow error\n")
@@ -197,13 +184,12 @@ func TestRunCommand_ForwardsStderr(t *testing.T) {
 // TestRunCommand_ForwardsBothStreams forwards both stdout and stderr from Runtime.
 func TestRunCommand_ForwardsBothStreams(t *testing.T) {
 	projectRoot := setupRunTestFixture(t, "Test")
-	finder := spectra.NewMockSpectraFinder(projectRoot, nil)
 	runtime := spectra.NewMockRuntimeWithStreams(1,
 		func(w io.Writer) { fmt.Fprint(w, "stdout data\n") },
 		func(w io.Writer) { fmt.Fprint(w, "stderr data\n") },
 	)
 
-	stdout, stderr, exitCode := executeRunCommand(t, projectRoot, []string{"Test"}, finder, runtime)
+	stdout, stderr, exitCode := executeRunCommand(t, projectRoot, []string{"Test"}, runtime)
 
 	assert.Equal(t, 1, exitCode)
 	assert.Contains(t, stdout, "stdout data\n")
@@ -219,7 +205,7 @@ func TestRunCommand_NoWorkflowName(t *testing.T) {
 	tmpDir := setupRunTestFixtureNoSpectra(t)
 	runtime := spectra.NewMockRuntime(0)
 
-	_, stderr, exitCode := executeRunCommand(t, tmpDir, []string{}, nil, runtime)
+	_, stderr, exitCode := executeRunCommand(t, tmpDir, []string{}, runtime)
 
 	assert.Equal(t, 1, exitCode)
 	assert.Contains(t, strings.ToLower(stderr), "workflow name")
@@ -232,7 +218,7 @@ func TestRunCommand_NoWorkflowNameWithFlag(t *testing.T) {
 	tmpDir := setupRunTestFixtureNoSpectra(t)
 	runtime := spectra.NewMockRuntime(0)
 
-	_, stderr, exitCode := executeRunCommand(t, tmpDir, []string{"--workflow"}, nil, runtime)
+	_, stderr, exitCode := executeRunCommand(t, tmpDir, []string{"--workflow"}, runtime)
 
 	assert.Equal(t, 1, exitCode)
 	assert.NotEmpty(t, stderr)
@@ -248,7 +234,7 @@ func TestRunCommand_EmptyWorkflowNamePositional(t *testing.T) {
 	tmpDir := setupRunTestFixtureNoSpectra(t)
 	runtime := spectra.NewMockRuntime(0)
 
-	_, stderr, exitCode := executeRunCommand(t, tmpDir, []string{""}, nil, runtime)
+	_, stderr, exitCode := executeRunCommand(t, tmpDir, []string{""}, runtime)
 
 	assert.Equal(t, 1, exitCode)
 	assert.Contains(t, strings.ToLower(stderr), "workflow name")
@@ -261,7 +247,7 @@ func TestRunCommand_EmptyWorkflowNameFlag(t *testing.T) {
 	tmpDir := setupRunTestFixtureNoSpectra(t)
 	runtime := spectra.NewMockRuntime(0)
 
-	_, stderr, exitCode := executeRunCommand(t, tmpDir, []string{"--workflow", ""}, nil, runtime)
+	_, stderr, exitCode := executeRunCommand(t, tmpDir, []string{"--workflow", ""}, runtime)
 
 	assert.Equal(t, 1, exitCode)
 	assert.Contains(t, strings.ToLower(stderr), "workflow name")
@@ -274,7 +260,7 @@ func TestRunCommand_WhitespaceWorkflowName(t *testing.T) {
 	tmpDir := setupRunTestFixtureNoSpectra(t)
 	runtime := spectra.NewMockRuntime(0)
 
-	_, stderr, exitCode := executeRunCommand(t, tmpDir, []string{"   "}, nil, runtime)
+	_, stderr, exitCode := executeRunCommand(t, tmpDir, []string{"   "}, runtime)
 
 	assert.Equal(t, 1, exitCode)
 	assert.Contains(t, strings.ToLower(stderr), "workflow name")
@@ -291,7 +277,7 @@ func TestRunCommand_TooManyArguments(t *testing.T) {
 	tmpDir := setupRunTestFixtureNoSpectra(t)
 	runtime := spectra.NewMockRuntime(0)
 
-	_, stderr, exitCode := executeRunCommand(t, tmpDir, []string{"Workflow1", "Workflow2"}, nil, runtime)
+	_, stderr, exitCode := executeRunCommand(t, tmpDir, []string{"Workflow1", "Workflow2"}, runtime)
 
 	assert.Equal(t, 1, exitCode)
 	assert.Contains(t, strings.ToLower(stderr), "too many arguments")
@@ -303,7 +289,7 @@ func TestRunCommand_TooManyArgumentsWithThree(t *testing.T) {
 	tmpDir := setupRunTestFixtureNoSpectra(t)
 	runtime := spectra.NewMockRuntime(0)
 
-	_, stderr, exitCode := executeRunCommand(t, tmpDir, []string{"Workflow1", "Workflow2", "Workflow3"}, nil, runtime)
+	_, stderr, exitCode := executeRunCommand(t, tmpDir, []string{"Workflow1", "Workflow2", "Workflow3"}, runtime)
 
 	assert.Equal(t, 1, exitCode)
 	assert.Contains(t, strings.ToLower(stderr), "too many arguments")
@@ -311,38 +297,20 @@ func TestRunCommand_TooManyArgumentsWithThree(t *testing.T) {
 }
 
 // =====================================================================
-// Validation Failures — Project Root Not Found
+// Error Propagation — Project Root Not Found
 // =====================================================================
 
-// TestRunCommand_SpectraNotFound returns error when .spectra directory is not found.
-func TestRunCommand_SpectraNotFound(t *testing.T) {
+// TestRunCommand_RuntimeReportsProjectRootNotFound forwards Runtime error when .spectra directory is not found.
+func TestRunCommand_RuntimeReportsProjectRootNotFound(t *testing.T) {
 	tmpDir := setupRunTestFixtureNoSpectra(t)
-	finder := spectra.NewMockSpectraFinder("", fmt.Errorf("spectra not initialized"))
-	runtime := spectra.NewMockRuntime(0)
+	runtime := spectra.NewMockRuntimeWithStderr(1, func(w io.Writer) {
+		fmt.Fprint(w, "Failed to locate project root: project root not found. Run 'spectra init' to initialize the project.")
+	})
 
-	_, stderr, exitCode := executeRunCommand(t, tmpDir, []string{"TestWorkflow"}, finder, runtime)
+	_, stderr, exitCode := executeRunCommand(t, tmpDir, []string{"TestWorkflow"}, runtime)
 
 	assert.Equal(t, 1, exitCode)
-	assert.Contains(t, stderr, ".spectra")
-	assert.Contains(t, strings.ToLower(stderr), "not found")
-	assert.False(t, runtime.RunCalled(), "Runtime.Run should not be called")
-}
-
-// TestRunCommand_SpectraNotFoundInParent returns error when .spectra directory is not found in any parent directory.
-func TestRunCommand_SpectraNotFoundInParent(t *testing.T) {
-	tmpDir := setupRunTestFixtureNoSpectra(t)
-	deepDir := filepath.Join(tmpDir, "a", "b", "c", "d")
-	require.NoError(t, os.MkdirAll(deepDir, 0755))
-
-	finder := spectra.NewMockSpectraFinder("", fmt.Errorf("spectra not initialized"))
-	runtime := spectra.NewMockRuntime(0)
-
-	_, stderr, exitCode := executeRunCommand(t, deepDir, []string{"TestWorkflow"}, finder, runtime)
-
-	assert.Equal(t, 1, exitCode)
-	assert.Contains(t, stderr, ".spectra")
-	assert.Contains(t, strings.ToLower(stderr), "not found")
-	assert.False(t, runtime.RunCalled(), "Runtime.Run should not be called")
+	assert.Contains(t, stderr, "Failed to locate project root")
 }
 
 // =====================================================================
@@ -352,12 +320,11 @@ func TestRunCommand_SpectraNotFoundInParent(t *testing.T) {
 // TestRunCommand_RuntimeReportsWorkflowNotFound forwards Runtime error when workflow file does not exist.
 func TestRunCommand_RuntimeReportsWorkflowNotFound(t *testing.T) {
 	projectRoot := setupRunTestFixture(t)
-	finder := spectra.NewMockSpectraFinder(projectRoot, nil)
 	runtime := spectra.NewMockRuntimeWithStderr(1, func(w io.Writer) {
 		fmt.Fprint(w, "Error: workflow definition not found")
 	})
 
-	_, stderr, exitCode := executeRunCommand(t, projectRoot, []string{"NonExistent"}, finder, runtime)
+	_, stderr, exitCode := executeRunCommand(t, projectRoot, []string{"NonExistent"}, runtime)
 
 	assert.Equal(t, 1, exitCode)
 	assert.Contains(t, stderr, "Error: workflow definition not found")
@@ -366,12 +333,11 @@ func TestRunCommand_RuntimeReportsWorkflowNotFound(t *testing.T) {
 // TestRunCommand_RuntimeReportsInvalidYAML forwards Runtime error when workflow file has invalid YAML syntax.
 func TestRunCommand_RuntimeReportsInvalidYAML(t *testing.T) {
 	projectRoot := setupRunTestFixture(t, "Invalid")
-	finder := spectra.NewMockSpectraFinder(projectRoot, nil)
 	runtime := spectra.NewMockRuntimeWithStderr(1, func(w io.Writer) {
 		fmt.Fprint(w, "Error: failed to parse workflow YAML")
 	})
 
-	_, stderr, exitCode := executeRunCommand(t, projectRoot, []string{"Invalid"}, finder, runtime)
+	_, stderr, exitCode := executeRunCommand(t, projectRoot, []string{"Invalid"}, runtime)
 
 	assert.Equal(t, 1, exitCode)
 	assert.Contains(t, stderr, "Error: failed to parse workflow YAML")
@@ -380,12 +346,11 @@ func TestRunCommand_RuntimeReportsInvalidYAML(t *testing.T) {
 // TestRunCommand_RuntimeReportsWorkflowNotReadable forwards Runtime error when workflow file cannot be read due to permissions.
 func TestRunCommand_RuntimeReportsWorkflowNotReadable(t *testing.T) {
 	projectRoot := setupRunTestFixture(t)
-	finder := spectra.NewMockSpectraFinder(projectRoot, nil)
 	runtime := spectra.NewMockRuntimeWithStderr(1, func(w io.Writer) {
 		fmt.Fprint(w, "Error: permission denied reading workflow file")
 	})
 
-	_, stderr, exitCode := executeRunCommand(t, projectRoot, []string{"Restricted"}, finder, runtime)
+	_, stderr, exitCode := executeRunCommand(t, projectRoot, []string{"Restricted"}, runtime)
 
 	assert.Equal(t, 1, exitCode)
 	assert.Contains(t, stderr, "Error: permission denied reading workflow file")
@@ -398,12 +363,11 @@ func TestRunCommand_RuntimeReportsWorkflowNotReadable(t *testing.T) {
 // TestRunCommand_RuntimeReportsAgentError forwards Runtime error when workflow fails due to agent error.
 func TestRunCommand_RuntimeReportsAgentError(t *testing.T) {
 	projectRoot := setupRunTestFixture(t, "AgentFail")
-	finder := spectra.NewMockSpectraFinder(projectRoot, nil)
 	runtime := spectra.NewMockRuntimeWithStderr(1, func(w io.Writer) {
 		fmt.Fprint(w, "Error: agent execution failed")
 	})
 
-	_, stderr, exitCode := executeRunCommand(t, projectRoot, []string{"AgentFail"}, finder, runtime)
+	_, stderr, exitCode := executeRunCommand(t, projectRoot, []string{"AgentFail"}, runtime)
 
 	assert.Equal(t, 1, exitCode)
 	assert.Contains(t, stderr, "Error: agent execution failed")
@@ -412,12 +376,11 @@ func TestRunCommand_RuntimeReportsAgentError(t *testing.T) {
 // TestRunCommand_RuntimeReportsSessionLockError forwards Runtime error when another session is already running.
 func TestRunCommand_RuntimeReportsSessionLockError(t *testing.T) {
 	projectRoot := setupRunTestFixture(t)
-	finder := spectra.NewMockSpectraFinder(projectRoot, nil)
 	runtime := spectra.NewMockRuntimeWithStderr(1, func(w io.Writer) {
 		fmt.Fprint(w, "Error: another workflow session is already running")
 	})
 
-	_, stderr, exitCode := executeRunCommand(t, projectRoot, []string{"Concurrent"}, finder, runtime)
+	_, stderr, exitCode := executeRunCommand(t, projectRoot, []string{"Concurrent"}, runtime)
 
 	assert.Equal(t, 1, exitCode)
 	assert.Contains(t, stderr, "Error: another workflow session is already running")
@@ -426,10 +389,9 @@ func TestRunCommand_RuntimeReportsSessionLockError(t *testing.T) {
 // TestRunCommand_RuntimeRunReturnsError converts Runtime.Run error return to exit code 1 and stderr message.
 func TestRunCommand_RuntimeRunReturnsError(t *testing.T) {
 	projectRoot := setupRunTestFixture(t, "Test")
-	finder := spectra.NewMockSpectraFinder(projectRoot, nil)
 	runtime := spectra.NewMockRuntimeWithError(errors.New("runtime internal error"))
 
-	_, stderr, exitCode := executeRunCommand(t, projectRoot, []string{"Test"}, finder, runtime)
+	_, stderr, exitCode := executeRunCommand(t, projectRoot, []string{"Test"}, runtime)
 
 	assert.Equal(t, 1, exitCode)
 	assert.NotEmpty(t, stderr)
@@ -442,10 +404,9 @@ func TestRunCommand_RuntimeRunReturnsError(t *testing.T) {
 // TestRunCommand_WorkflowNameWithPathSeparators passes workflow name with path separators to Runtime without validation.
 func TestRunCommand_WorkflowNameWithPathSeparators(t *testing.T) {
 	projectRoot := setupRunTestFixture(t)
-	finder := spectra.NewMockSpectraFinder(projectRoot, nil)
 	runtime := spectra.NewMockRuntime(0)
 
-	_, _, _ = executeRunCommand(t, projectRoot, []string{"../malicious/workflow"}, finder, runtime)
+	_, _, _ = executeRunCommand(t, projectRoot, []string{"../malicious/workflow"}, runtime)
 
 	assert.True(t, runtime.RunCalled(), "Runtime.Run should be called")
 	assert.Equal(t, "../malicious/workflow", runtime.WorkflowName(), "Command should not validate or sanitize the name")
@@ -454,10 +415,9 @@ func TestRunCommand_WorkflowNameWithPathSeparators(t *testing.T) {
 // TestRunCommand_WorkflowNameWithSpecialCharacters passes workflow name with special characters to Runtime.
 func TestRunCommand_WorkflowNameWithSpecialCharacters(t *testing.T) {
 	projectRoot := setupRunTestFixture(t)
-	finder := spectra.NewMockSpectraFinder(projectRoot, nil)
 	runtime := spectra.NewMockRuntime(0)
 
-	_, _, exitCode := executeRunCommand(t, projectRoot, []string{"Work@flow#123"}, finder, runtime)
+	_, _, exitCode := executeRunCommand(t, projectRoot, []string{"Work@flow#123"}, runtime)
 
 	assert.True(t, runtime.RunCalled(), "Runtime.Run should be called")
 	assert.Equal(t, "Work@flow#123", runtime.WorkflowName())
@@ -467,10 +427,9 @@ func TestRunCommand_WorkflowNameWithSpecialCharacters(t *testing.T) {
 // TestRunCommand_WorkflowNameWithUnicode passes workflow name with Unicode characters to Runtime.
 func TestRunCommand_WorkflowNameWithUnicode(t *testing.T) {
 	projectRoot := setupRunTestFixture(t)
-	finder := spectra.NewMockSpectraFinder(projectRoot, nil)
 	runtime := spectra.NewMockRuntime(0)
 
-	_, _, exitCode := executeRunCommand(t, projectRoot, []string{"工作流程"}, finder, runtime)
+	_, _, exitCode := executeRunCommand(t, projectRoot, []string{"工作流程"}, runtime)
 
 	assert.True(t, runtime.RunCalled(), "Runtime.Run should be called")
 	assert.Equal(t, "工作流程", runtime.WorkflowName())
@@ -484,7 +443,6 @@ func TestRunCommand_WorkflowNameWithUnicode(t *testing.T) {
 // TestRunCommand_PropagatesSIGINT propagates SIGINT signal to Runtime subprocess.
 func TestRunCommand_PropagatesSIGINT(t *testing.T) {
 	projectRoot := setupRunTestFixture(t, "TestWorkflow")
-	finder := spectra.NewMockSpectraFinder(projectRoot, nil)
 
 	signalCh := make(chan struct{})
 	signalReceived := false
@@ -499,7 +457,7 @@ func TestRunCommand_PropagatesSIGINT(t *testing.T) {
 	done := make(chan struct{})
 	go func() {
 		defer close(done)
-		stdout2, stderr2, code := executeRunCommand(t, projectRoot, []string{"TestWorkflow"}, finder, runtime)
+		stdout2, stderr2, code := executeRunCommand(t, projectRoot, []string{"TestWorkflow"}, runtime)
 		stdout.WriteString(stdout2)
 		stderr.WriteString(stderr2)
 		exitCode = code
@@ -530,7 +488,6 @@ func TestRunCommand_PropagatesSIGINT(t *testing.T) {
 // TestRunCommand_HandlesStreamingOutput does not timeout or buffer output from workflow that produces streaming output.
 func TestRunCommand_HandlesStreamingOutput(t *testing.T) {
 	projectRoot := setupRunTestFixture(t, "StreamingWorkflow")
-	finder := spectra.NewMockSpectraFinder(projectRoot, nil)
 	runtime := spectra.NewMockRuntimeWithStdout(0, func(w io.Writer) {
 		// Simulate streaming: produce multiple output lines over a short period
 		for i := 0; i < 10; i++ {
@@ -539,7 +496,7 @@ func TestRunCommand_HandlesStreamingOutput(t *testing.T) {
 		}
 	})
 
-	stdout, _, exitCode := executeRunCommand(t, projectRoot, []string{"StreamingWorkflow"}, finder, runtime)
+	stdout, _, exitCode := executeRunCommand(t, projectRoot, []string{"StreamingWorkflow"}, runtime)
 
 	assert.Equal(t, 0, exitCode)
 	// Verify all output lines are present
@@ -555,25 +512,21 @@ func TestRunCommand_HandlesStreamingOutput(t *testing.T) {
 // TestRunCommand_MultipleInvocationsIndependent multiple sequential invocations are independent.
 func TestRunCommand_MultipleInvocationsIndependent(t *testing.T) {
 	projectRoot := setupRunTestFixture(t, "TestWorkflow")
-	finder1 := spectra.NewMockSpectraFinder(projectRoot, nil)
 	runtime1 := spectra.NewMockRuntime(0)
 
-	_, _, exitCode1 := executeRunCommand(t, projectRoot, []string{"TestWorkflow"}, finder1, runtime1)
+	_, _, exitCode1 := executeRunCommand(t, projectRoot, []string{"TestWorkflow"}, runtime1)
 
 	assert.Equal(t, 0, exitCode1)
 	assert.True(t, runtime1.RunCalled(), "First Runtime.Run should be called")
-	assert.Equal(t, projectRoot, runtime1.ProjectRoot())
 	assert.Equal(t, "TestWorkflow", runtime1.WorkflowName())
 
 	// Second invocation with fresh mocks
-	finder2 := spectra.NewMockSpectraFinder(projectRoot, nil)
 	runtime2 := spectra.NewMockRuntime(0)
 
-	_, _, exitCode2 := executeRunCommand(t, projectRoot, []string{"TestWorkflow"}, finder2, runtime2)
+	_, _, exitCode2 := executeRunCommand(t, projectRoot, []string{"TestWorkflow"}, runtime2)
 
 	assert.Equal(t, 0, exitCode2)
 	assert.True(t, runtime2.RunCalled(), "Second Runtime.Run should be called")
-	assert.Equal(t, projectRoot, runtime2.ProjectRoot())
 	assert.Equal(t, "TestWorkflow", runtime2.WorkflowName())
 }
 
@@ -581,44 +534,12 @@ func TestRunCommand_MultipleInvocationsIndependent(t *testing.T) {
 // Mock / Dependency Interaction
 // =====================================================================
 
-// TestRunCommand_CallsSpectraFinder invokes SpectraFinder to locate project root.
-func TestRunCommand_CallsSpectraFinder(t *testing.T) {
-	projectRoot := setupRunTestFixture(t)
-	finder := spectra.NewMockSpectraFinder(projectRoot, nil)
-	runtime := spectra.NewMockRuntime(0)
-
-	_, _, _ = executeRunCommand(t, projectRoot, []string{"TestWorkflow"}, finder, runtime)
-
-	assert.True(t, finder.WasCalled(), "SpectraFinder.Find() should be called")
-	assert.True(t, runtime.RunCalled(), "Runtime.Run should be called with project root from SpectraFinder")
-	assert.Equal(t, projectRoot, runtime.ProjectRoot())
-}
-
-// TestRunCommand_PassesCorrectProjectRoot passes project root from SpectraFinder to Runtime.
-func TestRunCommand_PassesCorrectProjectRoot(t *testing.T) {
-	tmpDir := t.TempDir()
-	projectRoot := filepath.Join(tmpDir, "test-project")
-	require.NoError(t, os.MkdirAll(filepath.Join(projectRoot, ".spectra"), 0755))
-	subDir := filepath.Join(projectRoot, "sub")
-	require.NoError(t, os.MkdirAll(subDir, 0755))
-
-	finder := spectra.NewMockSpectraFinder(projectRoot, nil)
-	runtime := spectra.NewMockRuntime(0)
-
-	_, _, _ = executeRunCommand(t, subDir, []string{"TestWorkflow"}, finder, runtime)
-
-	assert.True(t, runtime.RunCalled(), "Runtime.Run should be called")
-	assert.Equal(t, projectRoot, runtime.ProjectRoot(), "Runtime.Run should receive project root from SpectraFinder")
-	assert.Equal(t, "TestWorkflow", runtime.WorkflowName())
-}
-
 // TestRunCommand_PassesCorrectWorkflowName passes workflow name exactly as provided to Runtime.
 func TestRunCommand_PassesCorrectWorkflowName(t *testing.T) {
 	projectRoot := setupRunTestFixture(t)
-	finder := spectra.NewMockSpectraFinder(projectRoot, nil)
 	runtime := spectra.NewMockRuntime(0)
 
-	_, _, _ = executeRunCommand(t, projectRoot, []string{"My-Workflow_123"}, finder, runtime)
+	_, _, _ = executeRunCommand(t, projectRoot, []string{"My-Workflow_123"}, runtime)
 
 	assert.True(t, runtime.RunCalled(), "Runtime.Run should be called")
 	assert.Equal(t, "My-Workflow_123", runtime.WorkflowName(), "Workflow name should be passed exactly, no transformation")

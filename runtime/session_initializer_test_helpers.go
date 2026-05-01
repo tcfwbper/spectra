@@ -40,18 +40,6 @@ func (si *SessionInitializer) SetFileAccessorError(err error) {
 	}
 }
 
-// SetSpectraFinderError configures the initializer to fail during spectra finder execution.
-func (si *SessionInitializer) SetSpectraFinderError(err error) {
-	si.spectraFinderFunc = func() (string, error) {
-		return "", err
-	}
-}
-
-// SetSpectraFinderBlock configures the initializer to block on spectra finder until channel is closed.
-func (si *SessionInitializer) SetSpectraFinderBlock(blockCh chan struct{}) {
-	si.spectraFinderBlockCh = blockCh
-}
-
 // SetSessionRunBlock configures the initializer to block on Session.Run until channel is closed.
 func (si *SessionInitializer) SetSessionRunBlock(blockCh chan struct{}) {
 	si.sessionRunBlockCh = blockCh

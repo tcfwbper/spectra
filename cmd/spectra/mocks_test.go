@@ -132,7 +132,6 @@ func (m *MockSpectraFinder) WasCalled() bool {
 // MockRuntime is a mock implementation of Runtime for command tests.
 type MockRuntime struct {
 	runCalled    bool
-	projectRoot  string
 	workflowName string
 	exitCode     int
 	err          error
@@ -167,9 +166,8 @@ func NewMockRuntimeWithStreams(exitCode int, stdoutFunc func(w io.Writer), stder
 }
 
 // Run records the call and returns the configured exit code.
-func (m *MockRuntime) Run(projectRoot, workflowName string, stdout, stderr io.Writer) (int, error) {
+func (m *MockRuntime) Run(workflowName string, stdout, stderr io.Writer) (int, error) {
 	m.runCalled = true
-	m.projectRoot = projectRoot
 	m.workflowName = workflowName
 	if m.stdoutFunc != nil {
 		m.stdoutFunc(stdout)
@@ -186,11 +184,6 @@ func (m *MockRuntime) Run(projectRoot, workflowName string, stdout, stderr io.Wr
 // RunCalled returns whether Run was called.
 func (m *MockRuntime) RunCalled() bool {
 	return m.runCalled
-}
-
-// ProjectRoot returns the project root passed to Run.
-func (m *MockRuntime) ProjectRoot() string {
-	return m.projectRoot
 }
 
 // WorkflowName returns the workflow name passed to Run.
