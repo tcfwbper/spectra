@@ -4,7 +4,7 @@ import "github.com/tcfwbper/spectra/entities"
 
 // SessionInitializerInterface is the interface Runtime uses for session initialization.
 type SessionInitializerInterface interface {
-	Initialize(workflowName string, terminationNotifier chan<- struct{}) (SessionForInitializer, error)
+	Initialize(workflowName string, projectRoot string, terminationNotifier chan<- struct{}) (SessionForInitializer, error)
 }
 
 // SessionFinalizerInterface is the interface Runtime uses for session finalization.

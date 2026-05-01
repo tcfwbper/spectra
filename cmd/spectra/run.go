@@ -6,39 +6,18 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
-	"github.com/tcfwbper/spectra/storage"
 )
-
-// SpectraFinderInterface defines the interface for locating the project root.
-type SpectraFinderInterface interface {
-	Find() (string, error)
-}
 
 // RuntimeInterface defines the interface for executing workflows.
 type RuntimeInterface interface {
-	Run(projectRoot, workflowName string, stdout, stderr io.Writer) (int, error)
-}
-
-// defaultSpectraFinder is a wrapper that implements SpectraFinderInterface.
-type defaultSpectraFinder struct{}
-
-func (d *defaultSpectraFinder) Find() (string, error) {
-	return storage.SpectraFinder("")
+	Run(workflowName string, stdout, stderr io.Writer) (int, error)
 }
 
 // RunHandlerOption is a function that configures the run handler.
 type RunHandlerOption func(*runHandlerConfig)
 
 type runHandlerConfig struct {
-	finder  SpectraFinderInterface
 	runtime RuntimeInterface
-}
-
-// WithSpectraFinder sets a custom SpectraFinder for testing.
-func WithSpectraFinder(finder SpectraFinderInterface) RunHandlerOption {
-	return func(cfg *runHandlerConfig) {
-		cfg.finder = finder
-	}
 }
 
 // WithRuntime sets a custom Runtime for testing.
@@ -85,9 +64,7 @@ func newRunCommand(opts []RunHandlerOption) *cobra.Command {
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Configure dependencies
-			cfg := &runHandlerConfig{
-				finder: &defaultSpectraFinder{},
-			}
+			cfg := &runHandlerConfig{}
 			for _, opt := range opts {
 				opt(cfg)
 			}
@@ -113,18 +90,12 @@ func newRunCommand(opts []RunHandlerOption) *cobra.Command {
 			// Use the original (untrimmed) workflow name for execution
 			finalWorkflowName = trimmedName
 
-			// Find project root
-			projectRoot, err := cfg.finder.Find()
-			if err != nil {
-				fmt.Fprintf(cmd.ErrOrStderr(), "Error: .spectra directory not found. Run 'spectra init' to initialize a project.\n")
-				return &exitError{code: 1}
-			}
-
 			// Execute workflow via Runtime
 			var exitCode int
 			if cfg.runtime != nil {
 				// Use injected runtime (for testing)
-				exitCode, err = cfg.runtime.Run(projectRoot, finalWorkflowName, cmd.OutOrStdout(), cmd.ErrOrStderr())
+				var err error
+				exitCode, err = cfg.runtime.Run(finalWorkflowName, cmd.OutOrStdout(), cmd.ErrOrStderr())
 				if err != nil {
 					// Runtime returned an error - write to stderr if not already written
 					fmt.Fprintf(cmd.ErrOrStderr(), "Error: %v\n", err)
