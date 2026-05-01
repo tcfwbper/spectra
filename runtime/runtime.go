@@ -7,8 +7,14 @@ import (
 	"syscall"
 )
 
+// SpectraFinderInterface defines the interface for locating the project root.
+type SpectraFinderInterface interface {
+	Find() (string, error)
+}
+
 // Runtime is the top-level entry point and main loop for the workflow execution system.
 type Runtime struct {
+	spectraFinder      SpectraFinderInterface
 	sessionInitializer SessionInitializerInterface
 	sessionFinalizer   SessionFinalizerInterface
 	socketManager      RuntimeSocketManagerInterface
@@ -16,11 +22,13 @@ type Runtime struct {
 
 // NewRuntime creates a new Runtime instance.
 func NewRuntime(
+	spectraFinder SpectraFinderInterface,
 	sessionInitializer SessionInitializerInterface,
 	sessionFinalizer SessionFinalizerInterface,
 	socketManager RuntimeSocketManagerInterface,
 ) *Runtime {
 	return &Runtime{
+		spectraFinder:      spectraFinder,
 		sessionInitializer: sessionInitializer,
 		sessionFinalizer:   sessionFinalizer,
 		socketManager:      socketManager,
@@ -29,11 +37,18 @@ func NewRuntime(
 
 // Run executes the main runtime loop for the given workflow.
 func (rt *Runtime) Run(workflowName string) int {
+	// Locate project root
+	projectRoot, err := rt.spectraFinder.Find()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Failed to locate project root: %v. Run 'spectra init' to initialize the project.\n", err)
+		return 1
+	}
+
 	// Create termination notifier channel with buffer size 2
 	terminationNotifier := make(chan struct{}, 2)
 
 	// Initialize session
-	sess, err := rt.sessionInitializer.Initialize(workflowName, terminationNotifier)
+	sess, err := rt.sessionInitializer.Initialize(workflowName, projectRoot, terminationNotifier)
 	if err != nil {
 		// Check if session entity exists
 		if sess == nil {

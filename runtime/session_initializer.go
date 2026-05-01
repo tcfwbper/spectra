@@ -2,6 +2,7 @@ package runtime
 
 import (
 	"fmt"
+	"os"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -106,10 +107,22 @@ func (si *SessionInitializer) defaultSessionConstructor(wfDef *storage.WorkflowD
 }
 
 // Initialize performs the complete initialization flow for a new session.
-func (si *SessionInitializer) Initialize(workflowName string, terminationNotifier chan<- struct{}) (SessionForInitializer, error) {
+func (si *SessionInitializer) Initialize(workflowName string, projectRoot string, terminationNotifier chan<- struct{}) (SessionForInitializer, error) {
 	// Validate terminationNotifier buffer capacity
 	if cap(terminationNotifier) < 2 {
 		return nil, fmt.Errorf("terminationNotifier channel must have buffer capacity >= 2, got %d", cap(terminationNotifier))
+	}
+
+	// Validate projectRoot
+	info, err := os.Stat(projectRoot)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, fmt.Errorf("project root does not exist: %s", projectRoot)
+		}
+		return nil, fmt.Errorf("failed to stat project root: %w", err)
+	}
+	if !info.IsDir() {
+		return nil, fmt.Errorf("project root is not a directory: %s", projectRoot)
 	}
 
 	// Shared state for timeout handler
@@ -125,17 +138,6 @@ func (si *SessionInitializer) Initialize(workflowName string, terminationNotifie
 
 	// Ensure timer is stopped on return
 	defer timer.Stop()
-
-	// Find project root
-	if si.spectraFinderBlockCh != nil {
-		<-si.spectraFinderBlockCh
-	}
-
-	if si.spectraFinderFunc != nil {
-		if _, err := si.spectraFinderFunc(); err != nil {
-			return nil, fmt.Errorf("failed to find project root: %w. Run 'spectra init' to initialize the project", err)
-		}
-	}
 
 	// Check for early timeout
 	if timedOutEarly.Load() {
