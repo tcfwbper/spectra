@@ -2,7 +2,7 @@
 
 ## Overview
 
-The `spectra run` command starts a workflow execution by invoking the Runtime module. It serves as the CLI entry point for workflow execution and is responsible for locating the project root, validating the workflow name argument, and delegating to the Runtime. The command forwards all Runtime output (stdout and stderr) to the user and exits with the Runtime's exit code.
+The `spectra run` command starts a workflow execution by invoking the Runtime module. It serves as the CLI entry point for workflow execution and is responsible for validating the workflow name argument and delegating to the Runtime. The Runtime writes directly to the process's stdout and stderr streams. The command exits with the Runtime's exit code.
 
 ## Behavior
 
@@ -11,15 +11,14 @@ The `spectra run` command starts a workflow execution by invoking the Runtime mo
 1. The `run` command is invoked as `spectra run --workflow <WorkflowName>` or `spectra run <WorkflowName>` (positional argument).
 2. The command validates that exactly one workflow name argument is provided. If missing or multiple arguments are provided, the command exits with code 1 and prints: `"Error: workflow name is required"` or `"Error: too many arguments"`.
 3. The command validates that the workflow name is non-empty after trimming whitespace. If empty, the command exits with code 1 and prints: `"Error: workflow name cannot be empty"`.
-4. The command invokes the Runtime module by calling `Runtime.Run(workflowName)`.
+4. The command invokes the Runtime module by calling `Runtime.Run(workflowName)`, which returns an integer exit code.
 5. The Runtime module handles all workflow execution logic as defined in `logic/runtime/runtime.md`, including locating the project root.
-6. The `run` command forwards all output from Runtime's stdout to its own stdout (visible to the user).
-7. The `run` command forwards all output from Runtime's stderr to its own stderr (visible to the user).
-8. When Runtime exits, the `run` command exits with the same exit code as Runtime.
-9. Runtime exit codes are:
+6. The Runtime writes directly to the process's stdout and stderr streams (i.e., `os.Stdout` and `os.Stderr`). The `run` command does not need to explicitly forward output.
+7. When Runtime returns, the `run` command exits with the same exit code returned by Runtime.
+8. Runtime exit codes are:
     - `0`: Workflow completed successfully (Session status = "completed")
     - `1`: Workflow failed or initialization error (Session status = "failed" or initialization failed)
-10. The `run` command does not perform any additional output or processing after Runtime exits. It simply propagates the exit code.
+9. The `run` command does not perform any additional output or processing after Runtime returns. It simply propagates the exit code.
 
 ### Command Syntax
 
@@ -78,7 +77,7 @@ When `.spectra` is not found:
 Error: .spectra directory not found. Run 'spectra init' to initialize a project.
 ```
 
-All other errors (workflow not found, invalid workflow definition, runtime errors) are reported by the Runtime module and forwarded to stderr.
+All other errors (workflow not found, invalid workflow definition, runtime errors) are reported by the Runtime module directly to stderr.
 
 ## Inputs
 
@@ -105,12 +104,12 @@ All other errors (workflow not found, invalid workflow definition, runtime error
 
 ### stdout
 
-- All output from Runtime's stdout (workflow execution logs, agent output, completion messages)
+- Runtime writes directly to `os.Stdout` (workflow execution logs, agent output, completion messages)
 
 ### stderr
 
 - Command invocation errors (missing workflow name, `.spectra` not found)
-- All output from Runtime's stderr (workflow errors, runtime errors, failure messages)
+- Runtime writes directly to `os.Stderr` (workflow errors, runtime errors, failure messages)
 
 ### Exit Codes
 
@@ -123,9 +122,9 @@ All other errors (workflow not found, invalid workflow definition, runtime error
 
 1. **Runtime Delegation**: After validating the workflow name, the command must delegate all execution logic to the Runtime module. It must not implement any workflow execution logic itself, including project root location logic.
 
-2. **Output Forwarding**: The command must forward all Runtime output (stdout and stderr) to its own stdout and stderr without modification, buffering, or filtering.
+2. **Shared Process Streams**: The Runtime writes directly to the process's `os.Stdout` and `os.Stderr`. The `run` command does not explicitly forward or intercept Runtime output. This is a natural consequence of running in the same process.
 
-3. **Exit Code Propagation**: The command must exit with the same exit code returned by the Runtime. It must not modify or interpret the exit code.
+3. **Exit Code Propagation**: The command must exit with the integer exit code returned by `Runtime.Run(workflowName)`. The Runtime interface returns only an exit code (`int`), not a Go `error`. The command must not modify or interpret the exit code.
 
 4. **No Project Root Resolution**: The command must not resolve the project root or use SpectraFinder. Project root resolution is handled by Runtime.
 
@@ -156,10 +155,10 @@ All other errors (workflow not found, invalid workflow definition, runtime error
   **Expected**: Runtime initialization fails (WorkflowDefinitionLoader returns parse error). Runtime prints error to stderr and exits with code 1. `run` command propagates exit code 1.
 
 - **Condition**: Runtime prints to stdout during workflow execution (e.g., agent output, transition logs).
-  **Expected**: `run` command forwards all stdout to the user in real-time.
+  **Expected**: Output appears on the user's stdout in real-time (Runtime writes directly to `os.Stdout`).
 
 - **Condition**: Runtime prints to stderr during workflow execution (e.g., agent errors, runtime errors).
-  **Expected**: `run` command forwards all stderr to the user in real-time.
+  **Expected**: Output appears on the user's stderr in real-time (Runtime writes directly to `os.Stderr`).
 
 - **Condition**: User terminates the `run` command with Ctrl+C (SIGINT).
   **Expected**: The signal is propagated to Runtime. Runtime handles graceful shutdown as defined in `logic/runtime/runtime.md`. `run` command exits when Runtime exits.
