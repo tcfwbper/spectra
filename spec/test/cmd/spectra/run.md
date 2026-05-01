@@ -14,14 +14,14 @@
 
 | Test ID | Category | Description | Setup | Input | Expected |
 |---|---|---|---|---|---|
-| `TestRunCommand_PositionalArgument` | `unit` | Executes workflow when workflow name is provided as positional argument. | Temporary test directory created programmatically within test fixture; `.spectra/` directory and `.spectra/workflows/TestWorkflow.yaml` file created inside test fixture; test changes working directory to test fixture; Runtime mocked to return exit code 0 | `run TestWorkflow` | Runtime.Run called with correct project root and `"TestWorkflow"`; exit code 0 |
-| `TestRunCommand_PositionalArgumentFromSubdirectory` | `unit` | Locates project root from subdirectory and executes workflow. | Temporary test directory created programmatically within test fixture; `.spectra/` and `.spectra/workflows/SimpleSdd.yaml` created inside test fixture; subdirectory `subdir/nested/` created inside test fixture; test changes working directory to `subdir/nested/` | `run SimpleSdd` | SpectraFinder locates project root correctly; Runtime.Run called with project root and `"SimpleSdd"`; exit code 0 |
+| `TestRunCommand_PositionalArgument` | `unit` | Executes workflow when workflow name is provided as positional argument. | Temporary test directory created programmatically within test fixture; `.spectra/` directory and `.spectra/workflows/TestWorkflow.yaml` file created inside test fixture; test changes working directory to test fixture; Runtime mocked to return exit code 0 | `run TestWorkflow` | Runtime.Run called with `"TestWorkflow"`; exit code 0 |
+| `TestRunCommand_PositionalArgumentFromSubdirectory` | `unit` | Executes workflow from subdirectory (Runtime handles project root location). | Temporary test directory created programmatically within test fixture; `.spectra/` and `.spectra/workflows/SimpleSdd.yaml` created inside test fixture; subdirectory `subdir/nested/` created inside test fixture; test changes working directory to `subdir/nested/`; Runtime mocked to return exit code 0 | `run SimpleSdd` | Runtime.Run called with `"SimpleSdd"`; exit code 0 |
 
 ### Happy Path — Flag Argument
 
 | Test ID | Category | Description | Setup | Input | Expected |
 |---|---|---|---|---|---|
-| `TestRunCommand_FlagArgument` | `unit` | Executes workflow when workflow name is provided via --workflow flag. | Temporary test directory created programmatically within test fixture; `.spectra/` directory and `.spectra/workflows/MyWorkflow.yaml` file created inside test fixture; test changes working directory to test fixture; Runtime mocked to return exit code 0 | `run --workflow MyWorkflow` | Runtime.Run called with correct project root and `"MyWorkflow"`; exit code 0 |
+| `TestRunCommand_FlagArgument` | `unit` | Executes workflow when workflow name is provided via --workflow flag. | Temporary test directory created programmatically within test fixture; `.spectra/` directory and `.spectra/workflows/MyWorkflow.yaml` file created inside test fixture; test changes working directory to test fixture; Runtime mocked to return exit code 0 | `run --workflow MyWorkflow` | Runtime.Run called with `"MyWorkflow"`; exit code 0 |
 | `TestRunCommand_FlagPrecedenceOverPositional` | `unit` | Flag takes precedence when both flag and positional argument are provided. | Temporary test directory created programmatically within test fixture; `.spectra/` directory and `.spectra/workflows/FlagWorkflow.yaml` file created inside test fixture; test changes working directory to test fixture; Runtime mocked to return exit code 0 | `run --workflow FlagWorkflow PositionalWorkflow` | Runtime.Run called with `"FlagWorkflow"` (not `"PositionalWorkflow"`); exit code 0 |
 
 ### Happy Path — Help Output
@@ -60,12 +60,11 @@
 | `TestRunCommand_TooManyArguments` | `unit` | Returns error when multiple positional arguments are provided. | No setup required | `run Workflow1 Workflow2` | Stderr contains `"too many arguments"`; Runtime.Run not called; exit code 1 |
 | `TestRunCommand_TooManyArgumentsWithThree` | `unit` | Returns error when three positional arguments are provided. | No setup required | `run Workflow1 Workflow2 Workflow3` | Stderr contains `"too many arguments"`; Runtime.Run not called; exit code 1 |
 
-### Validation Failures — Project Root Not Found
+### Error Propagation — Project Root Not Found
 
 | Test ID | Category | Description | Setup | Input | Expected |
 |---|---|---|---|---|---|
-| `TestRunCommand_SpectraNotFound` | `unit` | Returns error when .spectra directory is not found. | Temporary test directory created programmatically within test fixture; no `.spectra/` directory created inside test fixture; test changes working directory to test fixture | `run TestWorkflow` | Stderr contains `".spectra"` and `"not found"`; Runtime.Run not called; exit code 1 |
-| `TestRunCommand_SpectraNotFoundInParent` | `unit` | Returns error when .spectra directory is not found in any parent directory. | Temporary test directory created programmatically within test fixture; deep subdirectory structure created but no `.spectra/` at any level inside test fixture; test changes working directory to deepest subdirectory | `run TestWorkflow` | Stderr contains `".spectra"` and `"not found"`; Runtime.Run not called; exit code 1 |
+| `TestRunCommand_RuntimeReportsProjectRootNotFound` | `unit` | Forwards Runtime error when .spectra directory is not found. | Temporary test directory created programmatically within test fixture; no `.spectra/` directory created inside test fixture; test changes working directory to test fixture; Runtime mocked to write `"Failed to locate project root: <error>. Run 'spectra init' to initialize the project."` to stderr and return exit code 1 | `run TestWorkflow` | Command stderr contains `"Failed to locate project root"` from Runtime; exit code 1 |
 
 ### Error Propagation — Runtime Initialization Failures
 
@@ -113,6 +112,4 @@
 
 | Test ID | Category | Description | Setup | Input | Expected |
 |---|---|---|---|---|---|
-| `TestRunCommand_CallsSpectraFinder` | `unit` | Invokes SpectraFinder to locate project root. | Temporary test directory created programmatically within test fixture; `.spectra/` directory created inside test fixture; test changes working directory to test fixture; SpectraFinder and Runtime mocked | `run TestWorkflow` | SpectraFinder.Find() called from current working directory; SpectraFinder returns project root; Runtime.Run called with returned project root |
-| `TestRunCommand_PassesCorrectProjectRoot` | `unit` | Passes project root from SpectraFinder to Runtime. | Temporary test directory created programmatically within test fixture; `.spectra/` directory created at path `/tmp/test-project/.spectra/` inside test fixture; subdirectory `sub/` created inside test fixture; test changes working directory to `sub/`; SpectraFinder mocked to return `/tmp/test-project/`; Runtime mocked | `run TestWorkflow` | Runtime.Run called with projectRoot=`"/tmp/test-project/"` and workflowName=`"TestWorkflow"` |
 | `TestRunCommand_PassesCorrectWorkflowName` | `unit` | Passes workflow name exactly as provided to Runtime. | Temporary test directory created programmatically within test fixture; `.spectra/` directory created inside test fixture; test changes working directory to test fixture; Runtime mocked | `run My-Workflow_123` | Runtime.Run called with workflowName=`"My-Workflow_123"` (exact match, no transformation) |

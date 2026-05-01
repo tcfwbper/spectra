@@ -72,13 +72,19 @@
 |---|---|---|---|---|---|
 | `TestRun_SocketDeleteCalledTwice` | `unit` | Calls RuntimeSocketManager.DeleteSocket() multiple times safely. | Test fixture; simulate SIGINT (calls DeleteSocket once); then cleanup step (calls DeleteSocket again) | `WorkflowName="TestWorkflow"` then SIGINT | RuntimeSocketManager.DeleteSocket() called twice; second call is no-op (idempotent); no error |
 
+### Validation Failures — Project Root Lookup
+
+| Test ID | Category | Description | Setup | Input | Expected |
+|---|---|---|---|---|---|
+| `TestRun_ProjectRootNotFound` | `unit` | Exits with error when SpectraFinder fails to locate project root. | Test fixture creates temporary directory WITHOUT `.spectra/`; mock SpectraFinder returns error: "project root not found" | `WorkflowName="TestWorkflow"` | Runtime prints to stderr: `"Failed to locate project root: project root not found. Run 'spectra init' to initialize the project."`; exits with code 1; SessionInitializer NOT called; SessionFinalizer NOT called |
+| `TestRun_ProjectRootNotFoundFromSubdirectory` | `unit` | Exits with error when SpectraFinder fails from subdirectory. | Test fixture creates temporary directory with deep subdirectory structure but NO `.spectra/` at any level; test changes working directory to deepest subdirectory; mock SpectraFinder returns error | `WorkflowName="TestWorkflow"` | Runtime prints to stderr: `"Failed to locate project root: <error>. Run 'spectra init' to initialize the project."`; exits with code 1; SessionInitializer NOT called |
+
 ### Validation Failures — Initialization Errors (No Session Entity)
 
 | Test ID | Category | Description | Setup | Input | Expected |
 |---|---|---|---|---|---|
-| `TestRun_InitializationFails_ProjectRootNotFound` | `unit` | Exits with error when SpectraFinder fails before session creation. | Test fixture; mock SessionInitializer returns error: "failed to find project root"; no session entity returned | `WorkflowName="TestWorkflow"` | Runtime prints to stderr: `"Failed to initialize session: failed to find project root: <error>. Run 'spectra init' to initialize the project."`; exits with code 1; SessionFinalizer NOT called |
-| `TestRun_InitializationFails_WorkflowNotFound` | `unit` | Exits with error when workflow definition not found. | Test fixture; mock SessionInitializer returns error: "failed to load workflow definition: file not found"; no session entity | `WorkflowName="NonExistentWorkflow"` | Runtime prints to stderr: `"Failed to initialize session: failed to load workflow definition: file not found"`; exits with code 1; SessionFinalizer NOT called |
-| `TestRun_InitializationFails_NoSessionEntity` | `unit` | Handles early initialization failure gracefully. | Test fixture; mock SessionInitializer returns error with nil session | `WorkflowName="TestWorkflow"` | Runtime prints error to stderr; exits with code 1; SessionFinalizer NOT called (no session to finalize) |
+| `TestRun_InitializationFails_WorkflowNotFound` | `unit` | Exits with error when workflow definition not found. | Test fixture; mock SpectraFinder succeeds; mock SessionInitializer returns error: "failed to load workflow definition: file not found"; no session entity | `WorkflowName="NonExistentWorkflow"` | Runtime prints to stderr: `"Failed to initialize session: failed to load workflow definition: file not found"`; exits with code 1; SessionFinalizer NOT called |
+| `TestRun_InitializationFails_NoSessionEntity` | `unit` | Handles early initialization failure gracefully. | Test fixture; mock SpectraFinder succeeds; mock SessionInitializer returns error with nil session | `WorkflowName="TestWorkflow"` | Runtime prints error to stderr; exits with code 1; SessionFinalizer NOT called (no session to finalize) |
 
 ### Validation Failures — Initialization Errors (Session Entity Exists)
 
@@ -177,12 +183,19 @@
 |---|---|---|---|---|---|
 | `TestRun_SingleSessionBinding` | `unit` | Verifies Runtime binds to exactly one session per invocation. | Test fixture; track Session entity creation | `WorkflowName="TestWorkflow"` | Runtime creates exactly one Session entity; Runtime does not manage multiple sessions concurrently |
 
+### Mock / Dependency Interaction — SpectraFinder
+
+| Test ID | Category | Description | Setup | Input | Expected |
+|---|---|---|---|---|---|
+| `TestRun_SpectraFinderCalled` | `unit` | Calls SpectraFinder to locate project root. | Test fixture creates temporary directory with `.spectra/`; test changes working directory to test fixture; mock SpectraFinder tracks call | `WorkflowName="TestWorkflow"` | SpectraFinder called to locate project root from current working directory; returns project root path |
+| `TestRun_SpectraFinderFromSubdirectory` | `unit` | Calls SpectraFinder from subdirectory. | Test fixture creates temporary directory with `.spectra/`; subdirectory `sub/nested/` created inside test fixture; test changes working directory to `sub/nested/`; mock SpectraFinder tracks call | `WorkflowName="TestWorkflow"` | SpectraFinder called from `sub/nested/`; returns parent directory containing `.spectra/` |
+
 ### Mock / Dependency Interaction — SessionInitializer
 
 | Test ID | Category | Description | Setup | Input | Expected |
 |---|---|---|---|---|---|
-| `TestRun_SessionInitializerCalled` | `unit` | Calls SessionInitializer.Initialize with correct arguments. | Test fixture; mock SessionInitializer tracks Initialize() call | `WorkflowName="TestWorkflow"` | SessionInitializer.Initialize() called with `WorkflowName="TestWorkflow"`, `TerminationNotifier=<channel-cap-2>` |
-| `TestRun_SessionInitializerReturnsSession` | `unit` | Receives Session entity from SessionInitializer. | Test fixture; mock SessionInitializer returns Session with `ID="abc-123"`, `Status="running"` | `WorkflowName="TestWorkflow"` | Runtime receives Session; proceeds to start socket listener |
+| `TestRun_SessionInitializerCalled` | `unit` | Calls SessionInitializer.Initialize with correct arguments including resolved project root. | Test fixture; mock SpectraFinder returns `/tmp/test-project/`; mock SessionInitializer tracks Initialize() call | `WorkflowName="TestWorkflow"` | SessionInitializer.Initialize() called with `WorkflowName="TestWorkflow"`, `ProjectRoot="/tmp/test-project/"`, `TerminationNotifier=<channel-cap-2>` |
+| `TestRun_SessionInitializerReturnsSession` | `unit` | Receives Session entity from SessionInitializer. | Test fixture; mock SpectraFinder succeeds; mock SessionInitializer returns Session with `ID="abc-123"`, `Status="running"` | `WorkflowName="TestWorkflow"` | Runtime receives Session; proceeds to start socket listener |
 
 ### Mock / Dependency Interaction — SessionFinalizer
 
