@@ -1,6 +1,6 @@
 package main
 
-import "io"
+import "time"
 
 // MockSubcommandHandler is a mock implementation for testing subcommand handlers.
 type MockSubcommandHandler struct {
@@ -130,14 +130,14 @@ func (m *MockSpectraFinder) WasCalled() bool {
 }
 
 // MockRuntime is a mock implementation of Runtime for command tests.
+// The Runtime interface returns only an integer exit code from Run(workflowName).
 type MockRuntime struct {
-	runCalled    bool
-	workflowName string
-	exitCode     int
-	err          error
-	stdoutFunc   func(w io.Writer)
-	stderrFunc   func(w io.Writer)
-	signalCh     chan struct{}
+	runCalled      bool
+	workflowName   string
+	exitCode       int
+	signalCh       chan struct{}
+	signalReceived bool
+	blockDuration  time.Duration
 }
 
 // NewMockRuntime creates a new mock Runtime that returns the given exit code.
@@ -145,40 +145,20 @@ func NewMockRuntime(exitCode int) *MockRuntime {
 	return &MockRuntime{exitCode: exitCode}
 }
 
-// NewMockRuntimeWithError creates a new mock Runtime that returns an error.
-func NewMockRuntimeWithError(err error) *MockRuntime {
-	return &MockRuntime{exitCode: 1, err: err}
-}
-
-// NewMockRuntimeWithStdout creates a new mock Runtime that writes to stdout.
-func NewMockRuntimeWithStdout(exitCode int, stdoutFunc func(w io.Writer)) *MockRuntime {
-	return &MockRuntime{exitCode: exitCode, stdoutFunc: stdoutFunc}
-}
-
-// NewMockRuntimeWithStderr creates a new mock Runtime that writes to stderr.
-func NewMockRuntimeWithStderr(exitCode int, stderrFunc func(w io.Writer)) *MockRuntime {
-	return &MockRuntime{exitCode: exitCode, stderrFunc: stderrFunc}
-}
-
-// NewMockRuntimeWithStreams creates a new mock Runtime that writes to both stdout and stderr.
-func NewMockRuntimeWithStreams(exitCode int, stdoutFunc func(w io.Writer), stderrFunc func(w io.Writer)) *MockRuntime {
-	return &MockRuntime{exitCode: exitCode, stdoutFunc: stdoutFunc, stderrFunc: stderrFunc}
-}
-
 // Run records the call and returns the configured exit code.
-func (m *MockRuntime) Run(workflowName string, stdout, stderr io.Writer) (int, error) {
+// If blockDuration is set, Run sleeps before returning.
+// If signalCh is set, Run blocks until the channel is closed, then records signal receipt.
+func (m *MockRuntime) Run(workflowName string) int {
 	m.runCalled = true
 	m.workflowName = workflowName
-	if m.stdoutFunc != nil {
-		m.stdoutFunc(stdout)
-	}
-	if m.stderrFunc != nil {
-		m.stderrFunc(stderr)
+	if m.blockDuration > 0 {
+		time.Sleep(m.blockDuration)
 	}
 	if m.signalCh != nil {
 		<-m.signalCh
+		m.signalReceived = true
 	}
-	return m.exitCode, m.err
+	return m.exitCode
 }
 
 // RunCalled returns whether Run was called.
@@ -191,7 +171,18 @@ func (m *MockRuntime) WorkflowName() string {
 	return m.workflowName
 }
 
+// SignalReceived returns whether the mock received a signal via its signal channel.
+func (m *MockRuntime) SignalReceived() bool {
+	return m.signalReceived
+}
+
 // SetSignalCh sets a channel that Run will block on before returning.
+// When the channel is closed, Run records signal receipt and returns.
 func (m *MockRuntime) SetSignalCh(ch chan struct{}) {
 	m.signalCh = ch
+}
+
+// SetBlockDuration sets a duration that Run will sleep before returning.
+func (m *MockRuntime) SetBlockDuration(d time.Duration) {
+	m.blockDuration = d
 }
