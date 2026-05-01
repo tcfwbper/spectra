@@ -103,16 +103,6 @@ func (m *mockFileAccessorForInit) Prepare() error {
 	return args.Error(0)
 }
 
-// mockSpectraFinderForInit is a mock SpectraFinder for SessionInitializer tests.
-type mockSpectraFinderForInit struct {
-	mock.Mock
-}
-
-func (m *mockSpectraFinderForInit) Find() (string, error) {
-	args := m.Called()
-	return args.String(0), args.Error(1)
-}
-
 // mockSessionForInit is a mock Session for SessionInitializer tests.
 type mockSessionForInit struct {
 	mock.Mock
@@ -233,7 +223,7 @@ func TestInitialize_Success(t *testing.T) {
 	require.NoError(t, err)
 
 	terminationNotifier := make(chan struct{}, 2)
-	sess, err := si.Initialize("TestWorkflow", terminationNotifier)
+	sess, err := si.Initialize("TestWorkflow", projectRoot, terminationNotifier)
 
 	require.NoError(t, err)
 	require.NotNil(t, sess)
@@ -252,7 +242,7 @@ func TestInitialize_MetadataPersisted(t *testing.T) {
 	require.NoError(t, err)
 
 	terminationNotifier := make(chan struct{}, 2)
-	sess, err := si.Initialize("TestWorkflow", terminationNotifier)
+	sess, err := si.Initialize("TestWorkflow", projectRoot, terminationNotifier)
 
 	require.NoError(t, err)
 	require.NotNil(t, sess)
@@ -273,7 +263,7 @@ func TestInitialize_EmptyEventHistoryAndSessionData(t *testing.T) {
 	require.NoError(t, err)
 
 	terminationNotifier := make(chan struct{}, 2)
-	sess, err := si.Initialize("TestWorkflow", terminationNotifier)
+	sess, err := si.Initialize("TestWorkflow", projectRoot, terminationNotifier)
 
 	require.NoError(t, err)
 	require.NotNil(t, sess)
@@ -298,7 +288,7 @@ func TestInitialize_CurrentStateSetToEntryNode(t *testing.T) {
 	require.NoError(t, err)
 
 	terminationNotifier := make(chan struct{}, 2)
-	sess, err := si.Initialize("CustomWorkflow", terminationNotifier)
+	sess, err := si.Initialize("CustomWorkflow", projectRoot, terminationNotifier)
 
 	require.NoError(t, err)
 	assert.Equal(t, "custom_entry", sess.GetCurrentStateSafe())
@@ -315,7 +305,7 @@ func TestInitialize_TimestampsSet(t *testing.T) {
 
 	before := time.Now().Unix()
 	terminationNotifier := make(chan struct{}, 2)
-	sess, err := si.Initialize("TestWorkflow", terminationNotifier)
+	sess, err := si.Initialize("TestWorkflow", projectRoot, terminationNotifier)
 	after := time.Now().Unix()
 
 	require.NoError(t, err)
@@ -335,11 +325,11 @@ func TestInitialize_UniqueSessionUUID(t *testing.T) {
 	require.NoError(t, err)
 
 	terminationNotifier1 := make(chan struct{}, 2)
-	sess1, err := si.Initialize("TestWorkflow", terminationNotifier1)
+	sess1, err := si.Initialize("TestWorkflow", projectRoot, terminationNotifier1)
 	require.NoError(t, err)
 
 	terminationNotifier2 := make(chan struct{}, 2)
-	sess2, err := si.Initialize("TestWorkflow", terminationNotifier2)
+	sess2, err := si.Initialize("TestWorkflow", projectRoot, terminationNotifier2)
 	require.NoError(t, err)
 
 	assert.NotEqual(t, sess1.GetID(), sess2.GetID(), "each call should return a unique session UUID")
@@ -359,7 +349,7 @@ func TestInitialize_TimeoutTimerCanceled(t *testing.T) {
 	require.NoError(t, err)
 
 	terminationNotifier := make(chan struct{}, 2)
-	sess, err := si.Initialize("TestWorkflow", terminationNotifier)
+	sess, err := si.Initialize("TestWorkflow", projectRoot, terminationNotifier)
 
 	require.NoError(t, err)
 	assert.NotNil(t, sess)
@@ -386,7 +376,7 @@ func TestInitialize_CompletionRace_InitWins(t *testing.T) {
 	require.NoError(t, err)
 
 	terminationNotifier := make(chan struct{}, 2)
-	sess, err := si.Initialize("TestWorkflow", terminationNotifier)
+	sess, err := si.Initialize("TestWorkflow", projectRoot, terminationNotifier)
 
 	require.NoError(t, err)
 	assert.Equal(t, "running", sess.GetStatusSafe())
@@ -409,7 +399,7 @@ func TestInitialize_SocketCleanupOnSessionRunFailure(t *testing.T) {
 	si.SetSessionRunError(fmt.Errorf("run failed"))
 
 	terminationNotifier := make(chan struct{}, 2)
-	_, err = si.Initialize("TestWorkflow", terminationNotifier)
+	_, err = si.Initialize("TestWorkflow", projectRoot, terminationNotifier)
 
 	require.Error(t, err)
 	assert.Regexp(t, `(?i)failed to transition session to running:`, err.Error())
@@ -431,7 +421,7 @@ func TestInitialize_SocketCleanupOnMetadataWriteFailure(t *testing.T) {
 	si.SetMetadataWriteError(fmt.Errorf("no space left on device"))
 
 	terminationNotifier := make(chan struct{}, 2)
-	_, err = si.Initialize("TestWorkflow", terminationNotifier)
+	_, err = si.Initialize("TestWorkflow", projectRoot, terminationNotifier)
 
 	require.Error(t, err)
 	assert.Regexp(t, `(?i)failed to persist initial session metadata:`, err.Error())
@@ -453,7 +443,7 @@ func TestInitialize_SocketCleanupOnSocketCreateFailure(t *testing.T) {
 	si.SetSocketCreateError(fmt.Errorf("socket creation failed"))
 
 	terminationNotifier := make(chan struct{}, 2)
-	_, err = si.Initialize("TestWorkflow", terminationNotifier)
+	_, err = si.Initialize("TestWorkflow", projectRoot, terminationNotifier)
 
 	require.Error(t, err)
 	assert.Regexp(t, `(?i)failed to create runtime socket:`, err.Error())
@@ -488,7 +478,7 @@ func TestInitialize_TimeoutAfterSessionConstructed(t *testing.T) {
 	done := make(chan struct{})
 	go func() {
 		defer close(done)
-		_, initErr = si.Initialize("SlowWorkflow", terminationNotifier)
+		_, initErr = si.Initialize("SlowWorkflow", projectRoot, terminationNotifier)
 	}()
 
 	// Wait for timeout to fire
@@ -508,13 +498,16 @@ func TestInitialize_TimeoutAfterSessionConstructed(t *testing.T) {
 func TestInitialize_TimeoutBeforeSessionConstructed(t *testing.T) {
 	projectRoot, wdl, sdm := createSessionInitializerFixture(t)
 
-	// SpectraFinder blocks to prevent Session construction
+	// WorkflowDefinitionLoader blocks to prevent Session construction
 	blockCh := make(chan struct{})
+	wdl.On("Load", "TestWorkflow").Run(func(args mock.Arguments) {
+		<-blockCh
+	}).Return(defaultWorkflowDef(), nil)
+	sdm.On("CreateSessionDirectory", mock.AnythingOfType("string")).Return(nil)
+
 	si, err := NewSessionInitializer(projectRoot, wdl, sdm)
 	require.NoError(t, err)
 
-	// Configure SpectraFinder to block
-	si.SetSpectraFinderBlock(blockCh)
 	si.SetTimeoutDuration(50 * time.Millisecond)
 
 	terminationNotifier := make(chan struct{}, 2)
@@ -523,13 +516,13 @@ func TestInitialize_TimeoutBeforeSessionConstructed(t *testing.T) {
 	done := make(chan struct{})
 	go func() {
 		defer close(done)
-		_, initErr = si.Initialize("TestWorkflow", terminationNotifier)
+		_, initErr = si.Initialize("TestWorkflow", projectRoot, terminationNotifier)
 	}()
 
 	// Wait for timeout to fire before session is constructed
 	time.Sleep(200 * time.Millisecond)
 
-	// Unblock SpectraFinder
+	// Unblock WorkflowDefinitionLoader
 	close(blockCh)
 
 	<-done
@@ -549,7 +542,7 @@ func TestInitialize_TerminationNotifierBufferCapacity1(t *testing.T) {
 	require.NoError(t, err)
 
 	ch := make(chan struct{}, 1)
-	_, err = si.Initialize("TestWorkflow", ch)
+	_, err = si.Initialize("TestWorkflow", projectRoot, ch)
 
 	require.Error(t, err)
 	assert.Equal(t, "terminationNotifier channel must have buffer capacity >= 2, got 1", err.Error())
@@ -561,7 +554,7 @@ func TestInitialize_TerminationNotifierNil(t *testing.T) {
 	si, err := NewSessionInitializer(projectRoot, wdl, sdm)
 	require.NoError(t, err)
 
-	_, err = si.Initialize("TestWorkflow", nil)
+	_, err = si.Initialize("TestWorkflow", projectRoot, nil)
 
 	require.Error(t, err)
 	assert.Equal(t, "terminationNotifier channel must have buffer capacity >= 2, got 0", err.Error())
@@ -574,7 +567,7 @@ func TestInitialize_TerminationNotifierUnbuffered(t *testing.T) {
 	require.NoError(t, err)
 
 	ch := make(chan struct{})
-	_, err = si.Initialize("TestWorkflow", ch)
+	_, err = si.Initialize("TestWorkflow", projectRoot, ch)
 
 	require.Error(t, err)
 	assert.Equal(t, "terminationNotifier channel must have buffer capacity >= 2, got 0", err.Error())
@@ -590,7 +583,7 @@ func TestInitialize_TerminationNotifierBufferCapacity2(t *testing.T) {
 	require.NoError(t, err)
 
 	ch := make(chan struct{}, 2)
-	sess, err := si.Initialize("TestWorkflow", ch)
+	sess, err := si.Initialize("TestWorkflow", projectRoot, ch)
 
 	require.NoError(t, err)
 	assert.NotNil(t, sess)
@@ -606,7 +599,7 @@ func TestInitialize_TerminationNotifierBufferCapacity5(t *testing.T) {
 	require.NoError(t, err)
 
 	ch := make(chan struct{}, 5)
-	sess, err := si.Initialize("TestWorkflow", ch)
+	sess, err := si.Initialize("TestWorkflow", projectRoot, ch)
 
 	require.NoError(t, err)
 	assert.NotNil(t, sess)
@@ -616,23 +609,35 @@ func TestInitialize_TerminationNotifierBufferCapacity5(t *testing.T) {
 // Validation Failures — Project Root
 // =====================================================================
 
-func TestInitialize_ProjectRootNotFound(t *testing.T) {
-	tmpDir := t.TempDir() // No .spectra/ directory
+func TestInitialize_ProjectRootInvalid(t *testing.T) {
+	_, wdl, sdm := createSessionInitializerFixture(t)
+
+	si, err := NewSessionInitializer("/tmp/nonexistent-project/", wdl, sdm)
+	require.NoError(t, err)
+
+	terminationNotifier := make(chan struct{}, 2)
+	_, err = si.Initialize("TestWorkflow", "/tmp/nonexistent-project/", terminationNotifier)
+
+	require.Error(t, err)
+	assert.Regexp(t, `(?i)project root does not exist`, err.Error())
+}
+
+func TestInitialize_ProjectRootNotDirectory(t *testing.T) {
+	tmpDir := t.TempDir()
+	filePath := filepath.Join(tmpDir, "not-a-directory")
+	require.NoError(t, os.WriteFile(filePath, []byte("content"), 0644))
 
 	wdl := &mockWorkflowDefinitionLoaderForInit{}
 	sdm := &mockSessionDirectoryManagerForInit{}
 
-	si, err := NewSessionInitializer(tmpDir, wdl, sdm)
+	si, err := NewSessionInitializer(filePath, wdl, sdm)
 	require.NoError(t, err)
 
-	// Configure SpectraFinder to fail
-	si.SetSpectraFinderError(fmt.Errorf("spectra not initialized"))
-
 	terminationNotifier := make(chan struct{}, 2)
-	_, err = si.Initialize("TestWorkflow", terminationNotifier)
+	_, err = si.Initialize("TestWorkflow", filePath, terminationNotifier)
 
 	require.Error(t, err)
-	assert.Regexp(t, `(?i)failed to find project root:.*Run 'spectra init' to initialize the project`, err.Error())
+	assert.Regexp(t, `(?i)project root is not a directory`, err.Error())
 }
 
 // =====================================================================
@@ -648,7 +653,7 @@ func TestInitialize_WorkflowNotFound(t *testing.T) {
 	require.NoError(t, err)
 
 	terminationNotifier := make(chan struct{}, 2)
-	_, err = si.Initialize("NonExistentWorkflow", terminationNotifier)
+	_, err = si.Initialize("NonExistentWorkflow", projectRoot, terminationNotifier)
 
 	require.Error(t, err)
 	assert.Regexp(t, `(?i)failed to load workflow definition:`, err.Error())
@@ -663,7 +668,7 @@ func TestInitialize_WorkflowParseError(t *testing.T) {
 	require.NoError(t, err)
 
 	terminationNotifier := make(chan struct{}, 2)
-	_, err = si.Initialize("MalformedWorkflow", terminationNotifier)
+	_, err = si.Initialize("MalformedWorkflow", projectRoot, terminationNotifier)
 
 	require.Error(t, err)
 	assert.Regexp(t, `(?i)failed to load workflow definition:`, err.Error())
@@ -678,7 +683,7 @@ func TestInitialize_WorkflowValidationError(t *testing.T) {
 	require.NoError(t, err)
 
 	terminationNotifier := make(chan struct{}, 2)
-	_, err = si.Initialize("InvalidWorkflow", terminationNotifier)
+	_, err = si.Initialize("InvalidWorkflow", projectRoot, terminationNotifier)
 
 	require.Error(t, err)
 	assert.Regexp(t, `(?i)failed to load workflow definition:`, err.Error())
@@ -700,7 +705,7 @@ func TestInitialize_SessionDirectoryParentMissing(t *testing.T) {
 	require.NoError(t, err)
 
 	terminationNotifier := make(chan struct{}, 2)
-	_, err = si.Initialize("TestWorkflow", terminationNotifier)
+	_, err = si.Initialize("TestWorkflow", projectRoot, terminationNotifier)
 
 	require.Error(t, err)
 	assert.Regexp(t, `(?i)failed to create session directory:.*sessions directory does not exist.*Run 'spectra init'`, err.Error())
@@ -717,7 +722,7 @@ func TestInitialize_SessionDirectoryAlreadyExists(t *testing.T) {
 	require.NoError(t, err)
 
 	terminationNotifier := make(chan struct{}, 2)
-	_, err = si.Initialize("TestWorkflow", terminationNotifier)
+	_, err = si.Initialize("TestWorkflow", projectRoot, terminationNotifier)
 
 	require.Error(t, err)
 	assert.Regexp(t, `(?i)failed to create session directory:.*session directory already exists.*UUID collision or a previous session was not cleaned up`, err.Error())
@@ -734,7 +739,7 @@ func TestInitialize_SessionDirectoryPermissionDenied(t *testing.T) {
 	require.NoError(t, err)
 
 	terminationNotifier := make(chan struct{}, 2)
-	_, err = si.Initialize("TestWorkflow", terminationNotifier)
+	_, err = si.Initialize("TestWorkflow", projectRoot, terminationNotifier)
 
 	require.Error(t, err)
 	assert.Regexp(t, `(?i)failed to create session directory:`, err.Error())
@@ -756,7 +761,7 @@ func TestInitialize_StorageFileCreationFails(t *testing.T) {
 	si.SetFileAccessorError(fmt.Errorf("file creation failed"))
 
 	terminationNotifier := make(chan struct{}, 2)
-	_, err = si.Initialize("TestWorkflow", terminationNotifier)
+	_, err = si.Initialize("TestWorkflow", projectRoot, terminationNotifier)
 
 	require.Error(t, err)
 	assert.Regexp(t, `(?i)failed to initialize storage files:`, err.Error())
@@ -774,7 +779,7 @@ func TestInitialize_StorageFileDiskFull(t *testing.T) {
 	si.SetFileAccessorError(fmt.Errorf("no space left on device"))
 
 	terminationNotifier := make(chan struct{}, 2)
-	_, err = si.Initialize("TestWorkflow", terminationNotifier)
+	_, err = si.Initialize("TestWorkflow", projectRoot, terminationNotifier)
 
 	require.Error(t, err)
 	assert.Regexp(t, `(?i)failed to initialize storage files:.*no space left on device`, err.Error())
@@ -796,7 +801,7 @@ func TestInitialize_SocketFileAlreadyExists(t *testing.T) {
 	si.SetSocketCreateError(fmt.Errorf("runtime socket file already exists: /some/path. This may indicate a previous runtime process did not clean up properly or another runtime is currently active"))
 
 	terminationNotifier := make(chan struct{}, 2)
-	_, err = si.Initialize("TestWorkflow", terminationNotifier)
+	_, err = si.Initialize("TestWorkflow", projectRoot, terminationNotifier)
 
 	require.Error(t, err)
 	assert.Regexp(t, `(?i)failed to create runtime socket:.*runtime socket file already exists.*previous runtime process did not clean up`, err.Error())
@@ -815,7 +820,7 @@ func TestInitialize_SocketPermissionDenied(t *testing.T) {
 	si.SetSocketCreateError(fmt.Errorf("permission denied"))
 
 	terminationNotifier := make(chan struct{}, 2)
-	_, err = si.Initialize("TestWorkflow", terminationNotifier)
+	_, err = si.Initialize("TestWorkflow", projectRoot, terminationNotifier)
 
 	require.Error(t, err)
 	assert.Regexp(t, `(?i)failed to create runtime socket:`, err.Error())
@@ -834,7 +839,7 @@ func TestInitialize_SocketDiskFull(t *testing.T) {
 	si.SetSocketCreateError(fmt.Errorf("no space left on device"))
 
 	terminationNotifier := make(chan struct{}, 2)
-	_, err = si.Initialize("TestWorkflow", terminationNotifier)
+	_, err = si.Initialize("TestWorkflow", projectRoot, terminationNotifier)
 
 	require.Error(t, err)
 	assert.Regexp(t, `(?i)failed to create runtime socket:.*no space left on device`, err.Error())
@@ -857,7 +862,7 @@ func TestInitialize_MetadataWriteDiskFull(t *testing.T) {
 	si.SetMetadataWriteError(fmt.Errorf("no space left on device"))
 
 	terminationNotifier := make(chan struct{}, 2)
-	_, err = si.Initialize("TestWorkflow", terminationNotifier)
+	_, err = si.Initialize("TestWorkflow", projectRoot, terminationNotifier)
 
 	require.Error(t, err)
 	assert.Regexp(t, `(?i)failed to persist initial session metadata:.*no space left on device`, err.Error())
@@ -876,7 +881,7 @@ func TestInitialize_MetadataWritePermissionDenied(t *testing.T) {
 	si.SetMetadataWriteError(fmt.Errorf("permission denied"))
 
 	terminationNotifier := make(chan struct{}, 2)
-	_, err = si.Initialize("TestWorkflow", terminationNotifier)
+	_, err = si.Initialize("TestWorkflow", projectRoot, terminationNotifier)
 
 	require.Error(t, err)
 	assert.Regexp(t, `(?i)failed to persist initial session metadata:`, err.Error())
@@ -899,7 +904,7 @@ func TestInitialize_SessionRunFailsNonInitializing(t *testing.T) {
 	si.SetSessionRunError(fmt.Errorf("cannot run session: status is 'running', expected 'initializing'"))
 
 	terminationNotifier := make(chan struct{}, 2)
-	_, err = si.Initialize("TestWorkflow", terminationNotifier)
+	_, err = si.Initialize("TestWorkflow", projectRoot, terminationNotifier)
 
 	require.Error(t, err)
 	assert.Regexp(t, `(?i)failed to transition session to running:.*status is 'running', expected 'initializing'`, err.Error())
@@ -918,7 +923,7 @@ func TestInitialize_SessionRunFailsGeneric(t *testing.T) {
 	si.SetSessionRunError(fmt.Errorf("internal error"))
 
 	terminationNotifier := make(chan struct{}, 2)
-	_, err = si.Initialize("TestWorkflow", terminationNotifier)
+	_, err = si.Initialize("TestWorkflow", projectRoot, terminationNotifier)
 
 	require.Error(t, err)
 	assert.Regexp(t, `(?i)failed to transition session to running:.*internal error`, err.Error())
@@ -956,7 +961,7 @@ func TestInitialize_TimeoutRacesSessionRun_TimeoutWins(t *testing.T) {
 	done := make(chan struct{})
 	go func() {
 		defer close(done)
-		_, initErr = si.Initialize("TestWorkflow", terminationNotifier)
+		_, initErr = si.Initialize("TestWorkflow", projectRoot, terminationNotifier)
 	}()
 
 	// Wait for timeout to fire
@@ -983,7 +988,7 @@ func TestInitialize_TimeoutRacesSessionRun_SessionRunWins(t *testing.T) {
 
 	// All mocks complete immediately, so Session.Run() completes before timeout
 	terminationNotifier := make(chan struct{}, 2)
-	sess, err := si.Initialize("TestWorkflow", terminationNotifier)
+	sess, err := si.Initialize("TestWorkflow", projectRoot, terminationNotifier)
 
 	require.NoError(t, err)
 	assert.Equal(t, "running", sess.GetStatusSafe())
@@ -1003,7 +1008,7 @@ func TestInitialize_TimeoutHandlerExitsIfInitCompleted(t *testing.T) {
 	require.NoError(t, err)
 
 	terminationNotifier := make(chan struct{}, 2)
-	sess, err := si.Initialize("TestWorkflow", terminationNotifier)
+	sess, err := si.Initialize("TestWorkflow", projectRoot, terminationNotifier)
 
 	require.NoError(t, err)
 	assert.Equal(t, "running", sess.GetStatusSafe())
@@ -1028,7 +1033,7 @@ func TestInitialize_TimeoutHandlerExitsIfStatusRunning(t *testing.T) {
 	require.NoError(t, err)
 
 	terminationNotifier := make(chan struct{}, 2)
-	sess, err := si.Initialize("TestWorkflow", terminationNotifier)
+	sess, err := si.Initialize("TestWorkflow", projectRoot, terminationNotifier)
 
 	require.NoError(t, err)
 	assert.Equal(t, "running", sess.GetStatusSafe())
@@ -1047,7 +1052,7 @@ func TestInitialize_TimeoutHandlerExitsIfStatusFailed(t *testing.T) {
 	si.SetSessionRunError(fmt.Errorf("test error"))
 
 	terminationNotifier := make(chan struct{}, 2)
-	_, err = si.Initialize("TestWorkflow", terminationNotifier)
+	_, err = si.Initialize("TestWorkflow", projectRoot, terminationNotifier)
 
 	require.Error(t, err)
 }
@@ -1078,7 +1083,7 @@ func TestInitialize_TimeoutExactly30Seconds(t *testing.T) {
 	done := make(chan struct{})
 	go func() {
 		defer close(done)
-		_, initErr = si.Initialize("SlowWorkflow", terminationNotifier)
+		_, initErr = si.Initialize("SlowWorkflow", projectRoot, terminationNotifier)
 	}()
 
 	time.Sleep(200 * time.Millisecond)
@@ -1100,7 +1105,7 @@ func TestInitialize_CompletesJustBeforeTimeout(t *testing.T) {
 	require.NoError(t, err)
 
 	terminationNotifier := make(chan struct{}, 2)
-	sess, err := si.Initialize("FastWorkflow", terminationNotifier)
+	sess, err := si.Initialize("FastWorkflow", projectRoot, terminationNotifier)
 
 	require.NoError(t, err)
 	assert.Equal(t, "running", sess.GetStatusSafe())
@@ -1124,7 +1129,7 @@ func TestInitialize_WorkflowNamePascalCase(t *testing.T) {
 	require.NoError(t, err)
 
 	terminationNotifier := make(chan struct{}, 2)
-	sess, err := si.Initialize("MyTestWorkflow", terminationNotifier)
+	sess, err := si.Initialize("MyTestWorkflow", projectRoot, terminationNotifier)
 
 	require.NoError(t, err)
 	assert.Equal(t, "MyTestWorkflow", sess.GetWorkflowName())
@@ -1144,7 +1149,7 @@ func TestInitialize_WorkflowNameSingleWord(t *testing.T) {
 	require.NoError(t, err)
 
 	terminationNotifier := make(chan struct{}, 2)
-	sess, err := si.Initialize("Test", terminationNotifier)
+	sess, err := si.Initialize("Test", projectRoot, terminationNotifier)
 
 	require.NoError(t, err)
 	assert.Equal(t, "Test", sess.GetWorkflowName())
@@ -1164,7 +1169,7 @@ func TestInitialize_SessionUUIDFormat(t *testing.T) {
 	require.NoError(t, err)
 
 	terminationNotifier := make(chan struct{}, 2)
-	sess, err := si.Initialize("TestWorkflow", terminationNotifier)
+	sess, err := si.Initialize("TestWorkflow", projectRoot, terminationNotifier)
 
 	require.NoError(t, err)
 
@@ -1196,7 +1201,7 @@ func TestInitialize_NoDirectoryCleanupOnFailure(t *testing.T) {
 	si.SetSessionRunError(fmt.Errorf("run failed"))
 
 	terminationNotifier := make(chan struct{}, 2)
-	_, err = si.Initialize("TestWorkflow", terminationNotifier)
+	_, err = si.Initialize("TestWorkflow", projectRoot, terminationNotifier)
 
 	require.Error(t, err)
 
@@ -1225,7 +1230,7 @@ func TestInitialize_NoDirectoryCleanupOnTimeout(t *testing.T) {
 	done := make(chan struct{})
 	go func() {
 		defer close(done)
-		si.Initialize("SlowWorkflow", terminationNotifier)
+		si.Initialize("SlowWorkflow", projectRoot, terminationNotifier)
 	}()
 
 	time.Sleep(200 * time.Millisecond)
@@ -1257,7 +1262,7 @@ func TestInitialize_CriticalCallOrder(t *testing.T) {
 	si.SetCallOrderTracker(tracker)
 
 	terminationNotifier := make(chan struct{}, 2)
-	_, err = si.Initialize("TestWorkflow", terminationNotifier)
+	_, err = si.Initialize("TestWorkflow", projectRoot, terminationNotifier)
 
 	require.NoError(t, err)
 
@@ -1323,7 +1328,7 @@ func TestInitialize_TerminationNotifierPassedToSessionFail(t *testing.T) {
 	done := make(chan struct{})
 	go func() {
 		defer close(done)
-		si.Initialize("SlowWorkflow", terminationNotifier)
+		si.Initialize("SlowWorkflow", projectRoot, terminationNotifier)
 	}()
 
 	time.Sleep(200 * time.Millisecond)
@@ -1353,7 +1358,7 @@ func TestInitialize_TerminationNotifierPassedToSessionRun(t *testing.T) {
 	})
 
 	terminationNotifier := make(chan struct{}, 2)
-	_, err = si.Initialize("TestWorkflow", terminationNotifier)
+	_, err = si.Initialize("TestWorkflow", projectRoot, terminationNotifier)
 
 	require.NoError(t, err)
 
@@ -1390,7 +1395,7 @@ func TestInitialize_TimeoutRuntimeErrorFields(t *testing.T) {
 	done := make(chan struct{})
 	go func() {
 		defer close(done)
-		si.Initialize("TestWorkflow", terminationNotifier)
+		si.Initialize("TestWorkflow", projectRoot, terminationNotifier)
 	}()
 
 	time.Sleep(200 * time.Millisecond)
@@ -1420,7 +1425,7 @@ func TestInitialize_SessionRunFailureRuntimeErrorFields(t *testing.T) {
 	})
 
 	terminationNotifier := make(chan struct{}, 2)
-	_, err = si.Initialize("TestWorkflow", terminationNotifier)
+	_, err = si.Initialize("TestWorkflow", projectRoot, terminationNotifier)
 
 	require.Error(t, err)
 

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"sync"
 	"sync/atomic"
 	"syscall"
@@ -21,6 +22,28 @@ import (
 // =====================================================================
 // Mock types for Runtime tests
 // =====================================================================
+
+// mockSpectraFinderForRuntime mocks SpectraFinder for Runtime tests.
+type mockSpectraFinderForRuntime struct {
+	mu          sync.Mutex
+	projectRoot string
+	err         error
+	called      atomic.Bool
+}
+
+func newMockSpectraFinderForRuntime(projectRoot string, err error) *mockSpectraFinderForRuntime {
+	return &mockSpectraFinderForRuntime{
+		projectRoot: projectRoot,
+		err:         err,
+	}
+}
+
+func (m *mockSpectraFinderForRuntime) Find() (string, error) {
+	m.called.Store(true)
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.projectRoot, m.err
+}
 
 // mockSessionForRuntime implements SessionForInitializer and the additional
 // interfaces needed by Runtime (Done, Fail, GetStatusSafe, etc.).
@@ -148,18 +171,20 @@ func (m *mockSessionForRuntime) GetErrorSafe() error {
 
 // mockSessionInitializerForRuntime mocks the SessionInitializer for Runtime tests.
 type mockSessionInitializerForRuntime struct {
-	mu               sync.Mutex
-	session          SessionForInitializer
-	err              error
-	initializeCalled atomic.Bool
-	capturedWorkflow string
-	capturedNotifier chan<- struct{}
+	mu                  sync.Mutex
+	session             SessionForInitializer
+	err                 error
+	initializeCalled    atomic.Bool
+	capturedWorkflow    string
+	capturedProjectRoot string
+	capturedNotifier    chan<- struct{}
 }
 
-func (m *mockSessionInitializerForRuntime) Initialize(workflowName string, terminationNotifier chan<- struct{}) (SessionForInitializer, error) {
+func (m *mockSessionInitializerForRuntime) Initialize(workflowName string, projectRoot string, terminationNotifier chan<- struct{}) (SessionForInitializer, error) {
 	m.initializeCalled.Store(true)
 	m.mu.Lock()
 	m.capturedWorkflow = workflowName
+	m.capturedProjectRoot = projectRoot
 	m.capturedNotifier = terminationNotifier
 	sess := m.session
 	err := m.err
@@ -311,18 +336,27 @@ func captureStderr(t *testing.T, fn func()) string {
 	return buf.String()
 }
 
+// newSuccessSpectraFinder creates a mock SpectraFinder that returns a valid project root.
+func newSuccessSpectraFinder(t *testing.T) *mockSpectraFinderForRuntime {
+	t.Helper()
+	tmpDir := t.TempDir()
+	require.NoError(t, os.MkdirAll(filepath.Join(tmpDir, ".spectra"), 0755))
+	return newMockSpectraFinderForRuntime(tmpDir, nil)
+}
+
 // =====================================================================
 // Happy Path — Main Loop Flow (Session Completion)
 // =====================================================================
 
 func TestRun_CompletedSession_ExitCode0(t *testing.T) {
 	sess := newMockSessionForRuntime("abc-123", "completed", "TestWorkflow")
+	finder := newSuccessSpectraFinder(t)
 	initializer := &mockSessionInitializerForRuntime{session: sess}
 	finalizer := &mockSessionFinalizerForRuntime{}
 	sm := newMockRuntimeSocketManagerForRuntime()
 
 	// Simulate immediate completion: session already completed
-	rt := NewRuntime(initializer, finalizer, sm)
+	rt := NewRuntime(finder, initializer, finalizer, sm)
 	exitCode := rt.Run("TestWorkflow")
 
 	assert.Equal(t, 0, exitCode)
@@ -330,6 +364,7 @@ func TestRun_CompletedSession_ExitCode0(t *testing.T) {
 
 func TestRun_SessionDoneNotification(t *testing.T) {
 	sess := newMockSessionForRuntime("abc-123", "running", "TestWorkflow")
+	finder := newSuccessSpectraFinder(t)
 	initializer := &mockSessionInitializerForRuntime{session: sess}
 	finalizer := &mockSessionFinalizerForRuntime{}
 	sm := newMockRuntimeSocketManagerForRuntime()
@@ -337,7 +372,7 @@ func TestRun_SessionDoneNotification(t *testing.T) {
 	// Session.Done() will send notification to terminationNotifier during execution
 	initializer.session = sess
 
-	rt := NewRuntime(initializer, finalizer, sm)
+	rt := NewRuntime(finder, initializer, finalizer, sm)
 
 	// Run in goroutine and trigger Done after a short delay
 	var exitCode int
@@ -369,11 +404,12 @@ func TestRun_SessionDoneNotification(t *testing.T) {
 
 func TestRun_TerminationNotifierBufferSize2(t *testing.T) {
 	sess := newMockSessionForRuntime("abc-123", "running", "TestWorkflow")
+	finder := newSuccessSpectraFinder(t)
 	initializer := &mockSessionInitializerForRuntime{session: sess}
 	finalizer := &mockSessionFinalizerForRuntime{}
 	sm := newMockRuntimeSocketManagerForRuntime()
 
-	rt := NewRuntime(initializer, finalizer, sm)
+	rt := NewRuntime(finder, initializer, finalizer, sm)
 
 	// Run in goroutine to capture terminationNotifier
 	done := make(chan struct{})
@@ -407,11 +443,12 @@ func TestRun_TerminationNotifierBufferSize2(t *testing.T) {
 
 func TestRun_FailedSession_ExitCode1(t *testing.T) {
 	sess := newMockSessionForRuntime("abc-123", "failed", "TestWorkflow")
+	finder := newSuccessSpectraFinder(t)
 	initializer := &mockSessionInitializerForRuntime{session: sess}
 	finalizer := &mockSessionFinalizerForRuntime{}
 	sm := newMockRuntimeSocketManagerForRuntime()
 
-	rt := NewRuntime(initializer, finalizer, sm)
+	rt := NewRuntime(finder, initializer, finalizer, sm)
 	exitCode := rt.Run("TestWorkflow")
 
 	assert.Equal(t, 1, exitCode)
@@ -419,11 +456,12 @@ func TestRun_FailedSession_ExitCode1(t *testing.T) {
 
 func TestRun_SessionFailNotification(t *testing.T) {
 	sess := newMockSessionForRuntime("abc-123", "running", "TestWorkflow")
+	finder := newSuccessSpectraFinder(t)
 	initializer := &mockSessionInitializerForRuntime{session: sess}
 	finalizer := &mockSessionFinalizerForRuntime{}
 	sm := newMockRuntimeSocketManagerForRuntime()
 
-	rt := NewRuntime(initializer, finalizer, sm)
+	rt := NewRuntime(finder, initializer, finalizer, sm)
 
 	var exitCode int
 	done := make(chan struct{})
@@ -458,11 +496,12 @@ func TestRun_SessionFailNotification(t *testing.T) {
 
 func TestRun_SocketListenerStarted(t *testing.T) {
 	sess := newMockSessionForRuntime("abc-123", "running", "TestWorkflow")
+	finder := newSuccessSpectraFinder(t)
 	initializer := &mockSessionInitializerForRuntime{session: sess}
 	finalizer := &mockSessionFinalizerForRuntime{}
 	sm := newMockRuntimeSocketManagerForRuntime()
 
-	rt := NewRuntime(initializer, finalizer, sm)
+	rt := NewRuntime(finder, initializer, finalizer, sm)
 
 	done := make(chan struct{})
 	go func() {
@@ -496,11 +535,12 @@ func TestRun_SocketListenerStarted(t *testing.T) {
 
 func TestRun_SocketListenerStopped(t *testing.T) {
 	sess := newMockSessionForRuntime("abc-123", "running", "TestWorkflow")
+	finder := newSuccessSpectraFinder(t)
 	initializer := &mockSessionInitializerForRuntime{session: sess}
 	finalizer := &mockSessionFinalizerForRuntime{}
 	sm := newMockRuntimeSocketManagerForRuntime()
 
-	rt := NewRuntime(initializer, finalizer, sm)
+	rt := NewRuntime(finder, initializer, finalizer, sm)
 
 	done := make(chan struct{})
 	go func() {
@@ -530,11 +570,12 @@ func TestRun_SocketListenerStopped(t *testing.T) {
 
 func TestRun_MessageRouterInitialized(t *testing.T) {
 	sess := newMockSessionForRuntime("abc-123", "running", "TestWorkflow")
+	finder := newSuccessSpectraFinder(t)
 	initializer := &mockSessionInitializerForRuntime{session: sess}
 	finalizer := &mockSessionFinalizerForRuntime{}
 	sm := newMockRuntimeSocketManagerForRuntime()
 
-	rt := NewRuntime(initializer, finalizer, sm)
+	rt := NewRuntime(finder, initializer, finalizer, sm)
 
 	done := make(chan struct{})
 	go func() {
@@ -567,11 +608,12 @@ func TestRun_MessageRouterInitialized(t *testing.T) {
 
 func TestRun_ListenerGoroutineCompletes(t *testing.T) {
 	sess := newMockSessionForRuntime("abc-123", "running", "TestWorkflow")
+	finder := newSuccessSpectraFinder(t)
 	initializer := &mockSessionInitializerForRuntime{session: sess}
 	finalizer := &mockSessionFinalizerForRuntime{}
 	sm := newMockRuntimeSocketManagerForRuntime()
 
-	rt := NewRuntime(initializer, finalizer, sm)
+	rt := NewRuntime(finder, initializer, finalizer, sm)
 
 	done := make(chan struct{})
 	go func() {
@@ -608,11 +650,12 @@ func TestRun_ListenerGoroutineCompletes(t *testing.T) {
 
 func TestRun_SIGINT_GracefulShutdown(t *testing.T) {
 	sess := newMockSessionForRuntime("abc-123", "running", "TestWorkflow")
+	finder := newSuccessSpectraFinder(t)
 	initializer := &mockSessionInitializerForRuntime{session: sess}
 	finalizer := &mockSessionFinalizerForRuntime{}
 	sm := newMockRuntimeSocketManagerForRuntime()
 
-	rt := NewRuntime(initializer, finalizer, sm)
+	rt := NewRuntime(finder, initializer, finalizer, sm)
 
 	var exitCode int
 	done := make(chan struct{})
@@ -645,11 +688,12 @@ func TestRun_SIGINT_GracefulShutdown(t *testing.T) {
 
 func TestRun_SIGINT_SessionStatusUnchanged(t *testing.T) {
 	sess := newMockSessionForRuntime("abc-123", "running", "TestWorkflow")
+	finder := newSuccessSpectraFinder(t)
 	initializer := &mockSessionInitializerForRuntime{session: sess}
 	finalizer := &mockSessionFinalizerForRuntime{}
 	sm := newMockRuntimeSocketManagerForRuntime()
 
-	rt := NewRuntime(initializer, finalizer, sm)
+	rt := NewRuntime(finder, initializer, finalizer, sm)
 
 	done := make(chan struct{})
 	go func() {
@@ -678,13 +722,14 @@ func TestRun_SIGINT_SessionStatusUnchanged(t *testing.T) {
 
 func TestRun_SIGINT_SocketDeletedBeforeFinalization(t *testing.T) {
 	sess := newMockSessionForRuntime("abc-123", "running", "TestWorkflow")
+	finder := newSuccessSpectraFinder(t)
 	initializer := &mockSessionInitializerForRuntime{session: sess}
 	tracker := &runtimeCallOrderTracker{}
 	finalizer := &mockSessionFinalizerForRuntime{callOrder: tracker}
 	sm := newMockRuntimeSocketManagerForRuntime()
 	sm.callOrder = tracker
 
-	rt := NewRuntime(initializer, finalizer, sm)
+	rt := NewRuntime(finder, initializer, finalizer, sm)
 
 	done := make(chan struct{})
 	go func() {
@@ -716,11 +761,12 @@ func TestRun_SIGINT_SocketDeletedBeforeFinalization(t *testing.T) {
 
 func TestRun_SIGINT_LocksReleased(t *testing.T) {
 	sess := newMockSessionForRuntime("abc-123", "running", "TestWorkflow")
+	finder := newSuccessSpectraFinder(t)
 	initializer := &mockSessionInitializerForRuntime{session: sess}
 	finalizer := &mockSessionFinalizerForRuntime{}
 	sm := newMockRuntimeSocketManagerForRuntime()
 
-	rt := NewRuntime(initializer, finalizer, sm)
+	rt := NewRuntime(finder, initializer, finalizer, sm)
 
 	done := make(chan struct{})
 	go func() {
@@ -751,11 +797,12 @@ func TestRun_SIGINT_LocksReleased(t *testing.T) {
 
 func TestRun_SIGTERM_GracefulShutdown(t *testing.T) {
 	sess := newMockSessionForRuntime("abc-123", "running", "TestWorkflow")
+	finder := newSuccessSpectraFinder(t)
 	initializer := &mockSessionInitializerForRuntime{session: sess}
 	finalizer := &mockSessionFinalizerForRuntime{}
 	sm := newMockRuntimeSocketManagerForRuntime()
 
-	rt := NewRuntime(initializer, finalizer, sm)
+	rt := NewRuntime(finder, initializer, finalizer, sm)
 
 	var exitCode int
 	done := make(chan struct{})
@@ -786,11 +833,12 @@ func TestRun_SIGTERM_GracefulShutdown(t *testing.T) {
 
 func TestRun_SIGTERM_SessionStatusUnchanged(t *testing.T) {
 	sess := newMockSessionForRuntime("abc-123", "running", "TestWorkflow")
+	finder := newSuccessSpectraFinder(t)
 	initializer := &mockSessionInitializerForRuntime{session: sess}
 	finalizer := &mockSessionFinalizerForRuntime{}
 	sm := newMockRuntimeSocketManagerForRuntime()
 
-	rt := NewRuntime(initializer, finalizer, sm)
+	rt := NewRuntime(finder, initializer, finalizer, sm)
 
 	done := make(chan struct{})
 	go func() {
@@ -822,11 +870,12 @@ func TestRun_SIGTERM_SessionStatusUnchanged(t *testing.T) {
 
 func TestRun_DoubleSignal_ImmediateExit(t *testing.T) {
 	sess := newMockSessionForRuntime("abc-123", "running", "TestWorkflow")
+	finder := newSuccessSpectraFinder(t)
 	initializer := &mockSessionInitializerForRuntime{session: sess}
 	finalizer := &mockSessionFinalizerForRuntime{}
 	sm := newMockRuntimeSocketManagerForRuntime()
 
-	rt := NewRuntime(initializer, finalizer, sm)
+	rt := NewRuntime(finder, initializer, finalizer, sm)
 
 	var exitCode int
 	done := make(chan struct{})
@@ -858,12 +907,13 @@ func TestRun_DoubleSignal_ImmediateExit(t *testing.T) {
 
 func TestRun_DoubleSignal_NoWaitForFinalization(t *testing.T) {
 	sess := newMockSessionForRuntime("abc-123", "running", "TestWorkflow")
+	finder := newSuccessSpectraFinder(t)
 	initializer := &mockSessionInitializerForRuntime{session: sess}
 	// Finalizer that introduces a delay
 	finalizer := &mockSessionFinalizerForRuntime{}
 	sm := newMockRuntimeSocketManagerForRuntime()
 
-	rt := NewRuntime(initializer, finalizer, sm)
+	rt := NewRuntime(finder, initializer, finalizer, sm)
 
 	done := make(chan struct{})
 	go func() {
@@ -895,11 +945,12 @@ func TestRun_DoubleSignal_NoWaitForFinalization(t *testing.T) {
 
 func TestRun_ListenerErrorReceived(t *testing.T) {
 	sess := newMockSessionForRuntime("abc-123", "running", "TestWorkflow")
+	finder := newSuccessSpectraFinder(t)
 	initializer := &mockSessionInitializerForRuntime{session: sess}
 	finalizer := &mockSessionFinalizerForRuntime{}
 	sm := newMockRuntimeSocketManagerForRuntime()
 
-	rt := NewRuntime(initializer, finalizer, sm)
+	rt := NewRuntime(finder, initializer, finalizer, sm)
 
 	var exitCode int
 	done := make(chan struct{})
@@ -929,11 +980,12 @@ func TestRun_ListenerErrorReceived(t *testing.T) {
 
 func TestRun_ListenerErrorAfterTermination_Discarded(t *testing.T) {
 	sess := newMockSessionForRuntime("abc-123", "running", "TestWorkflow")
+	finder := newSuccessSpectraFinder(t)
 	initializer := &mockSessionInitializerForRuntime{session: sess}
 	finalizer := &mockSessionFinalizerForRuntime{}
 	sm := newMockRuntimeSocketManagerForRuntime()
 
-	rt := NewRuntime(initializer, finalizer, sm)
+	rt := NewRuntime(finder, initializer, finalizer, sm)
 
 	done := make(chan struct{})
 	go func() {
@@ -978,11 +1030,12 @@ func TestRun_ListenerErrorAfterTermination_Discarded(t *testing.T) {
 
 func TestRun_SocketDeleteCalledTwice(t *testing.T) {
 	sess := newMockSessionForRuntime("abc-123", "running", "TestWorkflow")
+	finder := newSuccessSpectraFinder(t)
 	initializer := &mockSessionInitializerForRuntime{session: sess}
 	finalizer := &mockSessionFinalizerForRuntime{}
 	sm := newMockRuntimeSocketManagerForRuntime()
 
-	rt := NewRuntime(initializer, finalizer, sm)
+	rt := NewRuntime(finder, initializer, finalizer, sm)
 
 	done := make(chan struct{})
 	go func() {
@@ -1013,36 +1066,75 @@ func TestRun_SocketDeleteCalledTwice(t *testing.T) {
 }
 
 // =====================================================================
-// Validation Failures — Initialization Errors (No Session Entity)
+// Validation Failures — Project Root Lookup
 // =====================================================================
 
-func TestRun_InitializationFails_ProjectRootNotFound(t *testing.T) {
-	initializer := &mockSessionInitializerForRuntime{
-		err: fmt.Errorf("failed to find project root: %w", fmt.Errorf("not a spectra project")),
-	}
+func TestRun_ProjectRootNotFound(t *testing.T) {
+	tmpDir := t.TempDir() // No .spectra/ directory
+	finder := newMockSpectraFinderForRuntime("", fmt.Errorf("project root not found"))
+	initializer := &mockSessionInitializerForRuntime{}
 	finalizer := &mockSessionFinalizerForRuntime{}
 	sm := newMockRuntimeSocketManagerForRuntime()
 
-	rt := NewRuntime(initializer, finalizer, sm)
+	// Change working directory to tmpDir
+	origDir, err := os.Getwd()
+	require.NoError(t, err)
+	require.NoError(t, os.Chdir(tmpDir))
+	defer func() { _ = os.Chdir(origDir) }()
+
+	rt := NewRuntime(finder, initializer, finalizer, sm)
 
 	stderr := captureStderr(t, func() {
 		exitCode := rt.Run("TestWorkflow")
 		assert.Equal(t, 1, exitCode)
 	})
 
-	assert.Contains(t, stderr, "Failed to initialize session")
-	assert.Contains(t, stderr, "failed to find project root")
-	assert.False(t, finalizer.finalizeCalled.Load(), "SessionFinalizer should NOT be called when no session entity")
+	assert.Contains(t, stderr, "Failed to locate project root: project root not found")
+	assert.Contains(t, stderr, "Run 'spectra init' to initialize the project")
+	assert.False(t, initializer.initializeCalled.Load(), "SessionInitializer should NOT be called")
+	assert.False(t, finalizer.finalizeCalled.Load(), "SessionFinalizer should NOT be called")
 }
 
+func TestRun_ProjectRootNotFoundFromSubdirectory(t *testing.T) {
+	tmpDir := t.TempDir()
+	deepDir := filepath.Join(tmpDir, "a", "b", "c", "d")
+	require.NoError(t, os.MkdirAll(deepDir, 0755))
+	finder := newMockSpectraFinderForRuntime("", fmt.Errorf("project root not found: no .spectra/ in any parent directory"))
+	initializer := &mockSessionInitializerForRuntime{}
+	finalizer := &mockSessionFinalizerForRuntime{}
+	sm := newMockRuntimeSocketManagerForRuntime()
+
+	// Change working directory to deepDir
+	origDir, err := os.Getwd()
+	require.NoError(t, err)
+	require.NoError(t, os.Chdir(deepDir))
+	defer func() { _ = os.Chdir(origDir) }()
+
+	rt := NewRuntime(finder, initializer, finalizer, sm)
+
+	stderr := captureStderr(t, func() {
+		exitCode := rt.Run("TestWorkflow")
+		assert.Equal(t, 1, exitCode)
+	})
+
+	assert.Contains(t, stderr, "Failed to locate project root")
+	assert.Contains(t, stderr, "Run 'spectra init' to initialize the project")
+	assert.False(t, initializer.initializeCalled.Load(), "SessionInitializer should NOT be called")
+}
+
+// =====================================================================
+// Validation Failures — Initialization Errors (No Session Entity)
+// =====================================================================
+
 func TestRun_InitializationFails_WorkflowNotFound(t *testing.T) {
+	finder := newSuccessSpectraFinder(t)
 	initializer := &mockSessionInitializerForRuntime{
 		err: fmt.Errorf("failed to load workflow definition: file not found"),
 	}
 	finalizer := &mockSessionFinalizerForRuntime{}
 	sm := newMockRuntimeSocketManagerForRuntime()
 
-	rt := NewRuntime(initializer, finalizer, sm)
+	rt := NewRuntime(finder, initializer, finalizer, sm)
 
 	stderr := captureStderr(t, func() {
 		exitCode := rt.Run("NonExistentWorkflow")
@@ -1055,6 +1147,7 @@ func TestRun_InitializationFails_WorkflowNotFound(t *testing.T) {
 }
 
 func TestRun_InitializationFails_NoSessionEntity(t *testing.T) {
+	finder := newSuccessSpectraFinder(t)
 	initializer := &mockSessionInitializerForRuntime{
 		session: nil,
 		err:     fmt.Errorf("early failure"),
@@ -1062,7 +1155,7 @@ func TestRun_InitializationFails_NoSessionEntity(t *testing.T) {
 	finalizer := &mockSessionFinalizerForRuntime{}
 	sm := newMockRuntimeSocketManagerForRuntime()
 
-	rt := NewRuntime(initializer, finalizer, sm)
+	rt := NewRuntime(finder, initializer, finalizer, sm)
 
 	stderr := captureStderr(t, func() {
 		exitCode := rt.Run("TestWorkflow")
@@ -1079,6 +1172,7 @@ func TestRun_InitializationFails_NoSessionEntity(t *testing.T) {
 
 func TestRun_InitializationFails_SessionExists_Initializing(t *testing.T) {
 	sess := newMockSessionForRuntime("abc-123", "initializing", "TestWorkflow")
+	finder := newSuccessSpectraFinder(t)
 	initializer := &mockSessionInitializerForRuntime{
 		session: sess,
 		err:     fmt.Errorf("initialization error with partial session"),
@@ -1086,7 +1180,7 @@ func TestRun_InitializationFails_SessionExists_Initializing(t *testing.T) {
 	finalizer := &mockSessionFinalizerForRuntime{}
 	sm := newMockRuntimeSocketManagerForRuntime()
 
-	rt := NewRuntime(initializer, finalizer, sm)
+	rt := NewRuntime(finder, initializer, finalizer, sm)
 	exitCode := rt.Run("TestWorkflow")
 
 	assert.Equal(t, 1, exitCode)
@@ -1095,6 +1189,7 @@ func TestRun_InitializationFails_SessionExists_Initializing(t *testing.T) {
 
 func TestRun_InitializationFails_SessionExists_Failed(t *testing.T) {
 	sess := newMockSessionForRuntime("abc-123", "failed", "TestWorkflow")
+	finder := newSuccessSpectraFinder(t)
 	initializer := &mockSessionInitializerForRuntime{
 		session: sess,
 		err:     fmt.Errorf("initialization failed with session in failed state"),
@@ -1102,7 +1197,7 @@ func TestRun_InitializationFails_SessionExists_Failed(t *testing.T) {
 	finalizer := &mockSessionFinalizerForRuntime{}
 	sm := newMockRuntimeSocketManagerForRuntime()
 
-	rt := NewRuntime(initializer, finalizer, sm)
+	rt := NewRuntime(finder, initializer, finalizer, sm)
 	exitCode := rt.Run("TestWorkflow")
 
 	assert.Equal(t, 1, exitCode)
@@ -1111,6 +1206,7 @@ func TestRun_InitializationFails_SessionExists_Failed(t *testing.T) {
 
 func TestRun_InitializationFails_SocketCreationError(t *testing.T) {
 	sess := newMockSessionForRuntime("abc-123", "initializing", "TestWorkflow")
+	finder := newSuccessSpectraFinder(t)
 	initializer := &mockSessionInitializerForRuntime{
 		session: sess,
 		err:     fmt.Errorf("failed to create runtime socket"),
@@ -1118,7 +1214,7 @@ func TestRun_InitializationFails_SocketCreationError(t *testing.T) {
 	finalizer := &mockSessionFinalizerForRuntime{}
 	sm := newMockRuntimeSocketManagerForRuntime()
 
-	rt := NewRuntime(initializer, finalizer, sm)
+	rt := NewRuntime(finder, initializer, finalizer, sm)
 	exitCode := rt.Run("TestWorkflow")
 
 	assert.Equal(t, 1, exitCode)
@@ -1127,6 +1223,7 @@ func TestRun_InitializationFails_SocketCreationError(t *testing.T) {
 
 func TestRun_InitializationTimeout(t *testing.T) {
 	sess := newMockSessionForRuntime("abc-123", "failed", "TestWorkflow")
+	finder := newSuccessSpectraFinder(t)
 	initializer := &mockSessionInitializerForRuntime{
 		session: sess,
 		err:     fmt.Errorf("session initialization timeout exceeded 30 seconds"),
@@ -1134,7 +1231,7 @@ func TestRun_InitializationTimeout(t *testing.T) {
 	finalizer := &mockSessionFinalizerForRuntime{}
 	sm := newMockRuntimeSocketManagerForRuntime()
 
-	rt := NewRuntime(initializer, finalizer, sm)
+	rt := NewRuntime(finder, initializer, finalizer, sm)
 	exitCode := rt.Run("TestWorkflow")
 
 	assert.Equal(t, 1, exitCode)
@@ -1147,12 +1244,13 @@ func TestRun_InitializationTimeout(t *testing.T) {
 
 func TestRun_ListenerSetup_BindFailure(t *testing.T) {
 	sess := newMockSessionForRuntime("abc-123", "running", "TestWorkflow")
+	finder := newSuccessSpectraFinder(t)
 	initializer := &mockSessionInitializerForRuntime{session: sess}
 	finalizer := &mockSessionFinalizerForRuntime{}
 	sm := newMockRuntimeSocketManagerForRuntime()
 	sm.listenSyncErr = fmt.Errorf("bind: address already in use")
 
-	rt := NewRuntime(initializer, finalizer, sm)
+	rt := NewRuntime(finder, initializer, finalizer, sm)
 	exitCode := rt.Run("TestWorkflow")
 
 	assert.Equal(t, 1, exitCode)
@@ -1162,12 +1260,13 @@ func TestRun_ListenerSetup_BindFailure(t *testing.T) {
 
 func TestRun_ListenerSetup_SocketAlreadyExists(t *testing.T) {
 	sess := newMockSessionForRuntime("abc-123", "running", "TestWorkflow")
+	finder := newSuccessSpectraFinder(t)
 	initializer := &mockSessionInitializerForRuntime{session: sess}
 	finalizer := &mockSessionFinalizerForRuntime{}
 	sm := newMockRuntimeSocketManagerForRuntime()
 	sm.listenSyncErr = fmt.Errorf("socket file already exists")
 
-	rt := NewRuntime(initializer, finalizer, sm)
+	rt := NewRuntime(finder, initializer, finalizer, sm)
 	exitCode := rt.Run("TestWorkflow")
 
 	assert.Equal(t, 1, exitCode)
@@ -1176,12 +1275,13 @@ func TestRun_ListenerSetup_SocketAlreadyExists(t *testing.T) {
 
 func TestRun_ListenerSetup_ListenerNeverSpawned(t *testing.T) {
 	sess := newMockSessionForRuntime("abc-123", "running", "TestWorkflow")
+	finder := newSuccessSpectraFinder(t)
 	initializer := &mockSessionInitializerForRuntime{session: sess}
 	finalizer := &mockSessionFinalizerForRuntime{}
 	sm := newMockRuntimeSocketManagerForRuntime()
 	sm.listenSyncErr = fmt.Errorf("bind failure")
 
-	rt := NewRuntime(initializer, finalizer, sm)
+	rt := NewRuntime(finder, initializer, finalizer, sm)
 	exitCode := rt.Run("TestWorkflow")
 
 	assert.Equal(t, 1, exitCode)
@@ -1194,13 +1294,14 @@ func TestRun_ListenerSetup_ListenerNeverSpawned(t *testing.T) {
 // =====================================================================
 
 func TestRun_EmptyWorkflowName(t *testing.T) {
+	finder := newSuccessSpectraFinder(t)
 	initializer := &mockSessionInitializerForRuntime{
 		err: fmt.Errorf("workflowName must be non-empty"),
 	}
 	finalizer := &mockSessionFinalizerForRuntime{}
 	sm := newMockRuntimeSocketManagerForRuntime()
 
-	rt := NewRuntime(initializer, finalizer, sm)
+	rt := NewRuntime(finder, initializer, finalizer, sm)
 
 	stderr := captureStderr(t, func() {
 		exitCode := rt.Run("")
@@ -1216,11 +1317,12 @@ func TestRun_EmptyWorkflowName(t *testing.T) {
 
 func TestRun_StatusCompleted_ExitCode0(t *testing.T) {
 	sess := newMockSessionForRuntime("abc-123", "completed", "TestWorkflow")
+	finder := newSuccessSpectraFinder(t)
 	initializer := &mockSessionInitializerForRuntime{session: sess}
 	finalizer := &mockSessionFinalizerForRuntime{}
 	sm := newMockRuntimeSocketManagerForRuntime()
 
-	rt := NewRuntime(initializer, finalizer, sm)
+	rt := NewRuntime(finder, initializer, finalizer, sm)
 	exitCode := rt.Run("TestWorkflow")
 
 	assert.Equal(t, 0, exitCode)
@@ -1229,11 +1331,12 @@ func TestRun_StatusCompleted_ExitCode0(t *testing.T) {
 
 func TestRun_StatusFailed_ExitCode1(t *testing.T) {
 	sess := newMockSessionForRuntime("abc-123", "failed", "TestWorkflow")
+	finder := newSuccessSpectraFinder(t)
 	initializer := &mockSessionInitializerForRuntime{session: sess}
 	finalizer := &mockSessionFinalizerForRuntime{}
 	sm := newMockRuntimeSocketManagerForRuntime()
 
-	rt := NewRuntime(initializer, finalizer, sm)
+	rt := NewRuntime(finder, initializer, finalizer, sm)
 	exitCode := rt.Run("TestWorkflow")
 
 	assert.Equal(t, 1, exitCode)
@@ -1242,11 +1345,12 @@ func TestRun_StatusFailed_ExitCode1(t *testing.T) {
 
 func TestRun_StatusInitializing_SIGINT_ExitCode1(t *testing.T) {
 	sess := newMockSessionForRuntime("abc-123", "initializing", "TestWorkflow")
+	finder := newSuccessSpectraFinder(t)
 	initializer := &mockSessionInitializerForRuntime{session: sess}
 	finalizer := &mockSessionFinalizerForRuntime{}
 	sm := newMockRuntimeSocketManagerForRuntime()
 
-	rt := NewRuntime(initializer, finalizer, sm)
+	rt := NewRuntime(finder, initializer, finalizer, sm)
 
 	var exitCode int
 	done := make(chan struct{})
@@ -1280,11 +1384,12 @@ func TestRun_StatusInitializing_SIGINT_ExitCode1(t *testing.T) {
 
 func TestRun_CompletionAndSIGINT_Race(t *testing.T) {
 	sess := newMockSessionForRuntime("abc-123", "running", "TestWorkflow")
+	finder := newSuccessSpectraFinder(t)
 	initializer := &mockSessionInitializerForRuntime{session: sess}
 	finalizer := &mockSessionFinalizerForRuntime{}
 	sm := newMockRuntimeSocketManagerForRuntime()
 
-	rt := NewRuntime(initializer, finalizer, sm)
+	rt := NewRuntime(finder, initializer, finalizer, sm)
 
 	var exitCode int
 	done := make(chan struct{})
@@ -1322,11 +1427,12 @@ func TestRun_CompletionAndSIGINT_Race(t *testing.T) {
 
 func TestRun_ListenerErrorAndCompletion_Race(t *testing.T) {
 	sess := newMockSessionForRuntime("abc-123", "running", "TestWorkflow")
+	finder := newSuccessSpectraFinder(t)
 	initializer := &mockSessionInitializerForRuntime{session: sess}
 	finalizer := &mockSessionFinalizerForRuntime{}
 	sm := newMockRuntimeSocketManagerForRuntime()
 
-	rt := NewRuntime(initializer, finalizer, sm)
+	rt := NewRuntime(finder, initializer, finalizer, sm)
 
 	var exitCode int
 	done := make(chan struct{})
@@ -1366,11 +1472,12 @@ func TestRun_ListenerErrorAndCompletion_Race(t *testing.T) {
 
 func TestRun_TerminationNotifierBufferNotExhausted(t *testing.T) {
 	sess := newMockSessionForRuntime("abc-123", "running", "TestWorkflow")
+	finder := newSuccessSpectraFinder(t)
 	initializer := &mockSessionInitializerForRuntime{session: sess}
 	finalizer := &mockSessionFinalizerForRuntime{}
 	sm := newMockRuntimeSocketManagerForRuntime()
 
-	rt := NewRuntime(initializer, finalizer, sm)
+	rt := NewRuntime(finder, initializer, finalizer, sm)
 
 	done := make(chan struct{})
 	go func() {
@@ -1401,11 +1508,12 @@ func TestRun_TerminationNotifierBufferNotExhausted(t *testing.T) {
 
 func TestRun_TerminationNotifierNeverClosed(t *testing.T) {
 	sess := newMockSessionForRuntime("abc-123", "running", "TestWorkflow")
+	finder := newSuccessSpectraFinder(t)
 	initializer := &mockSessionInitializerForRuntime{session: sess}
 	finalizer := &mockSessionFinalizerForRuntime{}
 	sm := newMockRuntimeSocketManagerForRuntime()
 
-	rt := NewRuntime(initializer, finalizer, sm)
+	rt := NewRuntime(finder, initializer, finalizer, sm)
 
 	done := make(chan struct{})
 	go func() {
@@ -1441,11 +1549,12 @@ func TestRun_TerminationNotifierNeverClosed(t *testing.T) {
 
 func TestRun_ListenerErrChNeverClosed(t *testing.T) {
 	sess := newMockSessionForRuntime("abc-123", "running", "TestWorkflow")
+	finder := newSuccessSpectraFinder(t)
 	initializer := &mockSessionInitializerForRuntime{session: sess}
 	finalizer := &mockSessionFinalizerForRuntime{}
 	sm := newMockRuntimeSocketManagerForRuntime()
 
-	rt := NewRuntime(initializer, finalizer, sm)
+	rt := NewRuntime(finder, initializer, finalizer, sm)
 
 	done := make(chan struct{})
 	go func() {
@@ -1484,11 +1593,12 @@ func TestRun_ListenerErrChNeverClosed(t *testing.T) {
 
 func TestRun_ListenerDoneChClosedExactlyOnce(t *testing.T) {
 	sess := newMockSessionForRuntime("abc-123", "running", "TestWorkflow")
+	finder := newSuccessSpectraFinder(t)
 	initializer := &mockSessionInitializerForRuntime{session: sess}
 	finalizer := &mockSessionFinalizerForRuntime{}
 	sm := newMockRuntimeSocketManagerForRuntime()
 
-	rt := NewRuntime(initializer, finalizer, sm)
+	rt := NewRuntime(finder, initializer, finalizer, sm)
 
 	done := make(chan struct{})
 	go func() {
@@ -1531,11 +1641,12 @@ func TestRun_ListenerDoneChClosedExactlyOnce(t *testing.T) {
 
 func TestRun_SessionFinalizerPrintFails(t *testing.T) {
 	sess := newMockSessionForRuntime("abc-123", "completed", "TestWorkflow")
+	finder := newSuccessSpectraFinder(t)
 	initializer := &mockSessionInitializerForRuntime{session: sess}
 	finalizer := &mockSessionFinalizerForRuntime{}
 	sm := newMockRuntimeSocketManagerForRuntime()
 
-	rt := NewRuntime(initializer, finalizer, sm)
+	rt := NewRuntime(finder, initializer, finalizer, sm)
 
 	// Even with closed output pipes, Runtime should proceed to exit
 	exitCode := rt.Run("TestWorkflow")
@@ -1544,11 +1655,12 @@ func TestRun_SessionFinalizerPrintFails(t *testing.T) {
 
 func TestRun_SessionFinalizerSocketDeleteWarning(t *testing.T) {
 	sess := newMockSessionForRuntime("abc-123", "completed", "TestWorkflow")
+	finder := newSuccessSpectraFinder(t)
 	initializer := &mockSessionInitializerForRuntime{session: sess}
 	finalizer := &mockSessionFinalizerForRuntime{}
 	sm := newMockRuntimeSocketManagerForRuntime()
 
-	rt := NewRuntime(initializer, finalizer, sm)
+	rt := NewRuntime(finder, initializer, finalizer, sm)
 	exitCode := rt.Run("TestWorkflow")
 
 	// RuntimeSocketManager.DeleteSocket() logs warning "socket not found" — no effect on exit code
@@ -1561,11 +1673,12 @@ func TestRun_SessionFinalizerSocketDeleteWarning(t *testing.T) {
 
 func TestRun_MetadataPersistenceFails_NonBlocking(t *testing.T) {
 	sess := newMockSessionForRuntime("abc-123", "running", "TestWorkflow")
+	finder := newSuccessSpectraFinder(t)
 	initializer := &mockSessionInitializerForRuntime{session: sess}
 	finalizer := &mockSessionFinalizerForRuntime{}
 	sm := newMockRuntimeSocketManagerForRuntime()
 
-	rt := NewRuntime(initializer, finalizer, sm)
+	rt := NewRuntime(finder, initializer, finalizer, sm)
 
 	done := make(chan struct{})
 	go func() {
@@ -1601,11 +1714,12 @@ func TestRun_MetadataPersistenceFails_NonBlocking(t *testing.T) {
 
 func TestRun_MessageRouterPanic(t *testing.T) {
 	sess := newMockSessionForRuntime("abc-123", "running", "TestWorkflow")
+	finder := newSuccessSpectraFinder(t)
 	initializer := &mockSessionInitializerForRuntime{session: sess}
 	finalizer := &mockSessionFinalizerForRuntime{}
 	sm := newMockRuntimeSocketManagerForRuntime()
 
-	rt := NewRuntime(initializer, finalizer, sm)
+	rt := NewRuntime(finder, initializer, finalizer, sm)
 
 	var exitCode int
 	done := make(chan struct{})
@@ -1647,11 +1761,12 @@ func TestRun_MessageRouterPanic(t *testing.T) {
 
 func TestRun_ListenerProcessingMessage_SocketDeleted(t *testing.T) {
 	sess := newMockSessionForRuntime("abc-123", "running", "TestWorkflow")
+	finder := newSuccessSpectraFinder(t)
 	initializer := &mockSessionInitializerForRuntime{session: sess}
 	finalizer := &mockSessionFinalizerForRuntime{}
 	sm := newMockRuntimeSocketManagerForRuntime()
 
-	rt := NewRuntime(initializer, finalizer, sm)
+	rt := NewRuntime(finder, initializer, finalizer, sm)
 
 	done := make(chan struct{})
 	go func() {
@@ -1701,11 +1816,12 @@ func TestRun_RuntimeCrash_NoCleanup(t *testing.T) {
 
 func TestRun_WorkflowNamePascalCase(t *testing.T) {
 	sess := newMockSessionForRuntime("abc-123", "completed", "ValidWorkflowName")
+	finder := newSuccessSpectraFinder(t)
 	initializer := &mockSessionInitializerForRuntime{session: sess}
 	finalizer := &mockSessionFinalizerForRuntime{}
 	sm := newMockRuntimeSocketManagerForRuntime()
 
-	rt := NewRuntime(initializer, finalizer, sm)
+	rt := NewRuntime(finder, initializer, finalizer, sm)
 	exitCode := rt.Run("ValidWorkflowName")
 
 	assert.Equal(t, 0, exitCode)
@@ -1717,11 +1833,12 @@ func TestRun_WorkflowNamePascalCase(t *testing.T) {
 
 func TestRun_WorkflowNameSingleWord(t *testing.T) {
 	sess := newMockSessionForRuntime("abc-123", "completed", "Workflow")
+	finder := newSuccessSpectraFinder(t)
 	initializer := &mockSessionInitializerForRuntime{session: sess}
 	finalizer := &mockSessionFinalizerForRuntime{}
 	sm := newMockRuntimeSocketManagerForRuntime()
 
-	rt := NewRuntime(initializer, finalizer, sm)
+	rt := NewRuntime(finder, initializer, finalizer, sm)
 	exitCode := rt.Run("Workflow")
 
 	assert.Equal(t, 0, exitCode)
@@ -1735,6 +1852,7 @@ func TestRun_SingleSessionBinding(t *testing.T) {
 	sess := newMockSessionForRuntime("abc-123", "completed", "TestWorkflow")
 	initializeCount := atomic.Int32{}
 
+	finder := newSuccessSpectraFinder(t)
 	initializer := &mockSessionInitializerForRuntime{session: sess}
 	// Track initialization calls
 	origSession := initializer.session
@@ -1743,7 +1861,7 @@ func TestRun_SingleSessionBinding(t *testing.T) {
 	finalizer := &mockSessionFinalizerForRuntime{}
 	sm := newMockRuntimeSocketManagerForRuntime()
 
-	rt := NewRuntime(initializer, finalizer, sm)
+	rt := NewRuntime(finder, initializer, finalizer, sm)
 
 	initializeCount.Add(1)
 	rt.Run("TestWorkflow")
@@ -1754,21 +1872,79 @@ func TestRun_SingleSessionBinding(t *testing.T) {
 }
 
 // =====================================================================
-// Mock / Dependency Interaction — SessionInitializer
+// Mock / Dependency Interaction — SpectraFinder
 // =====================================================================
 
-func TestRun_SessionInitializerCalled(t *testing.T) {
+func TestRun_SpectraFinderCalled(t *testing.T) {
+	tmpDir := t.TempDir()
+	require.NoError(t, os.MkdirAll(filepath.Join(tmpDir, ".spectra"), 0755))
+
+	finder := newMockSpectraFinderForRuntime(tmpDir, nil)
 	sess := newMockSessionForRuntime("abc-123", "completed", "TestWorkflow")
 	initializer := &mockSessionInitializerForRuntime{session: sess}
 	finalizer := &mockSessionFinalizerForRuntime{}
 	sm := newMockRuntimeSocketManagerForRuntime()
 
-	rt := NewRuntime(initializer, finalizer, sm)
+	// Change working directory to test fixture
+	origDir, err := os.Getwd()
+	require.NoError(t, err)
+	require.NoError(t, os.Chdir(tmpDir))
+	defer func() { _ = os.Chdir(origDir) }()
+
+	rt := NewRuntime(finder, initializer, finalizer, sm)
+	rt.Run("TestWorkflow")
+
+	assert.True(t, finder.called.Load(), "SpectraFinder should be called to locate project root")
+}
+
+func TestRun_SpectraFinderFromSubdirectory(t *testing.T) {
+	tmpDir := t.TempDir()
+	require.NoError(t, os.MkdirAll(filepath.Join(tmpDir, ".spectra"), 0755))
+	subDir := filepath.Join(tmpDir, "sub", "nested")
+	require.NoError(t, os.MkdirAll(subDir, 0755))
+
+	finder := newMockSpectraFinderForRuntime(tmpDir, nil)
+	sess := newMockSessionForRuntime("abc-123", "completed", "TestWorkflow")
+	initializer := &mockSessionInitializerForRuntime{session: sess}
+	finalizer := &mockSessionFinalizerForRuntime{}
+	sm := newMockRuntimeSocketManagerForRuntime()
+
+	// Change working directory to subdirectory
+	origDir, err := os.Getwd()
+	require.NoError(t, err)
+	require.NoError(t, os.Chdir(subDir))
+	defer func() { _ = os.Chdir(origDir) }()
+
+	rt := NewRuntime(finder, initializer, finalizer, sm)
+	rt.Run("TestWorkflow")
+
+	assert.True(t, finder.called.Load(), "SpectraFinder should be called from subdirectory")
+	// Verify project root was passed to SessionInitializer
+	initializer.mu.Lock()
+	capturedRoot := initializer.capturedProjectRoot
+	initializer.mu.Unlock()
+	assert.Equal(t, tmpDir, capturedRoot, "SpectraFinder should return parent directory containing .spectra/")
+}
+
+// =====================================================================
+// Mock / Dependency Interaction — SessionInitializer
+// =====================================================================
+
+func TestRun_SessionInitializerCalled(t *testing.T) {
+	projectRoot := "/tmp/test-project/"
+	finder := newMockSpectraFinderForRuntime(projectRoot, nil)
+	sess := newMockSessionForRuntime("abc-123", "completed", "TestWorkflow")
+	initializer := &mockSessionInitializerForRuntime{session: sess}
+	finalizer := &mockSessionFinalizerForRuntime{}
+	sm := newMockRuntimeSocketManagerForRuntime()
+
+	rt := NewRuntime(finder, initializer, finalizer, sm)
 	rt.Run("TestWorkflow")
 
 	assert.True(t, initializer.initializeCalled.Load(), "SessionInitializer.Initialize() should be called")
 	initializer.mu.Lock()
 	assert.Equal(t, "TestWorkflow", initializer.capturedWorkflow)
+	assert.Equal(t, projectRoot, initializer.capturedProjectRoot, "SessionInitializer should receive resolved project root")
 	notifier := initializer.capturedNotifier
 	initializer.mu.Unlock()
 	require.NotNil(t, notifier, "terminationNotifier should be passed to SessionInitializer")
@@ -1777,11 +1953,12 @@ func TestRun_SessionInitializerCalled(t *testing.T) {
 
 func TestRun_SessionInitializerReturnsSession(t *testing.T) {
 	sess := newMockSessionForRuntime("abc-123", "running", "TestWorkflow")
+	finder := newSuccessSpectraFinder(t)
 	initializer := &mockSessionInitializerForRuntime{session: sess}
 	finalizer := &mockSessionFinalizerForRuntime{}
 	sm := newMockRuntimeSocketManagerForRuntime()
 
-	rt := NewRuntime(initializer, finalizer, sm)
+	rt := NewRuntime(finder, initializer, finalizer, sm)
 
 	done := make(chan struct{})
 	go func() {
@@ -1815,11 +1992,12 @@ func TestRun_SessionInitializerReturnsSession(t *testing.T) {
 
 func TestRun_SessionFinalizerCalled(t *testing.T) {
 	sess := newMockSessionForRuntime("abc-123", "completed", "TestWorkflow")
+	finder := newSuccessSpectraFinder(t)
 	initializer := &mockSessionInitializerForRuntime{session: sess}
 	finalizer := &mockSessionFinalizerForRuntime{}
 	sm := newMockRuntimeSocketManagerForRuntime()
 
-	rt := NewRuntime(initializer, finalizer, sm)
+	rt := NewRuntime(finder, initializer, finalizer, sm)
 	rt.Run("TestWorkflow")
 
 	assert.True(t, finalizer.finalizeCalled.Load(), "SessionFinalizer.Finalize() should be called")
@@ -1828,11 +2006,12 @@ func TestRun_SessionFinalizerCalled(t *testing.T) {
 func TestRun_SessionFinalizerCalledOnAllPaths(t *testing.T) {
 	t.Run("completion", func(t *testing.T) {
 		sess := newMockSessionForRuntime("abc-123", "completed", "TestWorkflow")
+		finder := newSuccessSpectraFinder(t)
 		initializer := &mockSessionInitializerForRuntime{session: sess}
 		finalizer := &mockSessionFinalizerForRuntime{}
 		sm := newMockRuntimeSocketManagerForRuntime()
 
-		rt := NewRuntime(initializer, finalizer, sm)
+		rt := NewRuntime(finder, initializer, finalizer, sm)
 		rt.Run("TestWorkflow")
 
 		assert.True(t, finalizer.finalizeCalled.Load())
@@ -1840,11 +2019,12 @@ func TestRun_SessionFinalizerCalledOnAllPaths(t *testing.T) {
 
 	t.Run("failure", func(t *testing.T) {
 		sess := newMockSessionForRuntime("abc-123", "failed", "TestWorkflow")
+		finder := newSuccessSpectraFinder(t)
 		initializer := &mockSessionInitializerForRuntime{session: sess}
 		finalizer := &mockSessionFinalizerForRuntime{}
 		sm := newMockRuntimeSocketManagerForRuntime()
 
-		rt := NewRuntime(initializer, finalizer, sm)
+		rt := NewRuntime(finder, initializer, finalizer, sm)
 		rt.Run("TestWorkflow")
 
 		assert.True(t, finalizer.finalizeCalled.Load())
@@ -1852,11 +2032,12 @@ func TestRun_SessionFinalizerCalledOnAllPaths(t *testing.T) {
 
 	t.Run("SIGINT", func(t *testing.T) {
 		sess := newMockSessionForRuntime("abc-123", "running", "TestWorkflow")
+		finder := newSuccessSpectraFinder(t)
 		initializer := &mockSessionInitializerForRuntime{session: sess}
 		finalizer := &mockSessionFinalizerForRuntime{}
 		sm := newMockRuntimeSocketManagerForRuntime()
 
-		rt := NewRuntime(initializer, finalizer, sm)
+		rt := NewRuntime(finder, initializer, finalizer, sm)
 
 		done := make(chan struct{})
 		go func() {
@@ -1888,11 +2069,12 @@ func TestRun_SessionFinalizerCalledOnAllPaths(t *testing.T) {
 
 func TestRun_RuntimeSocketManagerListenCalled(t *testing.T) {
 	sess := newMockSessionForRuntime("abc-123", "running", "TestWorkflow")
+	finder := newSuccessSpectraFinder(t)
 	initializer := &mockSessionInitializerForRuntime{session: sess}
 	finalizer := &mockSessionFinalizerForRuntime{}
 	sm := newMockRuntimeSocketManagerForRuntime()
 
-	rt := NewRuntime(initializer, finalizer, sm)
+	rt := NewRuntime(finder, initializer, finalizer, sm)
 
 	done := make(chan struct{})
 	go func() {
@@ -1925,13 +2107,14 @@ func TestRun_RuntimeSocketManagerListenCalled(t *testing.T) {
 
 func TestRun_RuntimeSocketManagerDeleteSocketCalled(t *testing.T) {
 	sess := newMockSessionForRuntime("abc-123", "running", "TestWorkflow")
+	finder := newSuccessSpectraFinder(t)
 	initializer := &mockSessionInitializerForRuntime{session: sess}
 	tracker := &runtimeCallOrderTracker{}
 	finalizer := &mockSessionFinalizerForRuntime{callOrder: tracker}
 	sm := newMockRuntimeSocketManagerForRuntime()
 	sm.callOrder = tracker
 
-	rt := NewRuntime(initializer, finalizer, sm)
+	rt := NewRuntime(finder, initializer, finalizer, sm)
 
 	done := make(chan struct{})
 	go func() {
@@ -1971,11 +2154,12 @@ func TestRun_RuntimeSocketManagerDeleteSocketCalled(t *testing.T) {
 
 func TestRun_MessageRouterInitializedWithDependencies(t *testing.T) {
 	sess := newMockSessionForRuntime("abc-123", "running", "TestWorkflow")
+	finder := newSuccessSpectraFinder(t)
 	initializer := &mockSessionInitializerForRuntime{session: sess}
 	finalizer := &mockSessionFinalizerForRuntime{}
 	sm := newMockRuntimeSocketManagerForRuntime()
 
-	rt := NewRuntime(initializer, finalizer, sm)
+	rt := NewRuntime(finder, initializer, finalizer, sm)
 
 	done := make(chan struct{})
 	go func() {
@@ -2012,11 +2196,12 @@ func TestRun_MessageRouterInitializedWithDependencies(t *testing.T) {
 
 func TestRun_LocksReleasedOnExit(t *testing.T) {
 	sess := newMockSessionForRuntime("abc-123", "running", "TestWorkflow")
+	finder := newSuccessSpectraFinder(t)
 	initializer := &mockSessionInitializerForRuntime{session: sess}
 	finalizer := &mockSessionFinalizerForRuntime{}
 	sm := newMockRuntimeSocketManagerForRuntime()
 
-	rt := NewRuntime(initializer, finalizer, sm)
+	rt := NewRuntime(finder, initializer, finalizer, sm)
 
 	done := make(chan struct{})
 	go func() {
@@ -2050,11 +2235,12 @@ func TestRun_LocksReleasedOnExit(t *testing.T) {
 
 func TestRun_LocksReleasedOnSIGINT(t *testing.T) {
 	sess := newMockSessionForRuntime("abc-123", "running", "TestWorkflow")
+	finder := newSuccessSpectraFinder(t)
 	initializer := &mockSessionInitializerForRuntime{session: sess}
 	finalizer := &mockSessionFinalizerForRuntime{}
 	sm := newMockRuntimeSocketManagerForRuntime()
 
-	rt := NewRuntime(initializer, finalizer, sm)
+	rt := NewRuntime(finder, initializer, finalizer, sm)
 
 	done := make(chan struct{})
 	go func() {
@@ -2091,11 +2277,12 @@ func TestRun_LocksReleasedOnSIGINT(t *testing.T) {
 
 func TestRun_ListenerGoroutineSpawned(t *testing.T) {
 	sess := newMockSessionForRuntime("abc-123", "running", "TestWorkflow")
+	finder := newSuccessSpectraFinder(t)
 	initializer := &mockSessionInitializerForRuntime{session: sess}
 	finalizer := &mockSessionFinalizerForRuntime{}
 	sm := newMockRuntimeSocketManagerForRuntime()
 
-	rt := NewRuntime(initializer, finalizer, sm)
+	rt := NewRuntime(finder, initializer, finalizer, sm)
 
 	done := make(chan struct{})
 	go func() {
@@ -2125,11 +2312,12 @@ func TestRun_ListenerGoroutineSpawned(t *testing.T) {
 
 func TestRun_MainLoopBlocksOnSelect(t *testing.T) {
 	sess := newMockSessionForRuntime("abc-123", "running", "TestWorkflow")
+	finder := newSuccessSpectraFinder(t)
 	initializer := &mockSessionInitializerForRuntime{session: sess}
 	finalizer := &mockSessionFinalizerForRuntime{}
 	sm := newMockRuntimeSocketManagerForRuntime()
 
-	rt := NewRuntime(initializer, finalizer, sm)
+	rt := NewRuntime(finder, initializer, finalizer, sm)
 
 	done := make(chan struct{})
 	go func() {
@@ -2170,13 +2358,14 @@ func TestRun_MainLoopBlocksOnSelect(t *testing.T) {
 
 func TestRun_CleanupOrder_StopListener_WaitGoroutine_Finalize(t *testing.T) {
 	sess := newMockSessionForRuntime("abc-123", "running", "TestWorkflow")
+	finder := newSuccessSpectraFinder(t)
 	initializer := &mockSessionInitializerForRuntime{session: sess}
 	tracker := &runtimeCallOrderTracker{}
 	finalizer := &mockSessionFinalizerForRuntime{callOrder: tracker}
 	sm := newMockRuntimeSocketManagerForRuntime()
 	sm.callOrder = tracker
 
-	rt := NewRuntime(initializer, finalizer, sm)
+	rt := NewRuntime(finder, initializer, finalizer, sm)
 
 	done := make(chan struct{})
 	go func() {
@@ -2222,11 +2411,12 @@ func TestRun_CleanupOrder_StopListener_WaitGoroutine_Finalize(t *testing.T) {
 
 func TestRun_CleanupOrder_DrainErrors_AfterDoneChannel(t *testing.T) {
 	sess := newMockSessionForRuntime("abc-123", "running", "TestWorkflow")
+	finder := newSuccessSpectraFinder(t)
 	initializer := &mockSessionInitializerForRuntime{session: sess}
 	finalizer := &mockSessionFinalizerForRuntime{}
 	sm := newMockRuntimeSocketManagerForRuntime()
 
-	rt := NewRuntime(initializer, finalizer, sm)
+	rt := NewRuntime(finder, initializer, finalizer, sm)
 
 	done := make(chan struct{})
 	go func() {
