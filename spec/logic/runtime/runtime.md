@@ -2,53 +2,55 @@
 
 ## Overview
 
-Runtime is the top-level entry point and main loop for the workflow execution system. It is invoked by the CLI command `spectra run <workflow-name>` and orchestrates the entire session lifecycle: locating the project root, creating the termination notifier channel, invoking SessionInitializer to create and initialize the session, starting the socket listener (MessageRouter) in a separate goroutine, monitoring for termination signals (completion, failure, or OS kill signals), and invoking SessionFinalizer to clean up and print the final status. Runtime binds to exactly one session per invocation and exits when the session reaches a terminal state or is forcibly terminated. Runtime is responsible for graceful shutdown on OS signals (SIGINT, SIGTERM), ensuring that locks are released and the session status is properly finalized.
+Runtime is the top-level entry point and main loop for the workflow execution system. It is invoked by the CLI command `spectra run <workflow-name>` and orchestrates the entire session lifecycle: locating the project root using SpectraFinder, creating the termination notifier channel, invoking SessionInitializer to create and initialize the session, starting the socket listener (MessageRouter) in a separate goroutine, monitoring for termination signals (completion, failure, or OS kill signals), and invoking SessionFinalizer to clean up and print the final status. Runtime binds to exactly one session per invocation and exits when the session reaches a terminal state or is forcibly terminated. Runtime is responsible for graceful shutdown on OS signals (SIGINT, SIGTERM), ensuring that locks are released and the session status is properly finalized.
 
 ## Behavior
 
 ### Main Loop Flow
 
 1. Runtime is invoked by the CLI with a single input: `workflowName` (string, provided as a command-line argument to `spectra run <workflow-name>`).
-2. Runtime creates a buffered termination notifier channel: `terminationNotifier := make(chan struct{}, 2)`. The buffer size is 2 to prevent blocking when both `Session.Done()` and `Session.Fail()` send notifications, or when a timeout handler and a normal termination occur simultaneously.
-3. Runtime invokes `SessionInitializer.Initialize(workflowName, terminationNotifier)` to create and initialize the session.
-4. If SessionInitializer returns an error, Runtime proceeds directly to step 18 (SessionFinalizer invocation) with the partially initialized session (if available). If no session entity exists (early failure before session creation), Runtime prints an error to stderr and exits with code 1.
-5. If SessionInitializer succeeds and returns a Session entity with Status="running", Runtime proceeds to start the socket listener.
-6. Runtime initializes MessageRouter with the Session, EventProcessor, ErrorProcessor, and terminationNotifier.
-7. Runtime starts the socket listener by calling `listenerErrCh, listenerDoneCh, syncErr := RuntimeSocketManager.Listen(MessageRouter.RouteMessage)`. `Listen()` itself spawns the accept-loop goroutine and returns immediately with two channels: `listenerErrCh` (delivers asynchronous listener errors such as `accept`/`read` failures or invalid-frame protocol errors) and `listenerDoneCh` (closed by RuntimeSocketManager when the listener goroutine has fully exited).
-8. If `syncErr` is non-nil (synchronous setup failure such as `bind`/`listen` failure or socket already exists), Runtime constructs a RuntimeError with `Issuer="Runtime"`, `Message="failed to start socket listener"`, `Detail` containing the error string under key `"error"`, calls `Session.Fail(runtimeError, terminationNotifier)`, and proceeds to step 18 (SessionFinalizer). In this case the listener goroutine was never spawned and `listenerDoneCh` is already closed.
-9. Runtime sets up OS signal handling using `signal.Notify()` to capture SIGINT and SIGTERM signals.
-10. Runtime enters the main monitoring loop, using `select` to wait for one of the following events:
+2. Runtime calls SpectraFinder to locate the project root directory (the directory containing `.spectra/`). SpectraFinder searches upward from the current working directory.
+3. If SpectraFinder fails to find the project root (returns an error), Runtime prints to stderr: `"Failed to locate project root: <error>. Run 'spectra init' to initialize the project."` and exits with code 1.
+4. Runtime creates a buffered termination notifier channel: `terminationNotifier := make(chan struct{}, 2)`. The buffer size is 2 to prevent blocking when both `Session.Done()` and `Session.Fail()` send notifications, or when a timeout handler and a normal termination occur simultaneously.
+5. Runtime invokes `SessionInitializer.Initialize(workflowName, terminationNotifier)` to create and initialize the session. SessionInitializer is constructed with the resolved `projectRoot` from step 2.
+6. If SessionInitializer returns an error, Runtime proceeds directly to step 20 (SessionFinalizer invocation) with the partially initialized session (if available). If no session entity exists (early failure before session creation), Runtime prints an error to stderr and exits with code 1.
+7. If SessionInitializer succeeds and returns a Session entity with Status="running", Runtime proceeds to start the socket listener.
+8. Runtime initializes MessageRouter with the Session, EventProcessor, ErrorProcessor, and terminationNotifier.
+9. Runtime starts the socket listener by calling `listenerErrCh, listenerDoneCh, syncErr := RuntimeSocketManager.Listen(MessageRouter.RouteMessage)`. `Listen()` itself spawns the accept-loop goroutine and returns immediately with two channels: `listenerErrCh` (delivers asynchronous listener errors such as `accept`/`read` failures or invalid-frame protocol errors) and `listenerDoneCh` (closed by RuntimeSocketManager when the listener goroutine has fully exited).
+10. If `syncErr` is non-nil (synchronous setup failure such as `bind`/`listen` failure or socket already exists), Runtime constructs a RuntimeError with `Issuer="Runtime"`, `Message="failed to start socket listener"`, `Detail` containing the error string under key `"error"`, calls `Session.Fail(runtimeError, terminationNotifier)`, and proceeds to step 20 (SessionFinalizer). In this case the listener goroutine was never spawned and `listenerDoneCh` is already closed.
+11. Runtime sets up OS signal handling using `signal.Notify()` to capture SIGINT and SIGTERM signals.
+12. Runtime enters the main monitoring loop, using `select` to wait for one of the following events:
     - Termination notification from `terminationNotifier` (sent by `Session.Done()` or `Session.Fail()`)
     - Asynchronous listener error received on `listenerErrCh`
     - OS signal (SIGINT or SIGTERM)
-11. If a termination notification is received:
-    - Runtime exits the monitoring loop and proceeds to step 18 (SessionFinalizer).
-11a. If an asynchronous listener error is received on `listenerErrCh`:
+13. If a termination notification is received:
+    - Runtime exits the monitoring loop and proceeds to step 20 (SessionFinalizer).
+13a. If an asynchronous listener error is received on `listenerErrCh`:
     - Runtime constructs a RuntimeError with `Issuer="Runtime"`, `Message="runtime socket listener error"`, `Detail` containing the error string under key `"error"`, `SessionID` set to `Session.ID`, `FailingState` set to `Session.GetCurrentStateSafe()`, and `OccurredAt` set to the current POSIX timestamp.
     - Runtime calls `Session.Fail(runtimeError, terminationNotifier)`. `Session.Fail` sends a notification to `terminationNotifier`; the next `select` iteration (or the same one, depending on scheduling) observes the termination signal and exits the loop.
-    - Runtime exits the monitoring loop and proceeds to step 18 (SessionFinalizer).
-12. If an OS signal is received (SIGINT or SIGTERM):
+    - Runtime exits the monitoring loop and proceeds to step 20 (SessionFinalizer).
+14. If an OS signal is received (SIGINT or SIGTERM):
     - Runtime logs: `"Received signal <signal-name>. Initiating graceful shutdown."`
     - Runtime calls `RuntimeSocketManager.DeleteSocket()` to stop the listener and close the socket. This unblocks any pending socket operations.
     - Runtime does **not** transition the session to "failed" status. The session remains in its current status ("running" or "initializing").
     - Runtime releases any locks held by Session (Session's internal read-write lock is automatically released when goroutines exit).
-    - Runtime proceeds to step 18 (SessionFinalizer).
-13. After exiting the monitoring loop, Runtime proceeds to cleanup.
-14. Runtime stops the socket listener by calling `RuntimeSocketManager.DeleteSocket()` (idempotent; safe to call even if already called in step 12).
-15. Runtime waits for the listener goroutine to exit by reading from `listenerDoneCh`. RuntimeSocketManager closes `listenerDoneCh` when the listener goroutine has fully terminated (after socket close, all in-flight handlers returned). After `listenerDoneCh` is closed, Runtime drains any remaining errors from `listenerErrCh` (best-effort, non-blocking) and discards them; the session is already in a terminal state by this point so additional listener errors are not actionable.
-16. Runtime ensures that all locks are released by this point. Session methods handle lock release automatically. No explicit unlock is required by Runtime.
-17. Runtime invokes `SessionFinalizer.Finalize(session)` to print the final status and perform best-effort cleanup.
-18. If SessionFinalizer was invoked due to an initialization error (step 4):
+    - Runtime proceeds to step 20 (SessionFinalizer).
+15. After exiting the monitoring loop, Runtime proceeds to cleanup.
+16. Runtime stops the socket listener by calling `RuntimeSocketManager.DeleteSocket()` (idempotent; safe to call even if already called in step 14).
+17. Runtime waits for the listener goroutine to exit by reading from `listenerDoneCh`. RuntimeSocketManager closes `listenerDoneCh` when the listener goroutine has fully terminated (after socket close, all in-flight handlers returned). After `listenerDoneCh` is closed, Runtime drains any remaining errors from `listenerErrCh` (best-effort, non-blocking) and discards them; the session is already in a terminal state by this point so additional listener errors are not actionable.
+18. Runtime ensures that all locks are released by this point. Session methods handle lock release automatically. No explicit unlock is required by Runtime.
+19. Runtime invokes `SessionFinalizer.Finalize(session)` to print the final status and perform best-effort cleanup.
+20. If SessionFinalizer was invoked due to an initialization error (step 6):
     - If a session entity exists but is in "initializing" or "failed" status, SessionFinalizer prints the error details.
     - If no session entity exists, Runtime prints to stderr: `"Failed to initialize session: <error>"` and exits with code 1 without calling SessionFinalizer.
-19. After SessionFinalizer completes, Runtime exits.
-20. Runtime exits with code 0 if `Session.Status == "completed"`, and code 1 if `Session.Status == "failed"` or if initialization failed.
+21. After SessionFinalizer completes, Runtime exits.
+22. Runtime exits with code 0 if `Session.Status == "completed"`, and code 1 if `Session.Status == "failed"` or if initialization failed.
 
 ### Goroutine Management
 
-1. The socket listener runs in a separate goroutine spawned by Runtime at step 7.
+1. The socket listener runs in a separate goroutine spawned by Runtime at step 9.
 2. The listener goroutine runs `RuntimeSocketManager.Listen()`, which blocks until the socket is closed or an error occurs.
-3. When `RuntimeSocketManager.DeleteSocket()` is called (either in step 12 or step 14), the socket is closed, and the listener goroutine exits.
+3. When `RuntimeSocketManager.DeleteSocket()` is called (either in step 14 or step 16), the socket is closed, and the listener goroutine exits.
 4. Runtime waits for the listener goroutine to exit using a done channel before invoking SessionFinalizer.
 5. If the listener goroutine encounters an error (e.g., socket bind failure), it may trigger a RuntimeError via MessageRouter's panic recovery or return an error to Runtime (depending on the error type). Runtime handles this by calling `Session.Fail()` and proceeding to SessionFinalizer.
 
@@ -96,6 +98,11 @@ Runtime prints the following to console:
 Received signal <signal-name>. Initiating graceful shutdown.
 ```
 
+**On Project Root Lookup Failure**:
+```
+Failed to locate project root: <error>. Run 'spectra init' to initialize the project.
+```
+
 **On Initialization Failure (no session entity)**:
 ```
 Failed to initialize session: <error>
@@ -136,8 +143,8 @@ Failed to initialize session: <error>
 
 ## Edge Cases
 
-- **Condition**: SessionInitializer fails to find the project root (SpectraFinder error).
-  **Expected**: SessionInitializer returns an error. Runtime prints to stderr: `"Failed to initialize session: failed to find project root: <error>. Run 'spectra init' to initialize the project."` and exits with code 1. No session entity exists, so SessionFinalizer is not called.
+- **Condition**: SpectraFinder fails to find the project root.
+  **Expected**: Runtime prints to stderr: `"Failed to locate project root: <error>. Run 'spectra init' to initialize the project."` and exits with code 1. SessionInitializer is not invoked. No session entity exists, so SessionFinalizer is not called.
 
 - **Condition**: SessionInitializer fails to load the workflow definition (file not found, parse error).
   **Expected**: SessionInitializer returns an error. Runtime prints to stderr: `"Failed to initialize session: failed to load workflow definition: <error>"` and exits with code 1. No session entity exists, so SessionFinalizer is not called.
