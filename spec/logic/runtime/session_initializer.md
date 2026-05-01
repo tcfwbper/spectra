@@ -2,13 +2,13 @@
 
 ## Overview
 
-SessionInitializer orchestrates the complete initialization flow for creating a new session. It receives a workflow name and a termination notifier channel from Runtime, then performs the following sequence: finds the project root, generates a session UUID, loads the workflow definition, creates the session directory structure, constructs a Session entity with Status="initializing", initializes EventStore and MetadataStore (creating empty files), creates the runtime socket, persists the session metadata to disk, and transitions the session to Status="running" by calling Session.Run(). SessionInitializer enforces a mandatory 30-second timeout for the entire initialization process. If initialization exceeds this timeout, SessionInitializer triggers a RuntimeError and transitions the session to "failed" status. SessionInitializer does not clean up partial resources on failure (except the runtime socket, which is cleaned up by RuntimeSocketManager); the session directory and files remain on disk for inspection.
+SessionInitializer orchestrates the complete initialization flow for creating a new session. It receives a workflow name, project root path, and a termination notifier channel from Runtime, then performs the following sequence: generates a session UUID, loads the workflow definition, creates the session directory structure, constructs a Session entity with Status="initializing", initializes EventStore and MetadataStore (creating empty files), creates the runtime socket, persists the session metadata to disk, and transitions the session to Status="running" by calling Session.Run(). SessionInitializer enforces a mandatory 30-second timeout for the entire initialization process. If initialization exceeds this timeout, SessionInitializer triggers a RuntimeError and transitions the session to "failed" status. SessionInitializer does not clean up partial resources on failure (except the runtime socket, which is cleaned up by RuntimeSocketManager); the session directory and files remain on disk for inspection.
 
 ## Behavior
 
 ### Initialization Flow
 
-1. SessionInitializer is invoked by Runtime with inputs: `workflowName` (string) and `terminationNotifier` (chan<- struct{}).
+1. SessionInitializer is invoked by Runtime with inputs: `workflowName` (string), `projectRoot` (string, absolute path to the directory containing `.spectra/`), and `terminationNotifier` (chan<- struct{}).
 2. SessionInitializer validates that `terminationNotifier` has a buffer capacity of at least 2. If the capacity is less than 2, SessionInitializer returns an error: `"terminationNotifier channel must have buffer capacity >= 2, got <actual-capacity>"`.
 3. SessionInitializer starts a 30-second timeout timer using `time.AfterFunc(30*time.Second, timeoutHandler)`. The handler is a closure that captures a shared, mutex-guarded reference to the Session entity (initially `nil`) and a shared boolean `initCompleted` (initially `false`).
 4. The timeout handler executes the following logic:
@@ -16,17 +16,15 @@ SessionInitializer orchestrates the complete initialization flow for creating a 
    2. If `initCompleted == true`, release the mutex and exit (initialization already finished successfully; nothing to do).
    3. Read the current Session reference.
    4. Release the mutex.
-   5. **If the Session reference is `nil`** (timeout fired before SessionInitializer finished constructing the Session entity in step 12): the handler sets a shared atomic flag `timedOutEarly = true` so the main SessionInitializer goroutine can short-circuit on the next checkpoint, then sends a single notification to `terminationNotifier`. The handler does NOT call `Session.Fail()` (no Session exists). Runtime receives the notification, observes that no Session was returned, and reports an early initialization failure (no SessionFinalizer call).
+   5. **If the Session reference is `nil`** (timeout fired before SessionInitializer finished constructing the Session entity in step 10): the handler sets a shared atomic flag `timedOutEarly = true` so the main SessionInitializer goroutine can short-circuit on the next checkpoint, then sends a single notification to `terminationNotifier`. The handler does NOT call `Session.Fail()` (no Session exists). Runtime receives the notification, observes that no Session was returned, and reports an early initialization failure (no SessionFinalizer call).
    6. **If the Session reference is non-nil and `Session.Status == "initializing"`**: the handler constructs a RuntimeError with `Issuer="SessionInitializer"`, `Message="session initialization timeout exceeded 30 seconds"`, `Detail={}`, `SessionID` set to the Session's ID, `FailingState` set to `Session.CurrentState` (which is the workflow entry node at this point), and `OccurredAt` set to the current POSIX timestamp. The handler then calls `Session.Fail(runtimeError, terminationNotifier)`.
    7. **If the Session reference is non-nil but `Session.Status != "initializing"`** (e.g., already "running" or "failed"): the handler exits without action.
-5. SessionInitializer calls SpectraFinder to locate the project root. SpectraFinder searches upward from the current working directory for a `.spectra/` directory. (Alternative: SpectraFinder may be invoked once by Runtime and the resolved `ProjectRoot` passed to SessionInitializer at construction; both are acceptable as long as the dependency direction is documented.)
-6. If SpectraFinder fails to find the project root (returns an error), SessionInitializer returns an error: `"failed to find project root: <error>. Run 'spectra init' to initialize the project."`. The timeout timer is canceled.
-7. SessionInitializer generates a new session UUID using a UUID v4 generation library (e.g., `github.com/google/uuid`).
-8. SessionInitializer calls `WorkflowDefinitionLoader.Load(workflowName)` to load the workflow definition.
-9. If the workflow definition fails to load (file not found, parse error, validation error), SessionInitializer cancels the timeout timer and returns an error: `"failed to load workflow definition: <error>"`.
-10. SessionInitializer calls `SessionDirectoryManager.CreateSessionDirectory(sessionUUID)` to create the session directory `.spectra/sessions/<sessionUUID>/` with permissions 0775.
-11. If directory creation fails (parent directory does not exist, directory already exists, permission denied), SessionInitializer cancels the timeout timer and returns an error: `"failed to create session directory: <error>"`.
-12. SessionInitializer constructs a Session entity in memory with the following fields:
+5. SessionInitializer generates a new session UUID using a UUID v4 generation library (e.g., `github.com/google/uuid`).
+6. SessionInitializer calls `WorkflowDefinitionLoader.Load(workflowName)` to load the workflow definition.
+7. If the workflow definition fails to load (file not found, parse error, validation error), SessionInitializer cancels the timeout timer and returns an error: `"failed to load workflow definition: <error>"`.
+8. SessionInitializer calls `SessionDirectoryManager.CreateSessionDirectory(sessionUUID)` to create the session directory `.spectra/sessions/<sessionUUID>/` with permissions 0775.
+9. If directory creation fails (parent directory does not exist, directory already exists, permission denied), SessionInitializer cancels the timeout timer and returns an error: `"failed to create session directory: <error>"`.
+10. SessionInitializer constructs a Session entity in memory with the following fields:
     - `ID`: generated session UUID
     - `WorkflowName`: provided workflow name
     - `Status`: `"initializing"`
@@ -38,20 +36,20 @@ SessionInitializer orchestrates the complete initialization flow for creating a 
     - `Error`: `nil`
     
     Immediately after construction, SessionInitializer acquires the shared mutex used by the timeout handler and stores the Session reference. From this point onward, a timeout firing will be able to call `Session.Fail()` instead of taking the early-failure path.
-13. SessionInitializer initializes SessionMetadataStore with `ProjectRoot` and `SessionUUID`.
-14. SessionInitializer initializes EventStore with `ProjectRoot` and `SessionUUID`.
-15. SessionInitializer creates empty `session.json` and `events.jsonl` files by triggering the FileAccessor preparation callbacks. This is done by calling a helper method that uses FileAccessor to ensure the files exist. The `session.json` file is created with permissions 0644, and `events.jsonl` is created with permissions 0644.
-16. If file creation fails (parent directory does not exist, permission denied), SessionInitializer cancels the timeout timer and returns an error: `"failed to initialize storage files: <error>"`.
-17. SessionInitializer initializes RuntimeSocketManager with `ProjectRoot` and `SessionUUID`.
-18. SessionInitializer calls `RuntimeSocketManager.CreateSocket()` to create the Unix domain socket file `runtime.sock` in the session directory with permissions 0600.
-19. If socket creation fails (socket file already exists, permission denied, disk full), SessionInitializer cancels the timeout timer, calls `RuntimeSocketManager.DeleteSocket()` to clean up any partial socket, and returns an error: `"failed to create runtime socket: <error>"`.
-20. SessionInitializer writes the initial session metadata to disk by calling `SessionMetadataStore.Write(sessionMetadata)`. At this point, the session is still in Status="initializing".
-21. If the metadata write fails, SessionInitializer cancels the timeout timer, calls `RuntimeSocketManager.DeleteSocket()`, and returns an error: `"failed to persist initial session metadata: <error>"`.
-22. SessionInitializer calls `Session.Run(terminationNotifier)` to transition the session from Status="initializing" to Status="running".
-23. If `Session.Run()` fails (returns an error), SessionInitializer cancels the timeout timer, calls `RuntimeSocketManager.DeleteSocket()`, constructs a RuntimeError with `Issuer="SessionInitializer"`, `Message="failed to transition session to running status"`, `Detail` containing the error from Session.Run(), calls `Session.Fail(runtimeError, terminationNotifier)`, and returns an error: `"failed to transition session to running: <error>"`.
-24. If `Session.Run()` succeeds, SessionInitializer acquires the shared mutex, sets `initCompleted = true`, releases the mutex, cancels the timeout timer (`timer.Stop()`), and returns the initialized Session entity to Runtime.
+11. SessionInitializer initializes SessionMetadataStore with `projectRoot` and `sessionUUID`.
+12. SessionInitializer initializes EventStore with `projectRoot` and `sessionUUID`.
+13. SessionInitializer creates empty `session.json` and `events.jsonl` files by triggering the FileAccessor preparation callbacks. This is done by calling a helper method that uses FileAccessor to ensure the files exist. The `session.json` file is created with permissions 0644, and `events.jsonl` is created with permissions 0644.
+14. If file creation fails (parent directory does not exist, permission denied), SessionInitializer cancels the timeout timer and returns an error: `"failed to initialize storage files: <error>"`.
+15. SessionInitializer initializes RuntimeSocketManager with `projectRoot` and `sessionUUID`.
+16. SessionInitializer calls `RuntimeSocketManager.CreateSocket()` to create the Unix domain socket file `runtime.sock` in the session directory with permissions 0600.
+17. If socket creation fails (socket file already exists, permission denied, disk full), SessionInitializer cancels the timeout timer, calls `RuntimeSocketManager.DeleteSocket()` to clean up any partial socket, and returns an error: `"failed to create runtime socket: <error>"`.
+18. SessionInitializer writes the initial session metadata to disk by calling `SessionMetadataStore.Write(sessionMetadata)`. At this point, the session is still in Status="initializing".
+19. If the metadata write fails, SessionInitializer cancels the timeout timer, calls `RuntimeSocketManager.DeleteSocket()`, and returns an error: `"failed to persist initial session metadata: <error>"`.
+20. SessionInitializer calls `Session.Run(terminationNotifier)` to transition the session from Status="initializing" to Status="running".
+21. If `Session.Run()` fails (returns an error), SessionInitializer cancels the timeout timer, calls `RuntimeSocketManager.DeleteSocket()`, constructs a RuntimeError with `Issuer="SessionInitializer"`, `Message="failed to transition session to running status"`, `Detail` containing the error from Session.Run(), calls `Session.Fail(runtimeError, terminationNotifier)`, and returns an error: `"failed to transition session to running: <error>"`.
+22. If `Session.Run()` succeeds, SessionInitializer acquires the shared mutex, sets `initCompleted = true`, releases the mutex, cancels the timeout timer (`timer.Stop()`), and returns the initialized Session entity to Runtime.
 
-At every checkpoint between major steps (after each numbered step that performs IO), SessionInitializer also reads the shared atomic `timedOutEarly` flag. If it is `true` and the Session has not yet been constructed (step 12), SessionInitializer aborts immediately and returns an error: `"session initialization timeout exceeded 30 seconds before session entity was constructed"`. This avoids continuing to do IO work after the timeout has already fired.
+At every checkpoint between major steps (after each numbered step that performs IO), SessionInitializer also reads the shared atomic `timedOutEarly` flag. If it is `true` and the Session has not yet been constructed (step 10), SessionInitializer aborts immediately and returns an error: `"session initialization timeout exceeded 30 seconds before session entity was constructed"`. This avoids continuing to do IO work after the timeout has already fired.
 
 ### Timeout Handling
 
@@ -80,15 +78,16 @@ SessionInitializer is constructed once per Runtime invocation with the following
 | WorkflowDefinitionLoader | WorkflowDefinitionLoader | Injected loader, shared across the runtime; used to load and validate workflow definitions | Yes |
 | SessionDirectoryManager | SessionDirectoryManager | Injected directory manager (constructed with ProjectRoot) | Yes |
 
-Per-session collaborators that require the generated SessionUUID (`SessionMetadataStore`, `EventStore`, `RuntimeSocketManager`) are constructed by SessionInitializer internally using `ProjectRoot` and the freshly generated `SessionUUID`. They are not injected because the session UUID is not known until step 7. For test substitution, the test harness can inject SessionInitializer with stub versions of these store constructors via interface (implementation detail; not part of the spec contract).
+Per-session collaborators that require the generated SessionUUID (`SessionMetadataStore`, `EventStore`, `RuntimeSocketManager`) are constructed by SessionInitializer internally using `projectRoot` and the freshly generated `sessionUUID`. They are not injected because the session UUID is not known until step 5. For test substitution, the test harness can inject SessionInitializer with stub versions of these store constructors via interface (implementation detail; not part of the spec contract).
 
-Stateless utilities (`StorageLayout`, `SpectraFinder`, `FileAccessor`) are not injected; SessionInitializer (or the constructors it invokes) calls their package-level functions directly.
+Stateless utilities (`StorageLayout`, `FileAccessor`) are not injected; SessionInitializer (or the constructors it invokes) calls their package-level functions directly.
 
 ### For Initialize Operation
 
 | Field | Type | Constraints | Required |
 |-------|------|-------------|----------|
 | WorkflowName | string | Non-empty, PascalCase, must reference a valid workflow definition file | Yes |
+| ProjectRoot | string | Absolute path to the directory containing `.spectra/` | Yes |
 | TerminationNotifier | chan<- struct{} | Buffered channel with capacity >= 2 | Yes |
 
 ## Outputs
@@ -104,7 +103,6 @@ Stateless utilities (`StorageLayout`, `SpectraFinder`, `FileAccessor`) are not i
 | Error Message Format | Description |
 |---------------------|-------------|
 | `"terminationNotifier channel must have buffer capacity >= 2, got <actual-capacity>"` | Channel buffer is too small |
-| `"failed to find project root: <error>. Run 'spectra init' to initialize the project."` | SpectraFinder failed to locate `.spectra/` |
 | `"failed to load workflow definition: <error>"` | WorkflowDefinitionLoader failed |
 | `"failed to create session directory: <error>"` | SessionDirectoryManager failed |
 | `"failed to initialize storage files: <error>"` | EventStore or SessionMetadataStore file creation failed |
@@ -143,9 +141,6 @@ Stateless utilities (`StorageLayout`, `SpectraFinder`, `FileAccessor`) are not i
 14. **Timeout Value Hardcoded**: The 30-second timeout value is hardcoded in SessionInitializer and is not configurable via WorkflowDefinition or global settings.
 
 ## Edge Cases
-
-- **Condition**: SpectraFinder fails to find `.spectra/` directory.
-  **Expected**: SessionInitializer cancels the timeout timer and returns an error: `"failed to find project root: <error>. Run 'spectra init' to initialize the project."`. No session directory or resources are created.
 
 - **Condition**: WorkflowDefinitionLoader fails (workflow file not found, parse error, validation error).
   **Expected**: SessionInitializer cancels the timeout timer and returns an error: `"failed to load workflow definition: <error>"`. No session directory or resources are created.
@@ -210,5 +205,4 @@ Stateless utilities (`StorageLayout`, `SpectraFinder`, `FileAccessor`) are not i
 - [SessionMetadataStore](../storage/session_metadata_store.md) - Persists session metadata
 - [EventStore](../storage/event_store.md) - Persists event history
 - [RuntimeSocketManager](../storage/runtime_socket_manager.md) - Manages runtime socket lifecycle
-- [SpectraFinder](../storage/spectra_finder.md) - Locates project root
 - [ARCHITECTURE.md](../../ARCHITECTURE.md) - Framework architecture and session lifecycle

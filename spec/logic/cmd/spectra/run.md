@@ -11,17 +11,15 @@ The `spectra run` command starts a workflow execution by invoking the Runtime mo
 1. The `run` command is invoked as `spectra run --workflow <WorkflowName>` or `spectra run <WorkflowName>` (positional argument).
 2. The command validates that exactly one workflow name argument is provided. If missing or multiple arguments are provided, the command exits with code 1 and prints: `"Error: workflow name is required"` or `"Error: too many arguments"`.
 3. The command validates that the workflow name is non-empty after trimming whitespace. If empty, the command exits with code 1 and prints: `"Error: workflow name cannot be empty"`.
-4. The command uses `SpectraFinder` to locate the project root directory (the directory containing `.spectra/`).
-5. If `SpectraFinder` cannot find the project root, the command exits with code 1 and prints: `"Error: .spectra directory not found. Run 'spectra init' to initialize a project."`.
-6. After locating the project root, the command invokes the Runtime module by calling `Runtime.Run(projectRoot, workflowName)`.
-7. The Runtime module handles all workflow execution logic as defined in `logic/runtime/runtime.md`.
-8. The `run` command forwards all output from Runtime's stdout to its own stdout (visible to the user).
-9. The `run` command forwards all output from Runtime's stderr to its own stderr (visible to the user).
-10. When Runtime exits, the `run` command exits with the same exit code as Runtime.
-11. Runtime exit codes are:
+4. The command invokes the Runtime module by calling `Runtime.Run(workflowName)`.
+5. The Runtime module handles all workflow execution logic as defined in `logic/runtime/runtime.md`, including locating the project root.
+6. The `run` command forwards all output from Runtime's stdout to its own stdout (visible to the user).
+7. The `run` command forwards all output from Runtime's stderr to its own stderr (visible to the user).
+8. When Runtime exits, the `run` command exits with the same exit code as Runtime.
+9. Runtime exit codes are:
     - `0`: Workflow completed successfully (Session status = "completed")
     - `1`: Workflow failed or initialization error (Session status = "failed" or initialization failed)
-12. The `run` command does not perform any additional output or processing after Runtime exits. It simply propagates the exit code.
+10. The `run` command does not perform any additional output or processing after Runtime exits. It simply propagates the exit code.
 
 ### Command Syntax
 
@@ -101,7 +99,7 @@ All other errors (workflow not found, invalid workflow definition, runtime error
 
 | Input | Type | Source | Required |
 |-------|------|--------|----------|
-| Current Working Directory | string | Process environment | Yes (implicit, used by SpectraFinder) |
+| Current Working Directory | string | Process environment | Yes (implicit, used by Runtime to locate project root) |
 
 ## Outputs
 
@@ -123,13 +121,13 @@ All other errors (workflow not found, invalid workflow definition, runtime error
 
 ## Invariants
 
-1. **Runtime Delegation**: After locating the project root and validating the workflow name, the command must delegate all execution logic to the Runtime module. It must not implement any workflow execution logic itself.
+1. **Runtime Delegation**: After validating the workflow name, the command must delegate all execution logic to the Runtime module. It must not implement any workflow execution logic itself, including project root location logic.
 
 2. **Output Forwarding**: The command must forward all Runtime output (stdout and stderr) to its own stdout and stderr without modification, buffering, or filtering.
 
 3. **Exit Code Propagation**: The command must exit with the same exit code returned by the Runtime. It must not modify or interpret the exit code.
 
-4. **SpectraFinder Requirement**: The command must use SpectraFinder to locate the project root. It must not assume `.spectra/` exists in the current directory.
+4. **No Project Root Resolution**: The command must not resolve the project root or use SpectraFinder. Project root resolution is handled by Runtime.
 
 5. **No Workflow Validation**: The command must not validate the workflow definition (YAML syntax, structure, etc.). This is handled by the Runtime via WorkflowDefinitionLoader.
 
@@ -150,9 +148,6 @@ All other errors (workflow not found, invalid workflow definition, runtime error
 
 - **Condition**: User invokes `spectra run --workflow SimpleSdd SimpleSdd` (both flag and positional argument).
   **Expected**: The flag takes precedence. Runtime is invoked with workflow name `SimpleSdd`.
-
-- **Condition**: User invokes `spectra run SimpleSdd` from a directory without `.spectra/`.
-  **Expected**: SpectraFinder fails. Exit with code 1, print `"Error: .spectra directory not found. Run 'spectra init' to initialize a project."` to stderr.
 
 - **Condition**: User invokes `spectra run NonExistentWorkflow` (workflow file does not exist).
   **Expected**: Runtime initialization fails (WorkflowDefinitionLoader returns "workflow definition not found"). Runtime prints error to stderr and exits with code 1. `run` command propagates exit code 1.
@@ -175,9 +170,6 @@ All other errors (workflow not found, invalid workflow definition, runtime error
 - **Condition**: `.spectra/workflows/SimpleSdd.yaml` exists but is not readable (permission denied).
   **Expected**: Runtime initialization fails (WorkflowDefinitionLoader returns read error). Runtime prints error to stderr and exits with code 1. `run` command propagates exit code 1.
 
-- **Condition**: User invokes `spectra run SimpleSdd` from a subdirectory of a Spectra project.
-  **Expected**: SpectraFinder locates the nearest ancestor `.spectra/` directory. Runtime is invoked with the correct project root.
-
 - **Condition**: Workflow completes successfully after 10 minutes of execution.
   **Expected**: Runtime exits with code 0. `run` command propagates exit code 0.
 
@@ -196,7 +188,6 @@ All other errors (workflow not found, invalid workflow definition, runtime error
 ## Related
 
 - [Runtime](../../runtime/runtime.md) - Main workflow execution engine
-- [SpectraFinder](../../storage/spectra_finder.md) - Locates the project root
 - [WorkflowDefinitionLoader](../../storage/workflow_definition_loader.md) - Loads and validates workflow definitions (used by Runtime)
 - [init Subcommand](./init.md) - Initialize a Spectra project
 - [clear Subcommand](./clear.md) - Clear session data
