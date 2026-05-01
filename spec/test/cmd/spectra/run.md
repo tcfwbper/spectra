@@ -30,13 +30,12 @@
 |---|---|---|---|---|---|
 | `TestRunCommand_HelpFlag` | `unit` | Displays help information when --help flag is provided. | No setup required | `run --help` | Prints usage information containing `"Run a workflow"`, `"Usage:"`, `"Flags:"`, `"--workflow string"`, `"Examples:"`; Runtime.Run not called; exit code 0 |
 
-### Happy Path — Runtime Output Forwarding
+### Happy Path — Runtime Exit Code Propagation
 
 | Test ID | Category | Description | Setup | Input | Expected |
 |---|---|---|---|---|---|
-| `TestRunCommand_ForwardsStdout` | `unit` | Forwards Runtime stdout to command stdout. | Temporary test directory created programmatically within test fixture; `.spectra/` directory and `.spectra/workflows/Test.yaml` file created inside test fixture; test changes working directory to test fixture; Runtime mocked to write `"workflow output\n"` to stdout and return exit code 0 | `run Test` | Command stdout contains `"workflow output\n"`; exit code 0 |
-| `TestRunCommand_ForwardsStderr` | `unit` | Forwards Runtime stderr to command stderr. | Temporary test directory created programmatically within test fixture; `.spectra/` directory and `.spectra/workflows/Test.yaml` file created inside test fixture; test changes working directory to test fixture; Runtime mocked to write `"workflow error\n"` to stderr and return exit code 1 | `run Test` | Command stderr contains `"workflow error\n"`; exit code 1 |
-| `TestRunCommand_ForwardsBothStreams` | `unit` | Forwards both stdout and stderr from Runtime. | Temporary test directory created programmatically within test fixture; `.spectra/` directory and `.spectra/workflows/Test.yaml` file created inside test fixture; test changes working directory to test fixture; Runtime mocked to write to both stdout and stderr | `run Test` | Command stdout and stderr contain Runtime's respective output; exit code matches Runtime exit code |
+| `TestRunCommand_RuntimeExitCodeZero` | `unit` | Propagates exit code 0 from Runtime. | Temporary test directory created programmatically within test fixture; `.spectra/` directory and `.spectra/workflows/Test.yaml` file created inside test fixture; test changes working directory to test fixture; Runtime mocked to return exit code 0 | `run Test` | Runtime.Run called with `"Test"`; exit code 0 |
+| `TestRunCommand_RuntimeExitCodeOne` | `unit` | Propagates exit code 1 from Runtime. | Temporary test directory created programmatically within test fixture; `.spectra/` directory and `.spectra/workflows/Test.yaml` file created inside test fixture; test changes working directory to test fixture; Runtime mocked to return exit code 1 | `run Test` | Runtime.Run called with `"Test"`; exit code 1 |
 
 ### Validation Failures — Missing Workflow Name
 
@@ -64,23 +63,22 @@
 
 | Test ID | Category | Description | Setup | Input | Expected |
 |---|---|---|---|---|---|
-| `TestRunCommand_RuntimeReportsProjectRootNotFound` | `unit` | Forwards Runtime error when .spectra directory is not found. | Temporary test directory created programmatically within test fixture; no `.spectra/` directory created inside test fixture; test changes working directory to test fixture; Runtime mocked to write `"Failed to locate project root: <error>. Run 'spectra init' to initialize the project."` to stderr and return exit code 1 | `run TestWorkflow` | Command stderr contains `"Failed to locate project root"` from Runtime; exit code 1 |
+| `TestRunCommand_RuntimeReportsProjectRootNotFound` | `unit` | Propagates exit code 1 when Runtime fails to locate project root. | Temporary test directory created programmatically within test fixture; no `.spectra/` directory created inside test fixture; test changes working directory to test fixture; Runtime mocked to return exit code 1 | `run TestWorkflow` | Runtime.Run called with `"TestWorkflow"`; exit code 1 |
 
 ### Error Propagation — Runtime Initialization Failures
 
 | Test ID | Category | Description | Setup | Input | Expected |
 |---|---|---|---|---|---|
-| `TestRunCommand_RuntimeReportsWorkflowNotFound` | `unit` | Forwards Runtime error when workflow file does not exist. | Temporary test directory created programmatically within test fixture; `.spectra/` directory created but no workflow file inside test fixture; test changes working directory to test fixture; Runtime mocked to write `"Error: workflow definition not found"` to stderr and return exit code 1 | `run NonExistent` | Command stderr contains `"Error: workflow definition not found"`; exit code 1 |
-| `TestRunCommand_RuntimeReportsInvalidYAML` | `unit` | Forwards Runtime error when workflow file has invalid YAML syntax. | Temporary test directory created programmatically within test fixture; `.spectra/` directory and `.spectra/workflows/Invalid.yaml` with malformed YAML created inside test fixture; test changes working directory to test fixture; Runtime mocked to write YAML parse error to stderr and return exit code 1 | `run Invalid` | Command stderr contains YAML parse error from Runtime; exit code 1 |
-| `TestRunCommand_RuntimeReportsWorkflowNotReadable` | `unit` | Forwards Runtime error when workflow file cannot be read due to permissions. | Temporary test directory created programmatically within test fixture; `.spectra/` directory created inside test fixture; test changes working directory to test fixture; Runtime mocked to write `"Error: permission denied reading workflow file"` to stderr and return exit code 1 | `run Restricted` | Command stderr contains permission error from Runtime; exit code 1 |
+| `TestRunCommand_RuntimeReportsWorkflowNotFound` | `unit` | Propagates exit code 1 when Runtime cannot find workflow file. | Temporary test directory created programmatically within test fixture; `.spectra/` directory created but no workflow file inside test fixture; test changes working directory to test fixture; Runtime mocked to return exit code 1 | `run NonExistent` | Runtime.Run called with `"NonExistent"`; exit code 1 |
+| `TestRunCommand_RuntimeReportsInvalidYAML` | `unit` | Propagates exit code 1 when Runtime encounters invalid YAML. | Temporary test directory created programmatically within test fixture; `.spectra/` directory and `.spectra/workflows/Invalid.yaml` with malformed YAML created inside test fixture; test changes working directory to test fixture; Runtime mocked to return exit code 1 | `run Invalid` | Runtime.Run called with `"Invalid"`; exit code 1 |
+| `TestRunCommand_RuntimeReportsWorkflowNotReadable` | `unit` | Propagates exit code 1 when Runtime cannot read workflow file. | Temporary test directory created programmatically within test fixture; `.spectra/` directory created inside test fixture; test changes working directory to test fixture; Runtime mocked to return exit code 1 | `run Restricted` | Runtime.Run called with `"Restricted"`; exit code 1 |
 
 ### Error Propagation — Runtime Execution Failures
 
 | Test ID | Category | Description | Setup | Input | Expected |
 |---|---|---|---|---|---|
-| `TestRunCommand_RuntimeReportsAgentError` | `unit` | Forwards Runtime error when workflow fails due to agent error. | Temporary test directory created programmatically within test fixture; `.spectra/` directory and `.spectra/workflows/AgentFail.yaml` created inside test fixture; test changes working directory to test fixture; Runtime mocked to simulate agent failure with stderr output and return exit code 1 | `run AgentFail` | Command stderr contains agent error message from Runtime; exit code 1 |
-| `TestRunCommand_RuntimeReportsSessionLockError` | `unit` | Forwards Runtime error when another session is already running. | Temporary test directory created programmatically within test fixture; `.spectra/` directory created inside test fixture; test changes working directory to test fixture; Runtime mocked to write `"Error: another workflow session is already running"` to stderr and return exit code 1 | `run Concurrent` | Command stderr contains session lock error from Runtime; exit code 1 |
-| `TestRunCommand_RuntimeRunReturnsError` | `unit` | Converts Runtime.Run error return to exit code 1 and stderr message. | Temporary test directory created programmatically within test fixture; `.spectra/` directory and `.spectra/workflows/Test.yaml` created inside test fixture; test changes working directory to test fixture; Runtime.Run mocked to return Go error (e.g., `errors.New("runtime internal error")`) | `run Test` | Command writes error message to stderr; exit code 1 |
+| `TestRunCommand_RuntimeReportsAgentError` | `unit` | Propagates exit code 1 when Runtime fails due to agent error. | Temporary test directory created programmatically within test fixture; `.spectra/` directory and `.spectra/workflows/AgentFail.yaml` created inside test fixture; test changes working directory to test fixture; Runtime mocked to return exit code 1 | `run AgentFail` | Runtime.Run called with `"AgentFail"`; exit code 1 |
+| `TestRunCommand_RuntimeReportsSessionLockError` | `unit` | Propagates exit code 1 when Runtime detects another session is running. | Temporary test directory created programmatically within test fixture; `.spectra/` directory created inside test fixture; test changes working directory to test fixture; Runtime mocked to return exit code 1 | `run Concurrent` | Runtime.Run called with `"Concurrent"`; exit code 1 |
 
 ### Edge Cases — Special Workflow Names
 
@@ -96,11 +94,11 @@
 |---|---|---|---|---|---|
 | `TestRunCommand_PropagatesSIGINT` | `unit` | Propagates SIGINT signal to Runtime subprocess. | Temporary test directory created programmatically within test fixture; `.spectra/` directory and workflow file created inside test fixture; test changes working directory to test fixture; Runtime mocked to record signal delivery and return graceful shutdown exit code; SIGINT sent to mock Runtime (not test process itself) to ensure test isolation | `run TestWorkflow`, then send SIGINT to mock Runtime | Mock Runtime records SIGINT delivery; command exits with Runtime's exit code indicating graceful shutdown |
 
-### Edge Cases — Streaming Output
+### Edge Cases — Blocking Runtime
 
 | Test ID | Category | Description | Setup | Input | Expected |
 |---|---|---|---|---|---|
-| `TestRunCommand_HandlesStreamingOutput` | `unit` | Does not timeout or buffer output from workflow that produces streaming output. | Temporary test directory created programmatically within test fixture; `.spectra/` directory and workflow file created inside test fixture; test changes working directory to test fixture; Runtime mocked to simulate streaming behavior by producing multiple output lines over a SHORT period (100-200ms with output every 10-20ms) | `run StreamingWorkflow` | All Runtime output forwarded in real-time without buffering; command waits for Runtime to complete; exit code matches Runtime exit code |
+| `TestRunCommand_WaitsForRuntimeCompletion` | `unit` | Command waits for Runtime.Run to return before exiting. | Temporary test directory created programmatically within test fixture; `.spectra/` directory and workflow file created inside test fixture; test changes working directory to test fixture; Runtime mocked to block for a short period (100-200ms) before returning exit code 0 | `run TestWorkflow` | Command does not return until Runtime.Run completes; exit code 0 |
 
 ### Idempotency
 
