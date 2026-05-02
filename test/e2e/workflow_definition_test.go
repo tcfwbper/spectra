@@ -20,7 +20,7 @@ func TestWorkflowDefinition_BuiltinCopiedDuringInit(t *testing.T) {
 	// Test implementation placeholder:
 	// 1. Execute spectra init in tmpDir
 	// 2. Verify .spectra/workflows/ directory created
-	// 3. Verify built-in workflow YAML files exist (e.g., SimpleSdd.yaml)
+	// 3. Verify built-in workflow YAML files exist (e.g., DefaultLogicSpec.yaml)
 	// 4. Read and validate YAML content of copied files
 	// 5. Ensure all required fields are present and valid
 }
@@ -28,7 +28,7 @@ func TestWorkflowDefinition_BuiltinCopiedDuringInit(t *testing.T) {
 // TestWorkflowDefinition_ExistingWorkflowNotOverwritten verifies existing workflow file is not overwritten during spectra init
 func TestWorkflowDefinition_ExistingWorkflowNotOverwritten(t *testing.T) {
 	// Category: e2e
-	// Setup: Temporary test directory created; .spectra/workflows/SimpleSdd.yaml exists with custom content; all file operations occur within test fixtures
+	// Setup: Temporary test directory created; .spectra/workflows/DefaultLogicSpec.yaml exists with custom content; all file operations occur within test fixtures
 	tmpDir := t.TempDir()
 	workflowsDir := filepath.Join(tmpDir, ".spectra", "workflows")
 	err := os.MkdirAll(workflowsDir, 0755)
@@ -36,7 +36,7 @@ func TestWorkflowDefinition_ExistingWorkflowNotOverwritten(t *testing.T) {
 		t.Fatalf("Failed to create workflows directory: %v", err)
 	}
 
-	customContent := `name: "SimpleSdd"
+	customContent := `name: "DefaultLogicSpec"
 description: "Custom workflow description"
 entry_node: "CustomStart"
 exit_transitions:
@@ -56,19 +56,19 @@ transitions:
     event_type: "CustomDone"
     to_node: "CustomStart"
 `
-	customWorkflowPath := filepath.Join(workflowsDir, "SimpleSdd.yaml")
+	customWorkflowPath := filepath.Join(workflowsDir, "DefaultLogicSpec.yaml")
 	err = os.WriteFile(customWorkflowPath, []byte(customContent), 0644)
 	if err != nil {
 		t.Fatalf("Failed to write custom workflow: %v", err)
 	}
 
 	// Input: Execute `spectra init`
-	// Expected: SimpleSdd.yaml content unchanged; other built-in workflows copied; no error returned
+	// Expected: DefaultLogicSpec.yaml content unchanged; other built-in workflows copied; no error returned
 	t.Skip("Requires CLI infrastructure")
 
 	// Test implementation placeholder:
 	// 1. Execute spectra init in tmpDir
-	// 2. Read SimpleSdd.yaml content
+	// 2. Read DefaultLogicSpec.yaml content
 	// 3. Verify content matches customContent exactly
 	// 4. Verify other built-in workflows were copied
 	// 5. Ensure no error was returned
@@ -87,7 +87,7 @@ func TestWorkflowDefinition_ListWorkflows(t *testing.T) {
 
 	// Create test workflow files
 	workflows := map[string]string{
-		"SimpleSdd": `name: "SimpleSdd"
+		"DefaultLogicSpec": `name: "DefaultLogicSpec"
 description: "A simplified specification-driven development workflow"
 entry_node: "HumanRequirement"
 exit_transitions:
@@ -172,7 +172,7 @@ transitions:
 // TestWorkflowDefinition_ShowWorkflowDetails verifies CLI shows details for specific workflow
 func TestWorkflowDefinition_ShowWorkflowDetails(t *testing.T) {
 	// Category: e2e
-	// Setup: Temporary test directory created; workflow definition file at <test-dir>/.spectra/workflows/SimpleSdd.yaml; all file operations occur within test fixtures
+	// Setup: Temporary test directory created; workflow definition file at <test-dir>/.spectra/workflows/DefaultLogicSpec.yaml; all file operations occur within test fixtures
 	tmpDir := t.TempDir()
 	workflowsDir := filepath.Join(tmpDir, ".spectra", "workflows")
 	err := os.MkdirAll(workflowsDir, 0755)
@@ -180,7 +180,7 @@ func TestWorkflowDefinition_ShowWorkflowDetails(t *testing.T) {
 		t.Fatalf("Failed to create workflows directory: %v", err)
 	}
 
-	workflowContent := `name: "SimpleSdd"
+	workflowContent := `name: "DefaultLogicSpec"
 description: "A simplified specification-driven development workflow"
 entry_node: "HumanRequirement"
 exit_transitions:
@@ -209,21 +209,21 @@ transitions:
     event_type: "RequirementApproved"
     to_node: "HumanRequirement"
 `
-	workflowPath := filepath.Join(workflowsDir, "SimpleSdd.yaml")
+	workflowPath := filepath.Join(workflowsDir, "DefaultLogicSpec.yaml")
 	err = os.WriteFile(workflowPath, []byte(workflowContent), 0644)
 	if err != nil {
 		t.Fatalf("Failed to write workflow: %v", err)
 	}
 
-	// Input: Execute `spectra workflow show --workflow SimpleSdd`
+	// Input: Execute `spectra workflow show --workflow DefaultLogicSpec`
 	// Expected: Command succeeds; output displays all fields: name, description, entry_node, exit_transitions, nodes, transitions
 	t.Skip("Requires CLI infrastructure")
 
 	// Test implementation placeholder:
-	// 1. Execute spectra workflow show --workflow SimpleSdd in tmpDir
+	// 1. Execute spectra workflow show --workflow DefaultLogicSpec in tmpDir
 	// 2. Parse output
 	// 3. Verify all fields are displayed:
-	//    - name: "SimpleSdd"
+	//    - name: "DefaultLogicSpec"
 	//    - description: "A simplified specification-driven development workflow"
 	//    - entry_node: "HumanRequirement"
 	//    - exit_transitions: 1 transition

@@ -169,13 +169,13 @@ func TestWorkflowDefinitionLoader_Load_NameWithDigits(t *testing.T) {
 func TestWorkflowDefinitionLoader_Load_NameWithConsecutiveUppercase(t *testing.T) {
 	tmpDir := setupWorkflowTestDir(t)
 	mockLoader := NewMockAgentDefinitionLoader()
-	writeWorkflowYAML(t, tmpDir, "SimpleSDD", createMinimalValidWorkflowYAML("SimpleSDD"))
+	writeWorkflowYAML(t, tmpDir, "DefaultLOGICSPEC", createMinimalValidWorkflowYAML("DefaultLOGICSPEC"))
 
 	loader := NewWorkflowDefinitionLoader(tmpDir, mockLoader)
-	def, err := loader.Load("SimpleSDD")
+	def, err := loader.Load("DefaultLOGICSPEC")
 
 	require.NoError(t, err)
-	assert.Equal(t, "SimpleSDD", def.Name)
+	assert.Equal(t, "DefaultLOGICSPEC", def.Name)
 }
 
 func TestWorkflowDefinitionLoader_Load_SingleUppercaseLetter(t *testing.T) {
@@ -671,7 +671,7 @@ exit_transitions: []
 func TestWorkflowDefinitionLoader_Load_NameWithSpaces(t *testing.T) {
 	tmpDir := setupWorkflowTestDir(t)
 	mockLoader := NewMockAgentDefinitionLoader()
-	yamlContent := `name: "Simple SDD"
+	yamlContent := `name: "Default LogicSpec"
 entry_node: "Start"
 nodes:
   - name: "Start"
@@ -687,20 +687,20 @@ exit_transitions:
     event_type: "Begin"
     to_node: "End"
 `
-	writeWorkflowYAML(t, tmpDir, "SimpleSDD", yamlContent)
+	writeWorkflowYAML(t, tmpDir, "Default LogicSpec", yamlContent)
 
 	loader := NewWorkflowDefinitionLoader(tmpDir, mockLoader)
-	def, err := loader.Load("SimpleSDD")
+	def, err := loader.Load("Default LogicSpec")
 
 	assert.Nil(t, def)
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "workflow definition 'SimpleSDD' validation failed: name must be PascalCase with no spaces or special characters")
+	assert.Contains(t, err.Error(), "workflow definition 'Default LogicSpec' validation failed: name must be PascalCase with no spaces or special characters")
 }
 
 func TestWorkflowDefinitionLoader_Load_NameWithUnderscore(t *testing.T) {
 	tmpDir := setupWorkflowTestDir(t)
 	mockLoader := NewMockAgentDefinitionLoader()
-	yamlContent := `name: "Simple_SDD"
+	yamlContent := `name: "Default_LogicSpec"
 entry_node: "Start"
 nodes:
   - name: "Start"
@@ -716,20 +716,20 @@ exit_transitions:
     event_type: "Begin"
     to_node: "End"
 `
-	writeWorkflowYAML(t, tmpDir, "Simple_SDD", yamlContent)
+	writeWorkflowYAML(t, tmpDir, "Default_LogicSpec", yamlContent)
 
 	loader := NewWorkflowDefinitionLoader(tmpDir, mockLoader)
-	def, err := loader.Load("Simple_SDD")
+	def, err := loader.Load("Default_LogicSpec")
 
 	assert.Nil(t, def)
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "workflow definition 'Simple_SDD' validation failed: name must be PascalCase with no spaces or special characters")
+	assert.Contains(t, err.Error(), "workflow definition 'Default_LogicSpec' validation failed: name must be PascalCase with no spaces or special characters")
 }
 
 func TestWorkflowDefinitionLoader_Load_NameWithHyphen(t *testing.T) {
 	tmpDir := setupWorkflowTestDir(t)
 	mockLoader := NewMockAgentDefinitionLoader()
-	yamlContent := `name: "Simple-SDD"
+	yamlContent := `name: "Default-LogicSpec"
 entry_node: "Start"
 nodes:
   - name: "Start"
@@ -745,20 +745,20 @@ exit_transitions:
     event_type: "Begin"
     to_node: "End"
 `
-	writeWorkflowYAML(t, tmpDir, "Simple-SDD", yamlContent)
+	writeWorkflowYAML(t, tmpDir, "Default-LogicSpec", yamlContent)
 
 	loader := NewWorkflowDefinitionLoader(tmpDir, mockLoader)
-	def, err := loader.Load("Simple-SDD")
+	def, err := loader.Load("Default-LogicSpec")
 
 	assert.Nil(t, def)
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "workflow definition 'Simple-SDD' validation failed: name must be PascalCase with no spaces or special characters")
+	assert.Contains(t, err.Error(), "workflow definition 'Default-LogicSpec' validation failed: name must be PascalCase with no spaces or special characters")
 }
 
 func TestWorkflowDefinitionLoader_Load_NameWithDot(t *testing.T) {
 	tmpDir := setupWorkflowTestDir(t)
 	mockLoader := NewMockAgentDefinitionLoader()
-	yamlContent := `name: "Simple.SDD"
+	yamlContent := `name: "Default.LogicSpec"
 entry_node: "Start"
 nodes:
   - name: "Start"
@@ -774,20 +774,20 @@ exit_transitions:
     event_type: "Begin"
     to_node: "End"
 `
-	writeWorkflowYAML(t, tmpDir, "Simple.SDD", yamlContent)
+	writeWorkflowYAML(t, tmpDir, "Default.LogicSpec", yamlContent)
 
 	loader := NewWorkflowDefinitionLoader(tmpDir, mockLoader)
-	def, err := loader.Load("Simple.SDD")
+	def, err := loader.Load("Default.LogicSpec")
 
 	assert.Nil(t, def)
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "workflow definition 'Simple.SDD' validation failed: name must be PascalCase with no spaces or special characters")
+	assert.Contains(t, err.Error(), "workflow definition 'Default.LogicSpec' validation failed: name must be PascalCase with no spaces or special characters")
 }
 
 func TestWorkflowDefinitionLoader_Load_NameStartsLowercase(t *testing.T) {
 	tmpDir := setupWorkflowTestDir(t)
 	mockLoader := NewMockAgentDefinitionLoader()
-	yamlContent := `name: "simpleSDD"
+	yamlContent := `name: "defaultLogicSpec"
 entry_node: "Start"
 nodes:
   - name: "Start"
@@ -803,14 +803,14 @@ exit_transitions:
     event_type: "Begin"
     to_node: "End"
 `
-	writeWorkflowYAML(t, tmpDir, "simpleSDD", yamlContent)
+	writeWorkflowYAML(t, tmpDir, "defaultLogicSpec", yamlContent)
 
 	loader := NewWorkflowDefinitionLoader(tmpDir, mockLoader)
-	def, err := loader.Load("simpleSDD")
+	def, err := loader.Load("defaultLogicSpec")
 
 	assert.Nil(t, def)
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "workflow definition 'simpleSDD' validation failed: name must be PascalCase with no spaces or special characters")
+	assert.Contains(t, err.Error(), "workflow definition 'defaultLogicSpec' validation failed: name must be PascalCase with no spaces or special characters")
 }
 
 // Validation Failures — EntryNode

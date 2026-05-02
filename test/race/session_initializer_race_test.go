@@ -79,7 +79,7 @@ func TestInitialize_ConcurrentInitializers(t *testing.T) {
 			}
 
 			terminationNotifier := make(chan struct{}, 2)
-			sess, err := si.Initialize("TestWorkflow", terminationNotifier)
+			sess, err := si.Initialize("TestWorkflow", tmpDir, terminationNotifier)
 			if err != nil {
 				mu.Lock()
 				errCount++

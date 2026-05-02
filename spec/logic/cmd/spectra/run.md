@@ -47,8 +47,8 @@ Flags:
   --help              Show help information
 
 Examples:
-  spectra run SimpleSdd
-  spectra run --workflow SimpleSdd
+  spectra run DefaultLogicSpec
+  spectra run --workflow DefaultLogicSpec
 ```
 
 ### Error Output
@@ -142,16 +142,16 @@ All other errors (workflow not found, invalid workflow definition, runtime error
 - **Condition**: User invokes `spectra run ""` (empty string as workflow name).
   **Expected**: Exit with code 1, print `"Error: workflow name cannot be empty"` to stderr.
 
-- **Condition**: User invokes `spectra run SimpleSdd ExtraArg` (too many arguments).
+- **Condition**: User invokes `spectra run DefaultLogicSpec ExtraArg` (too many arguments).
   **Expected**: Exit with code 1, print `"Error: too many arguments"` to stderr.
 
-- **Condition**: User invokes `spectra run --workflow SimpleSdd SimpleSdd` (both flag and positional argument).
-  **Expected**: The flag takes precedence. Runtime is invoked with workflow name `SimpleSdd`.
+- **Condition**: User invokes `spectra run --workflow DefaultLogicSpec DefaultLogicSpec` (both flag and positional argument).
+  **Expected**: The flag takes precedence. Runtime is invoked with workflow name `DefaultLogicSpec`.
 
 - **Condition**: User invokes `spectra run NonExistentWorkflow` (workflow file does not exist).
   **Expected**: Runtime initialization fails (WorkflowDefinitionLoader returns "workflow definition not found"). Runtime prints error to stderr and exits with code 1. `run` command propagates exit code 1.
 
-- **Condition**: User invokes `spectra run SimpleSdd` (workflow file exists but has invalid YAML syntax).
+- **Condition**: User invokes `spectra run DefaultLogicSpec` (workflow file exists but has invalid YAML syntax).
   **Expected**: Runtime initialization fails (WorkflowDefinitionLoader returns parse error). Runtime prints error to stderr and exits with code 1. `run` command propagates exit code 1.
 
 - **Condition**: Runtime prints to stdout during workflow execution (e.g., agent output, transition logs).
@@ -163,10 +163,10 @@ All other errors (workflow not found, invalid workflow definition, runtime error
 - **Condition**: User terminates the `run` command with Ctrl+C (SIGINT).
   **Expected**: The signal is propagated to Runtime. Runtime handles graceful shutdown as defined in `logic/runtime/runtime.md`. `run` command exits when Runtime exits.
 
-- **Condition**: User invokes `spectra run SimpleSdd` while another workflow execution is in progress (same or different workflow).
+- **Condition**: User invokes `spectra run DefaultLogicSpec` while another workflow execution is in progress (same or different workflow).
   **Expected**: The command proceeds to invoke Runtime. Runtime handles concurrent execution detection (session lock, socket binding). If a session is already running, Runtime reports an error and exits with code 1.
 
-- **Condition**: `.spectra/workflows/SimpleSdd.yaml` exists but is not readable (permission denied).
+- **Condition**: `.spectra/workflows/DefaultLogicSpec.yaml` exists but is not readable (permission denied).
   **Expected**: Runtime initialization fails (WorkflowDefinitionLoader returns read error). Runtime prints error to stderr and exits with code 1. `run` command propagates exit code 1.
 
 - **Condition**: Workflow completes successfully after 10 minutes of execution.

@@ -15,7 +15,7 @@
 | Test ID | Category | Description | Setup | Input | Expected |
 |---|---|---|---|---|---|
 | `TestRunCommand_PositionalArgument` | `unit` | Executes workflow when workflow name is provided as positional argument. | Temporary test directory created programmatically within test fixture; `.spectra/` directory and `.spectra/workflows/TestWorkflow.yaml` file created inside test fixture; test changes working directory to test fixture; Runtime mocked to return exit code 0 | `run TestWorkflow` | Runtime.Run called with `"TestWorkflow"`; exit code 0 |
-| `TestRunCommand_PositionalArgumentFromSubdirectory` | `unit` | Executes workflow from subdirectory (Runtime handles project root location). | Temporary test directory created programmatically within test fixture; `.spectra/` and `.spectra/workflows/SimpleSdd.yaml` created inside test fixture; subdirectory `subdir/nested/` created inside test fixture; test changes working directory to `subdir/nested/`; Runtime mocked to return exit code 0 | `run SimpleSdd` | Runtime.Run called with `"SimpleSdd"`; exit code 0 |
+| `TestRunCommand_PositionalArgumentFromSubdirectory` | `unit` | Executes workflow from subdirectory (Runtime handles project root location). | Temporary test directory created programmatically within test fixture; `.spectra/` and `.spectra/workflows/DefaultLogicSpec.yaml` created inside test fixture; subdirectory `subdir/nested/` created inside test fixture; test changes working directory to `subdir/nested/`; Runtime mocked to return exit code 0 | `run DefaultLogicSpec` | Runtime.Run called with `"DefaultLogicSpec"`; exit code 0 |
 
 ### Happy Path — Flag Argument
 

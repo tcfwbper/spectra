@@ -14,7 +14,7 @@
 
 | Test ID | Category | Description | Setup | Input | Expected |
 |---|---|---|---|---|---|
-| `TestCopyWorkflows_AllNew` | `unit` | Copies all embedded workflow files when none exist at target paths. | Create temp project root with `.spectra/workflows/` directory; embed 2 workflow files (`SimpleSdd.yaml`, `Another.yaml`) | `projectRoot=<tempDir>` | Returns empty warnings slice and `nil` error; both files written with `0644` permissions |
+| `TestCopyWorkflows_AllNew` | `unit` | Copies all embedded workflow files when none exist at target paths. | Create temp project root with `.spectra/workflows/` directory; embed 2 workflow files (`DefaultLogicSpec.yaml`, `Another.yaml`) | `projectRoot=<tempDir>` | Returns empty warnings slice and `nil` error; both files written with `0644` permissions |
 | `TestCopyWorkflows_EmptyEmbedFS` | `unit` | Returns success with no files when embedded filesystem is empty. | Create temp project root with `.spectra/workflows/` directory; embed no workflow files | `projectRoot=<tempDir>` | Returns empty warnings slice and `nil` error; no files written |
 
 ### Happy Path — CopyAgents
@@ -36,7 +36,7 @@
 
 | Test ID | Category | Description | Setup | Input | Expected |
 |---|---|---|---|---|---|
-| `TestCopyWorkflows_MultipleInvocations` | `unit` | Second invocation skips all files and returns warnings. | Create temp project root with `.spectra/workflows/` directory; embed 1 workflow file; invoke `CopyWorkflows` once successfully | `projectRoot=<tempDir>` (second invocation) | Returns warnings slice with 1 entry: `"Warning: workflow definition 'SimpleSdd.yaml' already exists, skipping"`; `nil` error; file content unchanged |
+| `TestCopyWorkflows_MultipleInvocations` | `unit` | Second invocation skips all files and returns warnings. | Create temp project root with `.spectra/workflows/` directory; embed 1 workflow file; invoke `CopyWorkflows` once successfully | `projectRoot=<tempDir>` (second invocation) | Returns warnings slice with 1 entry: `"Warning: workflow definition 'DefaultLogicSpec.yaml' already exists, skipping"`; `nil` error; file content unchanged |
 | `TestCopyAgents_MultipleInvocations` | `unit` | Second invocation skips all files and returns warnings. | Create temp project root with `.spectra/agents/` directory; embed 1 agent file; invoke `CopyAgents` once successfully | `projectRoot=<tempDir>` (second invocation) | Returns warnings slice with 1 entry: `"Warning: agent definition 'Architect.yaml' already exists, skipping"`; `nil` error; file content unchanged |
 | `TestCopySpecFiles_MultipleInvocations` | `unit` | Second invocation skips all files and returns warnings. | Create temp project root with `spec/` directory; embed 2 spec files; invoke `CopySpecFiles` once successfully | `projectRoot=<tempDir>` (second invocation) | Returns warnings slice with 2 entries for each skipped file; `nil` error; file content unchanged |
 
@@ -44,7 +44,7 @@
 
 | Test ID | Category | Description | Setup | Input | Expected |
 |---|---|---|---|---|---|
-| `TestCopyWorkflows_WriteFailsFirstFile` | `unit` | Returns error when writing the first workflow file fails. | Create temp project root; make `.spectra/workflows/` directory read-only (`0555`); embed 1 workflow file | `projectRoot=<tempDir>` | Returns empty warnings slice and error matching `"failed to write built-in file '.spectra/workflows/SimpleSdd.yaml': permission denied"` |
+| `TestCopyWorkflows_WriteFailsFirstFile` | `unit` | Returns error when writing the first workflow file fails. | Create temp project root; make `.spectra/workflows/` directory read-only (`0555`); embed 1 workflow file | `projectRoot=<tempDir>` | Returns empty warnings slice and error matching `"failed to write built-in file '.spectra/workflows/DefaultLogicSpec.yaml': permission denied"` |
 | `TestCopyWorkflows_WriteFailsSecondFile` | `unit` | Returns error when writing the second workflow file fails after first succeeds. | Create temp project root with `.spectra/workflows/` directory; embed 2 workflow files; after first file write, change directory to read-only | `projectRoot=<tempDir>` | Returns empty warnings slice and error matching `"failed to write built-in file"` for second file; first file remains on disk |
 | `TestCopyWorkflows_WriteFailsAfterSkip` | `unit` | Returns collected warnings and error when write fails after skipping existing files. | Create temp project root with `.spectra/workflows/` directory; create existing workflow file `First.yaml`; embed 2 workflow files (`First.yaml`, `Second.yaml`); make directory read-only after checking first file | `projectRoot=<tempDir>` | Returns warnings slice with 1 entry for skipped file and error for failed write of second file |
 | `TestCopyAgents_WriteFailsPermissionDenied` | `unit` | Returns error when writing agent file fails due to permission denied. | Create temp project root; make `.spectra/agents/` directory read-only (`0555`); embed 1 agent file | `projectRoot=<tempDir>` | Returns empty warnings slice and error matching `"failed to write built-in file '.spectra/agents/Architect.yaml': permission denied"` |
@@ -63,7 +63,7 @@
 | Test ID | Category | Description | Setup | Input | Expected |
 |---|---|---|---|---|---|
 | `TestCopyWorkflows_MultipleDotsInFilename` | `unit` | Extracts workflow name correctly from filename with multiple dots. | Create temp project root with `.spectra/workflows/` directory; embed workflow file `My.Workflow.v2.yaml` | `projectRoot=<tempDir>` | Returns `nil` error; file written to `.spectra/workflows/My.Workflow.v2.yaml` |
-| `TestCopyWorkflows_MixedCaseFilename` | `unit` | Preserves case in workflow filename. | Create temp project root with `.spectra/workflows/` directory; embed workflow files `SimpleSDD.yaml`, `simpleWorkflow.yaml` | `projectRoot=<tempDir>` | Returns `nil` error; files written to `.spectra/workflows/SimpleSDD.yaml` and `.spectra/workflows/simpleWorkflow.yaml` |
+| `TestCopyWorkflows_MixedCaseFilename` | `unit` | Preserves case in workflow filename. | Create temp project root with `.spectra/workflows/` directory; embed workflow files `DefaultLOGICSPEC.yaml`, `defaultLogicSpec.yaml` | `projectRoot=<tempDir>` | Returns `nil` error; files written to `.spectra/workflows/DefaultLOGICSPEC.yaml` and `.spectra/workflows/defaultLogicSpec.yaml` |
 | `TestCopyWorkflows_NoYamlExtension` | `unit` | Processes file without `.yaml` extension. | Create temp project root with `.spectra/workflows/` directory; embed file `README.txt` | `projectRoot=<tempDir>` | Returns `nil` error; file written (name extraction behavior depends on StorageLayout; file copied as-is) |
 | `TestCopySpecFiles_NestedPath` | `unit` | Handles spec file in nested subdirectory. | Create temp project root with `spec/logic/` directory; embed file `logic/README.md` | `projectRoot=<tempDir>` | Returns `nil` error; file written to `spec/logic/README.md` |
 
@@ -80,7 +80,7 @@
 
 | Test ID | Category | Description | Setup | Input | Expected |
 |---|---|---|---|---|---|
-| `TestCopyWorkflows_UsesStorageLayout` | `unit` | Verifies copier uses StorageLayout to compose target paths. | Create temp project root with `.spectra/workflows/` directory; mock or spy on StorageLayout.GetWorkflowPath; embed 1 workflow file `SimpleSdd.yaml` | `projectRoot=<tempDir>` | `GetWorkflowPath` called with `projectRoot` and `"SimpleSdd"`; file written to returned path |
+| `TestCopyWorkflows_UsesStorageLayout` | `unit` | Verifies copier uses StorageLayout to compose target paths. | Create temp project root with `.spectra/workflows/` directory; mock or spy on StorageLayout.GetWorkflowPath; embed 1 workflow file `DefaultLogicSpec.yaml` | `projectRoot=<tempDir>` | `GetWorkflowPath` called with `projectRoot` and `"DefaultLogicSpec"`; file written to returned path |
 | `TestCopyAgents_UsesStorageLayout` | `unit` | Verifies copier uses StorageLayout to compose target paths for agents. | Create temp project root with `.spectra/agents/` directory; mock or spy on StorageLayout.GetAgentPath; embed 1 agent file `Architect.yaml` | `projectRoot=<tempDir>` | `GetAgentPath` called with `projectRoot` and `"Architect"`; file written to returned path |
 
 ### Data Independence (Copy Semantics)
@@ -119,7 +119,7 @@
 
 | Test ID | Category | Description | Setup | Input | Expected |
 |---|---|---|---|---|---|
-| `TestCopyWorkflows_ExistingFileIsDirectory` | `unit` | Skips when target path exists as directory. | Create temp project root with `.spectra/workflows/` directory; create subdirectory `.spectra/workflows/SimpleSdd.yaml/`; embed workflow file `SimpleSdd.yaml` | `projectRoot=<tempDir>` | Returns warnings slice with entry: `"Warning: workflow definition 'SimpleSdd.yaml' already exists, skipping"`; `nil` error (os.Stat succeeds for directory) |
+| `TestCopyWorkflows_ExistingFileIsDirectory` | `unit` | Skips when target path exists as directory. | Create temp project root with `.spectra/workflows/` directory; create subdirectory `.spectra/workflows/DefaultLogicSpec.yaml/`; embed workflow file `DefaultLogicSpec.yaml` | `projectRoot=<tempDir>` | Returns warnings slice with entry: `"Warning: workflow definition 'DefaultLogicSpec.yaml' already exists, skipping"`; `nil` error (os.Stat succeeds for directory) |
 | `TestCopyAgents_ExistingFileIsDirectory` | `unit` | Skips when target path exists as directory. | Create temp project root with `.spectra/agents/` directory; create subdirectory `.spectra/agents/Architect.yaml/`; embed agent file `Architect.yaml` | `projectRoot=<tempDir>` | Returns warnings slice with entry: `"Warning: agent definition 'Architect.yaml' already exists, skipping"`; `nil` error |
 | `TestCopySpecFiles_ExistingFileIsDirectory` | `unit` | Skips when target spec file path exists as directory. | Create temp project root with `spec/` directory; create subdirectory `spec/ARCHITECTURE.md/`; embed spec file `ARCHITECTURE.md` | `projectRoot=<tempDir>` | Returns warnings slice with entry: `"Warning: spec file 'ARCHITECTURE.md' already exists, skipping"`; `nil` error |
-| `TestCopyWorkflows_ExistingFileUnreadable` | `unit` | Skips when target file exists but is not readable. | Create temp project root with `.spectra/workflows/` directory; create file `SimpleSdd.yaml` with permissions `0000`; embed workflow file `SimpleSdd.yaml` | `projectRoot=<tempDir>` | Returns warnings slice with entry for skipped file; `nil` error (os.Stat does not require read permission) |
+| `TestCopyWorkflows_ExistingFileUnreadable` | `unit` | Skips when target file exists but is not readable. | Create temp project root with `.spectra/workflows/` directory; create file `DefaultLogicSpec.yaml` with permissions `0000`; embed workflow file `DefaultLogicSpec.yaml` | `projectRoot=<tempDir>` | Returns warnings slice with entry for skipped file; `nil` error (os.Stat does not require read permission) |

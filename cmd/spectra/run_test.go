@@ -85,15 +85,15 @@ func TestRunCommand_PositionalArgument(t *testing.T) {
 // TestRunCommand_PositionalArgumentFromSubdirectory executes workflow from subdirectory
 // (Runtime handles project root location).
 func TestRunCommand_PositionalArgumentFromSubdirectory(t *testing.T) {
-	projectRoot := setupRunTestFixture(t, "SimpleSdd")
+	projectRoot := setupRunTestFixture(t, "DefaultLogicSpec")
 	subDir := filepath.Join(projectRoot, "subdir", "nested")
 	require.NoError(t, os.MkdirAll(subDir, 0755))
 	mockRT := NewMockRuntime(0)
 
-	_, _, exitCode := executeRunCommand(t, subDir, []string{"SimpleSdd"}, mockRT)
+	_, _, exitCode := executeRunCommand(t, subDir, []string{"DefaultLogicSpec"}, mockRT)
 
 	assert.True(t, mockRT.RunCalled(), "Runtime.Run should be called")
-	assert.Equal(t, "SimpleSdd", mockRT.WorkflowName())
+	assert.Equal(t, "DefaultLogicSpec", mockRT.WorkflowName())
 	assert.Equal(t, 0, exitCode)
 }
 

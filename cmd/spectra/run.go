@@ -58,8 +58,8 @@ func newRunCommand(opts []runCommandOption) *cobra.Command {
 		Use:   "run [flags] <WorkflowName>",
 		Short: "Run a workflow",
 		Long:  "Run a workflow",
-		Example: `  spectra run SimpleSdd
-  spectra run --workflow SimpleSdd`,
+		Example: `  spectra run DefaultLogicSpec
+  spectra run --workflow DefaultLogicSpec`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Determine workflow name: flag takes precedence over positional argument
 			flagChanged := cmd.Flags().Changed("workflow")
