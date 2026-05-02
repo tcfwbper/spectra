@@ -10,7 +10,7 @@ BuiltinResourceCopier is responsible for copying embedded built-in workflow, age
 2. The embedded filesystems are populated at compile time using Go's `//go:embed` directive, referencing files in the `builtin/workflows/`, `builtin/agents/`, and `builtin/spec/` directories at the project root.
 3. BuiltinResourceCopier provides three methods: `CopyWorkflows(projectRoot)`, `CopyAgents(projectRoot)`, and `CopySpecFiles(projectRoot)`.
 4. `CopyWorkflows(projectRoot)` iterates over all embedded workflow YAML files in the `builtin/workflows/` embedded directory.
-5. For each embedded workflow file (e.g., `SimpleSdd.yaml`):
+5. For each embedded workflow file (e.g., `DefaultLogicSpec.yaml`):
    - The copier uses `StorageLayout.GetWorkflowPath(projectRoot, workflowName)` to compose the target path.
    - The copier extracts the workflow name from the filename (removing the `.yaml` extension).
    - The copier checks if the target file already exists using `os.Stat()`.
@@ -151,7 +151,7 @@ Where `<relativePath>` is the path relative to `spec/` (e.g., `ARCHITECTURE.md`,
 
 8. **Embedded Filesystem Access**: The copier accesses embedded files using the `embed.FS` API (`ReadFile`, `ReadDir`). It does not access the physical filesystem for source files.
 
-9. **Filename-to-Name Extraction**: The workflow/agent name is extracted from the filename by removing the `.yaml` extension. For example, `SimpleSdd.yaml` → `SimpleSdd`. For spec files, the relative path within `builtin/spec/` is preserved when constructing the target path in `spec/`.
+9. **Filename-to-Name Extraction**: The workflow/agent name is extracted from the filename by removing the `.yaml` extension. For example, `DefaultLogicSpec.yaml` → `DefaultLogicSpec`. For spec files, the relative path within `builtin/spec/` is preserved when constructing the target path in `spec/`.
 
 10. **StorageLayout Delegation**: The copier must use `StorageLayout` to compose target file paths for `.spectra/` files. For `spec/` files, the copier constructs paths by joining `projectRoot` with `spec/` and the relative path from the embedded filesystem.
 
@@ -169,7 +169,7 @@ Where `<relativePath>` is the path relative to `spec/` (e.g., `ARCHITECTURE.md`,
   **Expected**: `CopyWorkflows()` skips all files and returns a warnings list with one warning per file. Error is `nil`.
 
 - **Condition**: Writing the first workflow file fails (permission denied).
-  **Expected**: `CopyWorkflows()` returns an empty warnings list and an error: `"failed to write built-in file '.spectra/workflows/SimpleSdd.yaml': permission denied"`. Subsequent files are not processed.
+  **Expected**: `CopyWorkflows()` returns an empty warnings list and an error: `"failed to write built-in file '.spectra/workflows/DefaultLogicSpec.yaml': permission denied"`. Subsequent files are not processed.
 
 - **Condition**: Writing the second workflow file fails (disk full), after successfully copying the first file.
   **Expected**: `CopyWorkflows()` returns an error: `"failed to write built-in file '.spectra/workflows/AnotherWorkflow.yaml': no space left on device"`. The first file remains on disk. Warnings list is empty (no files were skipped).
@@ -186,17 +186,17 @@ Where `<relativePath>` is the path relative to `spec/` (e.g., `ARCHITECTURE.md`,
 - **Condition**: Embedded filesystem contains a file with multiple dots in the name (e.g., `My.Workflow.v2.yaml`).
   **Expected**: The copier extracts the name by removing the `.yaml` extension: `My.Workflow.v2`. StorageLayout composes the path `.spectra/workflows/My.Workflow.v2.yaml`. The file is copied.
 
-- **Condition**: Embedded filesystem contains a file with uppercase and lowercase letters (e.g., `SimpleSDD.yaml`, `simpleWorkflow.yaml`).
-  **Expected**: The copier treats filenames as-is without case conversion. Files are copied to `.spectra/workflows/SimpleSDD.yaml` and `.spectra/workflows/simpleWorkflow.yaml`.
+- **Condition**: Embedded filesystem contains a file with uppercase and lowercase letters (e.g., `DefaultLOGICSPEC.yaml`, `defaultLogicSpec.yaml`).
+  **Expected**: The copier treats filenames as-is without case conversion. Files are copied to `.spectra/workflows/DefaultLOGICSPEC.yaml` and `.spectra/workflows/defaultLogicSpec.yaml`.
 
 - **Condition**: Target directory `.spectra/workflows/` does not exist.
-  **Expected**: `os.WriteFile()` fails with "no such file or directory". The copier returns an error: `"failed to write built-in file '.spectra/workflows/SimpleSdd.yaml': no such file or directory"`.
+  **Expected**: `os.WriteFile()` fails with "no such file or directory". The copier returns an error: `"failed to write built-in file '.spectra/workflows/DefaultLogicSpec.yaml': no such file or directory"`.
 
 - **Condition**: `ProjectRoot` is a relative path (e.g., `"./project"`).
   **Expected**: StorageLayout composes relative paths. `os.Stat()` and `os.WriteFile()` operate on relative paths. This may succeed or fail depending on the current working directory. The copier does not validate `ProjectRoot` format.
 
 - **Condition**: `ProjectRoot` is an empty string.
-  **Expected**: StorageLayout composes paths like `workflows/SimpleSdd.yaml` (relative to current directory). This may succeed or fail. The copier does not validate `ProjectRoot`.
+  **Expected**: StorageLayout composes paths like `workflows/DefaultLogicSpec.yaml` (relative to current directory). This may succeed or fail. The copier does not validate `ProjectRoot`.
 
 - **Condition**: Embedded file content is empty (0 bytes).
   **Expected**: The copier writes an empty file to the target path. `os.WriteFile()` succeeds. The file exists but is empty.

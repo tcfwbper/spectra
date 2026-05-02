@@ -17,7 +17,7 @@ func TestWorkflowDefinition_ValidWorkflowAllFields(t *testing.T) {
 	err := os.MkdirAll(workflowsDir, 0755)
 	require.NoError(t, err)
 
-	// Input: Name="SimpleSdd", Description="Simple workflow", EntryNode="HumanRequirement", ExitTransitions, Nodes, Transitions
+	// Input: Name="DefaultLogicSpec", Description="Simple workflow", EntryNode="HumanRequirement", ExitTransitions, Nodes, Transitions
 	nodes := []*components.Node{
 		createNode(t, "HumanRequirement", "human", "", ""),
 		createNode(t, "HumanApproval", "human", "", ""),
@@ -31,7 +31,7 @@ func TestWorkflowDefinition_ValidWorkflowAllFields(t *testing.T) {
 	}
 
 	workflow, err := components.NewWorkflowDefinition(
-		"SimpleSdd",
+		"DefaultLogicSpec",
 		"Simple workflow",
 		"HumanRequirement",
 		exitTransitions,
@@ -41,15 +41,15 @@ func TestWorkflowDefinition_ValidWorkflowAllFields(t *testing.T) {
 	require.NoError(t, err)
 
 	// Expected: Returns valid WorkflowDefinition; all fields match input
-	require.Equal(t, "SimpleSdd", workflow.GetName())
+	require.Equal(t, "DefaultLogicSpec", workflow.GetName())
 	require.Equal(t, "Simple workflow", workflow.GetDescription())
 	require.Equal(t, "HumanRequirement", workflow.GetEntryNode())
 	require.Len(t, workflow.GetExitTransitions(), 1)
 	require.Len(t, workflow.GetNodes(), 2)
 	require.Len(t, workflow.GetTransitions(), 2)
 
-	// Expected: YAML file created at <test-dir>/.spectra/workflows/SimpleSdd.yaml
-	yamlPath := filepath.Join(workflowsDir, "SimpleSdd.yaml")
+	// Expected: YAML file created at <test-dir>/.spectra/workflows/DefaultLogicSpec.yaml
+	yamlPath := filepath.Join(workflowsDir, "DefaultLogicSpec.yaml")
 	err = workflow.SaveToFile(yamlPath)
 	require.NoError(t, err)
 	require.FileExists(t, yamlPath)
@@ -137,7 +137,7 @@ func TestWorkflowDefinition_LoadValidYAML(t *testing.T) {
 	err := os.MkdirAll(workflowsDir, 0755)
 	require.NoError(t, err)
 
-	yamlContent := `name: "SimpleSdd"
+	yamlContent := `name: "DefaultLogicSpec"
 description: "Simple workflow"
 entry_node: "HumanRequirement"
 exit_transitions:
@@ -157,16 +157,16 @@ transitions:
     event_type: "RequirementApproved"
     to_node: "HumanRequirement"
 `
-	yamlPath := filepath.Join(workflowsDir, "SimpleSdd.yaml")
+	yamlPath := filepath.Join(workflowsDir, "DefaultLogicSpec.yaml")
 	err = os.WriteFile(yamlPath, []byte(yamlContent), 0644)
 	require.NoError(t, err)
 
-	// Input: Load workflow with Name="SimpleSdd"
+	// Input: Load workflow with Name="DefaultLogicSpec"
 	workflow, err := components.LoadWorkflowDefinition(yamlPath)
 	require.NoError(t, err)
 
 	// Expected: Returns valid WorkflowDefinition; all fields match YAML content
-	require.Equal(t, "SimpleSdd", workflow.GetName())
+	require.Equal(t, "DefaultLogicSpec", workflow.GetName())
 	require.Equal(t, "Simple workflow", workflow.GetDescription())
 	require.Equal(t, "HumanRequirement", workflow.GetEntryNode())
 	require.Len(t, workflow.GetExitTransitions(), 1)
@@ -254,8 +254,8 @@ func TestWorkflowDefinition_NameWithSpaces(t *testing.T) {
 	}
 	exitTransitions := []*components.ExitTransition{createExitTransition(t, "End", "Done", "Start")}
 
-	// Input: Name="Simple Sdd", valid other fields
-	_, err = components.NewWorkflowDefinition("Simple Sdd", "", "Start", exitTransitions, nodes, transitions)
+	// Input: Name="Default LogicSpec", valid other fields
+	_, err = components.NewWorkflowDefinition("Default LogicSpec", "", "Start", exitTransitions, nodes, transitions)
 
 	// Expected: Returns error; error message matches /workflow name.*PascalCase.*spaces.*special.*characters/i
 	assertErrorMatches(t, err, `(?i)workflow name.*PascalCase.*spaces.*special.*characters`)
@@ -279,8 +279,8 @@ func TestWorkflowDefinition_NameWithUnderscores(t *testing.T) {
 	}
 	exitTransitions := []*components.ExitTransition{createExitTransition(t, "End", "Done", "Start")}
 
-	// Input: Name="Simple_Sdd", valid other fields
-	_, err = components.NewWorkflowDefinition("Simple_Sdd", "", "Start", exitTransitions, nodes, transitions)
+	// Input: Name="Default_LogicSpec", valid other fields
+	_, err = components.NewWorkflowDefinition("Default_LogicSpec", "", "Start", exitTransitions, nodes, transitions)
 
 	// Expected: Returns error; error message matches /workflow name.*PascalCase.*spaces.*special.*characters/i
 	assertErrorMatches(t, err, `(?i)workflow name.*PascalCase.*spaces.*special.*characters`)
@@ -304,8 +304,8 @@ func TestWorkflowDefinition_NameWithHyphens(t *testing.T) {
 	}
 	exitTransitions := []*components.ExitTransition{createExitTransition(t, "End", "Done", "Start")}
 
-	// Input: Name="Simple-Sdd", valid other fields
-	_, err = components.NewWorkflowDefinition("Simple-Sdd", "", "Start", exitTransitions, nodes, transitions)
+	// Input: Name="Default-LogicSpec", valid other fields
+	_, err = components.NewWorkflowDefinition("Default-LogicSpec", "", "Start", exitTransitions, nodes, transitions)
 
 	// Expected: Returns error; error message matches /workflow name.*PascalCase.*spaces.*special.*characters/i
 	assertErrorMatches(t, err, `(?i)workflow name.*PascalCase.*spaces.*special.*characters`)
@@ -329,8 +329,8 @@ func TestWorkflowDefinition_NameNotPascalCase(t *testing.T) {
 	}
 	exitTransitions := []*components.ExitTransition{createExitTransition(t, "End", "Done", "Start")}
 
-	// Input: Name="simpleSdd", valid other fields
-	_, err = components.NewWorkflowDefinition("simpleSdd", "", "Start", exitTransitions, nodes, transitions)
+	// Input: Name="defaultLogicSpec", valid other fields
+	_, err = components.NewWorkflowDefinition("defaultLogicSpec", "", "Start", exitTransitions, nodes, transitions)
 
 	// Expected: Returns error; error message matches /workflow name.*PascalCase/i
 	assertErrorMatches(t, err, `(?i)workflow name.*PascalCase`)
@@ -672,13 +672,13 @@ transitions:
 
 // TestWorkflowDefinition_DuplicateName rejects loading multiple WorkflowDefinitions with same Name
 func TestWorkflowDefinition_DuplicateName(t *testing.T) {
-	// Setup: Temporary test directory created; YAML file at SimpleSdd.yaml; second YAML with same name
+	// Setup: Temporary test directory created; YAML file at DefaultLogicSpec.yaml; second YAML with same name
 	tmpDir := t.TempDir()
 	workflowsDir := filepath.Join(tmpDir, ".spectra", "workflows")
 	err := os.MkdirAll(workflowsDir, 0755)
 	require.NoError(t, err)
 
-	yamlContent := `name: "SimpleSdd"
+	yamlContent := `name: "DefaultLogicSpec"
 description: "test"
 entry_node: "Start"
 exit_transitions:
@@ -695,7 +695,7 @@ transitions:
     event_type: "Done"
     to_node: "End"
 `
-	yamlPath1 := filepath.Join(workflowsDir, "SimpleSdd.yaml")
+	yamlPath1 := filepath.Join(workflowsDir, "DefaultLogicSpec.yaml")
 	err = os.WriteFile(yamlPath1, []byte(yamlContent), 0644)
 	require.NoError(t, err)
 
@@ -707,17 +707,17 @@ transitions:
 	require.NoError(t, err)
 
 	// Create second workflow with same name
-	yamlPath2 := filepath.Join(workflowsDir, "SimpleSdd2.yaml")
+	yamlPath2 := filepath.Join(workflowsDir, "DefaultLogicSpec2.yaml")
 	err = os.WriteFile(yamlPath2, []byte(yamlContent), 0644)
 	require.NoError(t, err)
 
-	// Input: Load both workflows with Name="SimpleSdd"
+	// Input: Load both workflows with Name="DefaultLogicSpec"
 	workflow2, err := components.LoadWorkflowDefinition(yamlPath2)
 	require.NoError(t, err)
 	err = registry.Register(workflow2)
 
-	// Expected: Second workflow load returns error; error message matches /workflow.*SimpleSdd.*already exists/i
-	assertErrorMatches(t, err, `(?i)workflow.*SimpleSdd.*already exists`)
+	// Expected: Second workflow load returns error; error message matches /workflow.*DefaultLogicSpec.*already exists/i
+	assertErrorMatches(t, err, `(?i)workflow.*DefaultLogicSpec.*already exists`)
 }
 
 // TestWorkflowDefinition_ExitTargetNodeMayLackOutgoing Node targeted by exit transition is allowed to have no outgoing transitions

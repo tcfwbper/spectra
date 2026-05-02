@@ -56,12 +56,12 @@ func TestAgentDefinition_EmptyToolLists(t *testing.T) {
 	err := os.MkdirAll(agentsDir, 0755)
 	require.NoError(t, err)
 
-	// Input: Role="SimpleAgent", Model="sonnet", Effort="medium", SystemPrompt="Simple agent", AgentRoot=".", AllowedTools=[], DisallowedTools=[]
+	// Input: Role="DefaultArchitect", Model="sonnet", Effort="medium", SystemPrompt="Example prompt", AgentRoot=".", AllowedTools=[], DisallowedTools=[]
 	agent, err := components.NewAgentDefinition(
-		"SimpleAgent",
+		"DefaultArchitect",
 		"sonnet",
 		"medium",
-		"Simple agent",
+		"Example prompt",
 		".",
 		[]string{},
 		[]string{},

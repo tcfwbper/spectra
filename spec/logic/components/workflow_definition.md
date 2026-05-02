@@ -46,7 +46,7 @@ A WorkflowDefinition describes the structure and behavior of an event-driven sta
 
 **Example**:
 ```yaml
-name: "SimpleSdd"
+name: "DefaultLogicSpec"
 description: "A simplified specification-driven development workflow"
 entry_node: "HumanRequirement"
 exit_transitions:
@@ -131,7 +131,7 @@ transitions:
 - **Condition**: Workflow file `.spectra/workflows/<name>.yaml` does not exist.
   **Expected**: Runtime returns "workflow not found" error.
 
-- **Condition**: `Name` contains spaces or special characters (e.g., `"Simple-SDD"`, `"simple_sdd"`).
+- **Condition**: `Name` contains spaces or special characters (e.g., `"Default-LogicSpec"`, `"default_logicspec"`).
   **Expected**: Runtime rejects the workflow definition with an error: "workflow name must be PascalCase with no spaces or special characters".
 
 - **Condition**: `EntryNode` references a non-existent node.

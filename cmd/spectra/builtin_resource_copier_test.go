@@ -24,7 +24,7 @@ func TestCopyWorkflows_AllNew(t *testing.T) {
 	require.NoError(t, os.MkdirAll(workflowsDir, 0755))
 
 	embedFS := fstest.MapFS{
-		"builtin/workflows/SimpleSdd.yaml": &fstest.MapFile{Data: []byte("name: SimpleSdd\n")},
+		"builtin/workflows/DefaultLogicSpec.yaml": &fstest.MapFile{Data: []byte("name: DefaultLogicSpec\n")},
 		"builtin/workflows/Another.yaml":   &fstest.MapFile{Data: []byte("name: Another\n")},
 	}
 
@@ -35,7 +35,7 @@ func TestCopyWorkflows_AllNew(t *testing.T) {
 	assert.Empty(t, warnings)
 
 	// Verify files written
-	path1 := storage.GetWorkflowPath(tmpDir, "SimpleSdd")
+	path1 := storage.GetWorkflowPath(tmpDir, "DefaultLogicSpec")
 	path2 := storage.GetWorkflowPath(tmpDir, "Another")
 	assertFileExistsWithPermissions(t, path1, 0644)
 	assertFileExistsWithPermissions(t, path2, 0644)
@@ -190,7 +190,7 @@ func TestCopyWorkflows_MultipleInvocations(t *testing.T) {
 	require.NoError(t, os.MkdirAll(workflowsDir, 0755))
 
 	embedFS := fstest.MapFS{
-		"builtin/workflows/SimpleSdd.yaml": &fstest.MapFile{Data: []byte("name: SimpleSdd\n")},
+		"builtin/workflows/DefaultLogicSpec.yaml": &fstest.MapFile{Data: []byte("name: DefaultLogicSpec\n")},
 	}
 
 	copier := spectra.NewBuiltinResourceCopier(embedFS, nil, nil)
@@ -201,7 +201,7 @@ func TestCopyWorkflows_MultipleInvocations(t *testing.T) {
 	assert.Empty(t, warnings1)
 
 	// Read content after first copy
-	path := storage.GetWorkflowPath(tmpDir, "SimpleSdd")
+	path := storage.GetWorkflowPath(tmpDir, "DefaultLogicSpec")
 	originalContent, err := os.ReadFile(path)
 	require.NoError(t, err)
 
@@ -209,7 +209,7 @@ func TestCopyWorkflows_MultipleInvocations(t *testing.T) {
 	warnings2, err2 := copier.CopyWorkflows(tmpDir)
 	assert.NoError(t, err2)
 	assert.Len(t, warnings2, 1)
-	assert.Equal(t, "Warning: workflow definition 'SimpleSdd.yaml' already exists, skipping", warnings2[0])
+	assert.Equal(t, "Warning: workflow definition 'DefaultLogicSpec.yaml' already exists, skipping", warnings2[0])
 
 	// File content unchanged
 	content, err := os.ReadFile(path)
@@ -294,7 +294,7 @@ func TestCopyWorkflows_WriteFailsFirstFile(t *testing.T) {
 	t.Cleanup(func() { os.Chmod(workflowsDir, 0755) })
 
 	embedFS := fstest.MapFS{
-		"builtin/workflows/SimpleSdd.yaml": &fstest.MapFile{Data: []byte("name: SimpleSdd\n")},
+		"builtin/workflows/DefaultLogicSpec.yaml": &fstest.MapFile{Data: []byte("name: DefaultLogicSpec\n")},
 	}
 
 	copier := spectra.NewBuiltinResourceCopier(embedFS, nil, nil)
@@ -450,7 +450,7 @@ func TestCopyWorkflows_TargetDirMissing(t *testing.T) {
 	// Do NOT create .spectra/workflows/
 
 	embedFS := fstest.MapFS{
-		"builtin/workflows/SimpleSdd.yaml": &fstest.MapFile{Data: []byte("name: SimpleSdd\n")},
+		"builtin/workflows/DefaultLogicSpec.yaml": &fstest.MapFile{Data: []byte("name: DefaultLogicSpec\n")},
 	}
 
 	copier := spectra.NewBuiltinResourceCopier(embedFS, nil, nil)
@@ -509,8 +509,8 @@ func TestCopyWorkflows_MixedCaseFilename(t *testing.T) {
 	require.NoError(t, os.MkdirAll(workflowsDir, 0755))
 
 	embedFS := fstest.MapFS{
-		"builtin/workflows/SimpleSDD.yaml":      &fstest.MapFile{Data: []byte("a")},
-		"builtin/workflows/simpleWorkflow.yaml": &fstest.MapFile{Data: []byte("b")},
+		"builtin/workflows/DefaultLOGICSPEC.yaml":      &fstest.MapFile{Data: []byte("a")},
+		"builtin/workflows/defaultLogicSpec.yaml": &fstest.MapFile{Data: []byte("b")},
 	}
 
 	copier := spectra.NewBuiltinResourceCopier(embedFS, nil, nil)
@@ -518,9 +518,9 @@ func TestCopyWorkflows_MixedCaseFilename(t *testing.T) {
 
 	assert.NoError(t, err)
 
-	_, err1 := os.Stat(storage.GetWorkflowPath(tmpDir, "SimpleSDD"))
+	_, err1 := os.Stat(storage.GetWorkflowPath(tmpDir, "DefaultLOGICSPEC"))
 	assert.NoError(t, err1)
-	_, err2 := os.Stat(storage.GetWorkflowPath(tmpDir, "simpleWorkflow"))
+	_, err2 := os.Stat(storage.GetWorkflowPath(tmpDir, "defaultLogicSpec"))
 	assert.NoError(t, err2)
 }
 
@@ -570,7 +570,7 @@ func TestCopySpecFiles_NestedPath(t *testing.T) {
 // TestCopyWorkflows_EmptyProjectRoot handles empty project root path.
 func TestCopyWorkflows_EmptyProjectRoot(t *testing.T) {
 	embedFS := fstest.MapFS{
-		"builtin/workflows/SimpleSdd.yaml": &fstest.MapFile{Data: []byte("name: SimpleSdd\n")},
+		"builtin/workflows/DefaultLogicSpec.yaml": &fstest.MapFile{Data: []byte("name: DefaultLogicSpec\n")},
 	}
 
 	copier := spectra.NewBuiltinResourceCopier(embedFS, nil, nil)
@@ -586,7 +586,7 @@ func TestCopyWorkflows_RelativeProjectRoot(t *testing.T) {
 	require.NoError(t, os.MkdirAll(workflowsDir, 0755))
 
 	embedFS := fstest.MapFS{
-		"builtin/workflows/SimpleSdd.yaml": &fstest.MapFile{Data: []byte("name: SimpleSdd\n")},
+		"builtin/workflows/DefaultLogicSpec.yaml": &fstest.MapFile{Data: []byte("name: DefaultLogicSpec\n")},
 	}
 
 	copier := spectra.NewBuiltinResourceCopier(embedFS, nil, nil)
@@ -660,7 +660,7 @@ func TestCopyWorkflows_UsesStorageLayout(t *testing.T) {
 	require.NoError(t, os.MkdirAll(workflowsDir, 0755))
 
 	embedFS := fstest.MapFS{
-		"builtin/workflows/SimpleSdd.yaml": &fstest.MapFile{Data: []byte("name: SimpleSdd\n")},
+		"builtin/workflows/DefaultLogicSpec.yaml": &fstest.MapFile{Data: []byte("name: DefaultLogicSpec\n")},
 	}
 
 	copier := spectra.NewBuiltinResourceCopier(embedFS, nil, nil)
@@ -668,7 +668,7 @@ func TestCopyWorkflows_UsesStorageLayout(t *testing.T) {
 	require.NoError(t, err)
 
 	// Verify file is at the path StorageLayout would compose
-	expectedPath := storage.GetWorkflowPath(tmpDir, "SimpleSdd")
+	expectedPath := storage.GetWorkflowPath(tmpDir, "DefaultLogicSpec")
 	_, statErr := os.Stat(expectedPath)
 	assert.NoError(t, statErr)
 }
@@ -702,16 +702,16 @@ func TestCopyWorkflows_FileContentIndependent(t *testing.T) {
 	workflowsDir := filepath.Join(tmpDir, ".spectra", "workflows")
 	require.NoError(t, os.MkdirAll(workflowsDir, 0755))
 
-	embeddedContent := []byte("name: SimpleSdd\nsteps:\n  - invalid yaml {{{\n")
+	embeddedContent := []byte("name: DefaultLogicSpec\nsteps:\n  - invalid yaml {{{\n")
 	embedFS := fstest.MapFS{
-		"builtin/workflows/SimpleSdd.yaml": &fstest.MapFile{Data: embeddedContent},
+		"builtin/workflows/DefaultLogicSpec.yaml": &fstest.MapFile{Data: embeddedContent},
 	}
 
 	copier := spectra.NewBuiltinResourceCopier(embedFS, nil, nil)
 	_, err := copier.CopyWorkflows(tmpDir)
 	require.NoError(t, err)
 
-	path := storage.GetWorkflowPath(tmpDir, "SimpleSdd")
+	path := storage.GetWorkflowPath(tmpDir, "DefaultLogicSpec")
 	content, readErr := os.ReadFile(path)
 	require.NoError(t, readErr)
 	assert.Equal(t, embeddedContent, content)
@@ -841,14 +841,14 @@ func TestCopyWorkflows_FilePermissions(t *testing.T) {
 	require.NoError(t, os.MkdirAll(workflowsDir, 0755))
 
 	embedFS := fstest.MapFS{
-		"builtin/workflows/SimpleSdd.yaml": &fstest.MapFile{Data: []byte("name: SimpleSdd\n")},
+		"builtin/workflows/DefaultLogicSpec.yaml": &fstest.MapFile{Data: []byte("name: DefaultLogicSpec\n")},
 	}
 
 	copier := spectra.NewBuiltinResourceCopier(embedFS, nil, nil)
 	_, err := copier.CopyWorkflows(tmpDir)
 	require.NoError(t, err)
 
-	path := storage.GetWorkflowPath(tmpDir, "SimpleSdd")
+	path := storage.GetWorkflowPath(tmpDir, "DefaultLogicSpec")
 	assertFileExistsWithPermissions(t, path, 0644)
 }
 
@@ -1000,11 +1000,11 @@ func TestCopyWorkflows_ExistingFileIsDirectory(t *testing.T) {
 	require.NoError(t, os.MkdirAll(workflowsDir, 0755))
 
 	// Create a directory at the target path
-	targetPath := storage.GetWorkflowPath(tmpDir, "SimpleSdd")
+	targetPath := storage.GetWorkflowPath(tmpDir, "DefaultLogicSpec")
 	require.NoError(t, os.MkdirAll(targetPath, 0755))
 
 	embedFS := fstest.MapFS{
-		"builtin/workflows/SimpleSdd.yaml": &fstest.MapFile{Data: []byte("name: SimpleSdd\n")},
+		"builtin/workflows/DefaultLogicSpec.yaml": &fstest.MapFile{Data: []byte("name: DefaultLogicSpec\n")},
 	}
 
 	copier := spectra.NewBuiltinResourceCopier(embedFS, nil, nil)
@@ -1012,7 +1012,7 @@ func TestCopyWorkflows_ExistingFileIsDirectory(t *testing.T) {
 
 	assert.NoError(t, err)
 	assert.Len(t, warnings, 1)
-	assert.Equal(t, "Warning: workflow definition 'SimpleSdd.yaml' already exists, skipping", warnings[0])
+	assert.Equal(t, "Warning: workflow definition 'DefaultLogicSpec.yaml' already exists, skipping", warnings[0])
 }
 
 // TestCopyAgents_ExistingFileIsDirectory skips when target path exists as directory.
@@ -1069,12 +1069,12 @@ func TestCopyWorkflows_ExistingFileUnreadable(t *testing.T) {
 	require.NoError(t, os.MkdirAll(workflowsDir, 0755))
 
 	// Create file with no permissions
-	targetPath := storage.GetWorkflowPath(tmpDir, "SimpleSdd")
+	targetPath := storage.GetWorkflowPath(tmpDir, "DefaultLogicSpec")
 	require.NoError(t, os.WriteFile(targetPath, []byte("data"), 0000))
 	t.Cleanup(func() { os.Chmod(targetPath, 0644) })
 
 	embedFS := fstest.MapFS{
-		"builtin/workflows/SimpleSdd.yaml": &fstest.MapFile{Data: []byte("name: SimpleSdd\n")},
+		"builtin/workflows/DefaultLogicSpec.yaml": &fstest.MapFile{Data: []byte("name: DefaultLogicSpec\n")},
 	}
 
 	copier := spectra.NewBuiltinResourceCopier(embedFS, nil, nil)
@@ -1082,7 +1082,7 @@ func TestCopyWorkflows_ExistingFileUnreadable(t *testing.T) {
 
 	assert.NoError(t, err)
 	assert.Len(t, warnings, 1)
-	assert.Contains(t, warnings[0], "SimpleSdd.yaml")
+	assert.Contains(t, warnings[0], "DefaultLogicSpec.yaml")
 }
 
 // =====================================================================

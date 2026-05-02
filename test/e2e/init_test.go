@@ -85,7 +85,7 @@ func TestInit_FreshDirectory(t *testing.T) {
 	assert.DirExists(t, filepath.Join(tmpDir, "spec", "test"))
 
 	// Verify .spectra/ files written
-	assert.FileExists(t, filepath.Join(tmpDir, ".spectra", "workflows", "SimpleSdd.yaml"))
+	assert.FileExists(t, filepath.Join(tmpDir, ".spectra", "workflows", "DefaultLogicSpec.yaml"))
 
 	// Verify spec/ files written
 	assert.FileExists(t, filepath.Join(tmpDir, "spec", "ARCHITECTURE.md"))
@@ -204,7 +204,7 @@ func TestInit_SomeBuiltinFilesExist(t *testing.T) {
 	require.NoError(t, os.MkdirAll(filepath.Join(tmpDir, "spec", "test"), 0755))
 
 	require.NoError(t, os.WriteFile(
-		filepath.Join(tmpDir, ".spectra", "workflows", "SimpleSdd.yaml"),
+		filepath.Join(tmpDir, ".spectra", "workflows", "DefaultLogicSpec.yaml"),
 		[]byte("existing workflow"), 0644))
 	require.NoError(t, os.WriteFile(
 		filepath.Join(tmpDir, "spec", "ARCHITECTURE.md"),
@@ -213,7 +213,7 @@ func TestInit_SomeBuiltinFilesExist(t *testing.T) {
 	stdout, _, exitCode := executeInitCommand(t, tmpDir)
 
 	assert.Equal(t, 0, exitCode)
-	assert.Contains(t, stdout, "Warning: workflow definition 'SimpleSdd.yaml' already exists, skipping")
+	assert.Contains(t, stdout, "Warning: workflow definition 'DefaultLogicSpec.yaml' already exists, skipping")
 	assert.Contains(t, stdout, "Warning: spec file 'ARCHITECTURE.md' already exists, skipping")
 	assert.Contains(t, stdout, "Spectra project initialized successfully")
 }
@@ -273,7 +273,7 @@ func TestInit_PhasesExecuteInOrder(t *testing.T) {
 	assert.DirExists(t, filepath.Join(tmpDir, ".spectra", "sessions"))
 	assert.DirExists(t, filepath.Join(tmpDir, ".spectra", "workflows"))
 	assert.DirExists(t, filepath.Join(tmpDir, ".spectra", "agents"))
-	assert.FileExists(t, filepath.Join(tmpDir, ".spectra", "workflows", "SimpleSdd.yaml"))
+	assert.FileExists(t, filepath.Join(tmpDir, ".spectra", "workflows", "DefaultLogicSpec.yaml"))
 	assert.DirExists(t, filepath.Join(tmpDir, "spec"))
 	assert.DirExists(t, filepath.Join(tmpDir, "spec", "logic"))
 	assert.DirExists(t, filepath.Join(tmpDir, "spec", "test"))
@@ -870,7 +870,7 @@ func TestInit_FilePermissions(t *testing.T) {
 	require.Equal(t, 0, exitCode)
 
 	assertFileExistsWithPerm(t, filepath.Join(tmpDir, ".gitignore"), 0644)
-	assertFileExistsWithPerm(t, filepath.Join(tmpDir, ".spectra", "workflows", "SimpleSdd.yaml"), 0644)
+	assertFileExistsWithPerm(t, filepath.Join(tmpDir, ".spectra", "workflows", "DefaultLogicSpec.yaml"), 0644)
 	assertFileExistsWithPerm(t, filepath.Join(tmpDir, "spec", "ARCHITECTURE.md"), 0644)
 	assertFileExistsWithPerm(t, filepath.Join(tmpDir, "spec", "CONVENTIONS.md"), 0644)
 	assertFileExistsWithPerm(t, filepath.Join(tmpDir, "spec", "logic", "README.md"), 0644)
@@ -895,7 +895,7 @@ func TestInit_BuiltinFilesNotValidated(t *testing.T) {
 	assert.Contains(t, stdout, "Spectra project initialized successfully")
 
 	// All files exist (content is not validated)
-	assert.FileExists(t, filepath.Join(tmpDir, ".spectra", "workflows", "SimpleSdd.yaml"))
+	assert.FileExists(t, filepath.Join(tmpDir, ".spectra", "workflows", "DefaultLogicSpec.yaml"))
 }
 
 // TestInit_BuiltinSpecFilesNotValidated copies built-in spec files without validating Markdown syntax.
@@ -939,7 +939,7 @@ func TestInit_PhaseOrderingSpectraDirsBeforeFiles(t *testing.T) {
 
 	// Directories and files both exist — files couldn't be created without directories
 	assert.DirExists(t, filepath.Join(tmpDir, ".spectra", "workflows"))
-	assert.FileExists(t, filepath.Join(tmpDir, ".spectra", "workflows", "SimpleSdd.yaml"))
+	assert.FileExists(t, filepath.Join(tmpDir, ".spectra", "workflows", "DefaultLogicSpec.yaml"))
 }
 
 // TestInit_PhaseOrderingSpecDirsBeforeFiles verifies spec/ directories created before spec/ files written.
@@ -974,5 +974,5 @@ func TestInit_PhaseOrderingSpectraDirsBeforeSpecDirs(t *testing.T) {
 	// .spectra structure should exist (Phases 1+2 completed before Phase 3 failed)
 	assert.DirExists(t, filepath.Join(tmpDir, ".spectra"))
 	assert.DirExists(t, filepath.Join(tmpDir, ".spectra", "workflows"))
-	assert.FileExists(t, filepath.Join(tmpDir, ".spectra", "workflows", "SimpleSdd.yaml"))
+	assert.FileExists(t, filepath.Join(tmpDir, ".spectra", "workflows", "DefaultLogicSpec.yaml"))
 }

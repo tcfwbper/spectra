@@ -103,7 +103,7 @@ WorkflowDefinitionLoader provides read-only access to workflow definition files 
 
 11. **YAML Parsing Only**: WorkflowDefinitionLoader must only support YAML format. It must not attempt to parse other formats (JSON, TOML, etc.).
 
-12. **PascalCase Validation Pattern**: Name validation must follow the pattern `^[A-Z][a-zA-Z0-9]*$`. This pattern allows consecutive uppercase letters (e.g., `SimpleSdd`), mixed case (e.g., `SimpleWorkflow`), and digits (e.g., `V2Workflow`), but prohibits spaces, underscores, hyphens, and other special characters.
+12. **PascalCase Validation Pattern**: Name validation must follow the pattern `^[A-Z][a-zA-Z0-9]*$`. This pattern allows consecutive uppercase letters (e.g., `DefaultLOGICSPEC`), mixed case (e.g., `DefaultLogicSpec`), and digits (e.g., `V2Workflow`), but prohibits spaces, underscores, hyphens, and other special characters.
 
 13. **Agent Reference Integrity at Load Time**: Every node with `type=="agent"` must have an `agent_role` whose corresponding YAML file exists and passes AgentDefinitionLoader's full validation. WorkflowDefinitionLoader resolves these references at load time by invoking `AgentDefinitionLoader.Load(agentRole)` for each agent node. The Runtime never reaches a state where it has an in-memory WorkflowDefinition referencing a non-existent or invalid agent.
 
@@ -121,22 +121,22 @@ WorkflowDefinitionLoader provides read-only access to workflow definition files 
 - **Condition**: Workflow file has valid YAML but missing required field `Name`.
   **Expected**: WorkflowDefinitionLoader returns: `"workflow definition '<workflowName>' validation failed: missing required field 'name'"`.
 
-- **Condition**: `Name` field contains spaces (e.g., `"Simple SDD"`).
+- **Condition**: `Name` field contains spaces (e.g., `"Default LogicSpec"`).
   **Expected**: WorkflowDefinitionLoader returns: `"workflow definition '<workflowName>' validation failed: name must be PascalCase with no spaces or special characters"`.
 
-- **Condition**: `Name` field contains underscores (e.g., `"Simple_SDD"`).
+- **Condition**: `Name` field contains underscores (e.g., `"Default_LogicSpec"`).
   **Expected**: WorkflowDefinitionLoader returns: `"workflow definition '<workflowName>' validation failed: name must be PascalCase with no spaces or special characters"`.
 
-- **Condition**: `Name` field contains hyphens or other special characters (e.g., `"Simple-SDD"`, `"Simple.SDD"`).
+- **Condition**: `Name` field contains hyphens or other special characters (e.g., `"Default-LogicSpec"`, `"Default.LogicSpec"`).
   **Expected**: WorkflowDefinitionLoader returns: `"workflow definition '<workflowName>' validation failed: name must be PascalCase with no spaces or special characters"`.
 
-- **Condition**: `Name` field is valid PascalCase with consecutive uppercase letters (e.g., `"SimpleSDD"`).
+- **Condition**: `Name` field is valid PascalCase with consecutive uppercase letters (e.g., `"DefaultLOGICSPEC"`).
   **Expected**: WorkflowDefinitionLoader accepts this as valid.
 
 - **Condition**: `Name` field contains digits (e.g., `"V2Workflow"`, `"Workflow2024"`).
   **Expected**: WorkflowDefinitionLoader accepts this as valid (digits are allowed after the first character).
 
-- **Condition**: `Name` field starts with a lowercase letter (e.g., `"simpleSDD"`).
+- **Condition**: `Name` field starts with a lowercase letter (e.g., `"defaultLogicSpec"`).
   **Expected**: WorkflowDefinitionLoader returns: `"workflow definition '<workflowName>' validation failed: name must be PascalCase with no spaces or special characters"`.
 
 - **Condition**: `Name` field is a single uppercase letter (e.g., `"A"`).

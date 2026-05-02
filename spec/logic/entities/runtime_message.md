@@ -62,7 +62,7 @@ RuntimeMessage is the structured message format used for communication between s
 
 **Example 2: Error report from agent**
 ```json
-{"type": "error", "claudeSessionID": "550e8400-e29b-41d4-a716-446655440000", "payload": {"message": "Failed to load workflow definition", "detail": {"error": "file not found", "path": ".spectra/workflows/SimpleSdd.yaml"}}}
+{"type": "error", "claudeSessionID": "550e8400-e29b-41d4-a716-446655440000", "payload": {"message": "Failed to load workflow definition", "detail": {"error": "file not found", "path": ".spectra/workflows/DefaultLogicSpec.yaml"}}}
 ```
 
 **Example 3: Event from human node (empty claudeSessionID)**

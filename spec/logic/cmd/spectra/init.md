@@ -37,7 +37,7 @@ The `spectra init` command initializes a new Spectra project in the current dire
 
 #### Phase 2: Create .spectra/ files
 12. Built-in files are embedded in the binary using Go's `embed` directive and stored in a virtual filesystem accessible at compile time.
-13. For each built-in workflow definition file (e.g., `SimpleSdd.yaml`):
+13. For each built-in workflow definition file (e.g., `DefaultLogicSpec.yaml`):
    - The command composes the target path: `.spectra/workflows/<WorkflowName>.yaml`.
    - If the file does not exist at the target path, the command copies the embedded file content to the target path with permissions `0644` (rw-r--r--).
    - If the file already exists at the target path, the command prints a warning: `"Warning: workflow definition '<WorkflowName>.yaml' already exists, skipping"` and continues to the next file.
@@ -79,7 +79,7 @@ The `spectra init` command initializes a new Spectra project in the current dire
 The `init` command embeds the following built-in files (exact filenames and count depend on the default workflow and agents defined in ARCHITECTURE.md):
 
 **Built-in Workflows** (stored in `builtin/workflows/`):
-- `SimpleSdd.yaml` (default SDD+TDD workflow)
+- `DefaultLogicSpec.yaml` (default SDD+TDD workflow)
 
 **Built-in Agents** (stored in `builtin/agents/`):
 - `Architect.yaml`
@@ -125,7 +125,7 @@ Spectra project initialized successfully
 When a file already exists and is skipped:
 
 ```
-Warning: workflow definition 'SimpleSdd.yaml' already exists, skipping
+Warning: workflow definition 'DefaultLogicSpec.yaml' already exists, skipping
 Warning: agent definition 'Architect.yaml' already exists, skipping
 Warning: spec file 'ARCHITECTURE.md' already exists, skipping
 Warning: spec file 'logic/README.md' already exists, skipping
@@ -156,7 +156,7 @@ Error: failed to create directory 'spec/logic': permission denied
 When file write fails:
 
 ```
-Error: failed to write built-in file '.spectra/workflows/SimpleSdd.yaml': disk quota exceeded
+Error: failed to write built-in file '.spectra/workflows/DefaultLogicSpec.yaml': disk quota exceeded
 Error: failed to write built-in file 'spec/ARCHITECTURE.md': disk quota exceeded
 ```
 
@@ -290,7 +290,7 @@ On success or partial success:
 - **Condition**: All `.spectra/` and `spec/` directories and all built-in files already exist.
   **Expected**: The command prints warnings for each skipped file and exits with code 0, printing `"Spectra project initialized successfully"`.
 
-- **Condition**: A built-in workflow file `SimpleSdd.yaml` already exists but has different content.
+- **Condition**: A built-in workflow file `DefaultLogicSpec.yaml` already exists but has different content.
   **Expected**: The command prints a warning and skips the file. The existing file is not overwritten or compared.
 
 - **Condition**: Creating `.spectra/` directory fails due to permission denied.
@@ -300,7 +300,7 @@ On success or partial success:
   **Expected**: The command prints an error and exits with code 1. `.spectra/` remains on disk (partial state).
 
 - **Condition**: Writing a built-in workflow file fails due to disk full.
-  **Expected**: The command prints `"Error: failed to write built-in file '.spectra/workflows/SimpleSdd.yaml': no space left on device"` and exits with code 1. Any previously written files remain on disk (partial state). `spec/` directories and files are not created.
+  **Expected**: The command prints `"Error: failed to write built-in file '.spectra/workflows/DefaultLogicSpec.yaml': no space left on device"` and exits with code 1. Any previously written files remain on disk (partial state). `spec/` directories and files are not created.
 
 - **Condition**: Creating `spec/` directory fails after all `.spectra/` directories and files are successfully created.
   **Expected**: The command prints `"Error: failed to create directory 'spec': permission denied"` and exits with code 1. All `.spectra/` directories and files remain on disk (partial state).
