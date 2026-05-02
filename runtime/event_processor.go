@@ -71,6 +71,10 @@ func NewEventProcessor(
 
 // ProcessEvent processes an event message from an agent or human node.
 func (ep *EventProcessor) ProcessEvent(sessionUUID string, message entities.RuntimeMessage) entities.RuntimeResponse {
+	// Step 2: Capture current state at the beginning for consistent validation
+	// This ensures that concurrent events process based on the node state they saw when they started
+	currentState := ep.session.GetCurrentStateSafe()
+
 	// Step 3: Validate session status
 	status := ep.session.GetStatusSafe()
 	if status != "running" {
@@ -90,8 +94,7 @@ func (ep *EventProcessor) ProcessEvent(sessionUUID string, message entities.Runt
 		}
 	}
 
-	// Step 5: Get current node definition
-	currentState := ep.session.GetCurrentStateSafe()
+	// Step 5: Get current node definition using the captured state
 	var currentNode *storage.Node
 	for i := range workflowDef.Nodes {
 		if workflowDef.Nodes[i].Name == currentState {
@@ -107,7 +110,8 @@ func (ep *EventProcessor) ProcessEvent(sessionUUID string, message entities.Runt
 	}
 
 	// Step 6: Validate claudeSessionID
-	if currentNode.Type == "agent" {
+	switch currentNode.Type {
+	case "agent":
 		key := fmt.Sprintf("%s.ClaudeSessionID", currentState)
 		storedValue, ok := ep.session.GetSessionDataSafe(key)
 		if !ok {
@@ -129,7 +133,7 @@ func (ep *EventProcessor) ProcessEvent(sessionUUID string, message entities.Runt
 				Message: fmt.Sprintf("claude session ID mismatch: expected %s but got %s", storedUUID, message.ClaudeSessionID),
 			}
 		}
-	} else if currentNode.Type == "human" {
+	case "human":
 		if message.ClaudeSessionID != "" {
 			return entities.RuntimeResponse{
 				Status:  "error",
