@@ -1,4 +1,4 @@
-package main
+package spectra_agent
 
 import (
 	"bufio"

@@ -1,4 +1,4 @@
-package main_test
+package spectra_agent_test
 
 import (
 	"bytes"
