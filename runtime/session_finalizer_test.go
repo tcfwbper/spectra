@@ -11,7 +11,6 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
 
@@ -29,27 +28,6 @@ func (m *mockSessionForFinalizer) GetID() string           { return m.id }
 func (m *mockSessionForFinalizer) GetStatusSafe() string   { return m.status }
 func (m *mockSessionForFinalizer) GetWorkflowName() string { return m.workflowName }
 func (m *mockSessionForFinalizer) GetErrorSafe() error     { return m.err }
-
-// mockRuntimeSocketManagerForFinalizer is a mock RuntimeSocketManager for SessionFinalizer tests.
-type mockRuntimeSocketManagerForFinalizer struct {
-	mock.Mock
-	mu              sync.Mutex
-	deleteCallCount int
-}
-
-func (m *mockRuntimeSocketManagerForFinalizer) DeleteSocket() error {
-	m.mu.Lock()
-	m.deleteCallCount++
-	m.mu.Unlock()
-	args := m.Called()
-	return args.Error(0)
-}
-
-func (m *mockRuntimeSocketManagerForFinalizer) getDeleteCallCount() int {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	return m.deleteCallCount
-}
 
 // mockLoggerForFinalizer captures log messages for SessionFinalizer tests.
 type mockLoggerForFinalizer struct {
@@ -148,12 +126,10 @@ func captureStdoutStderr(t *testing.T, fn func()) (string, string) {
 
 // --- Test fixture ---
 
-func createSessionFinalizerFixture(t *testing.T) (*mockRuntimeSocketManagerForFinalizer, *mockLoggerForFinalizer) {
+func createSessionFinalizerFixture(t *testing.T) *mockLoggerForFinalizer {
 	t.Helper()
-	sm := &mockRuntimeSocketManagerForFinalizer{}
-	sm.On("DeleteSocket").Return(nil)
 	logger := &mockLoggerForFinalizer{}
-	return sm, logger
+	return logger
 }
 
 // =====================================================================
@@ -161,9 +137,9 @@ func createSessionFinalizerFixture(t *testing.T) (*mockRuntimeSocketManagerForFi
 // =====================================================================
 
 func TestSessionFinalizer_New(t *testing.T) {
-	sm, logger := createSessionFinalizerFixture(t)
+	logger := createSessionFinalizerFixture(t)
 
-	sf, err := NewSessionFinalizer(sm, logger)
+	sf, err := NewSessionFinalizer(logger)
 
 	require.NoError(t, err)
 	assert.NotNil(t, sf)
@@ -174,8 +150,8 @@ func TestSessionFinalizer_New(t *testing.T) {
 // =====================================================================
 
 func TestFinalize_CompletedSession_StdoutOutput(t *testing.T) {
-	sm, logger := createSessionFinalizerFixture(t)
-	sf, err := NewSessionFinalizer(sm, logger)
+	logger := createSessionFinalizerFixture(t)
+	sf, err := NewSessionFinalizer(logger)
 	require.NoError(t, err)
 
 	sess := &mockSessionForFinalizer{
@@ -188,25 +164,8 @@ func TestFinalize_CompletedSession_StdoutOutput(t *testing.T) {
 		sf.Finalize(sess)
 	})
 
-	sm.AssertCalled(t, "DeleteSocket")
 	assert.Contains(t, stdout, "Session abc-123 completed successfully. Workflow: TestWorkflow")
 	assert.Empty(t, stderr, "no stderr output expected for completed session")
-}
-
-func TestFinalize_CompletedSession_SocketDeleted(t *testing.T) {
-	sm, logger := createSessionFinalizerFixture(t)
-	sf, err := NewSessionFinalizer(sm, logger)
-	require.NoError(t, err)
-
-	sess := &mockSessionForFinalizer{
-		status: "completed",
-	}
-
-	captureStdoutStderr(t, func() {
-		sf.Finalize(sess)
-	})
-
-	sm.AssertNumberOfCalls(t, "DeleteSocket", 1)
 }
 
 // =====================================================================
@@ -214,8 +173,8 @@ func TestFinalize_CompletedSession_SocketDeleted(t *testing.T) {
 // =====================================================================
 
 func TestFinalize_FailedSession_AgentError_FullDetail(t *testing.T) {
-	sm, logger := createSessionFinalizerFixture(t)
-	sf, err := NewSessionFinalizer(sm, logger)
+	logger := createSessionFinalizerFixture(t)
+	sf, err := NewSessionFinalizer(logger)
 	require.NoError(t, err)
 
 	agentErr := &finalizerAgentError{
@@ -249,8 +208,8 @@ func TestFinalize_FailedSession_AgentError_FullDetail(t *testing.T) {
 }
 
 func TestFinalize_FailedSession_AgentError_EmptyDetail(t *testing.T) {
-	sm, logger := createSessionFinalizerFixture(t)
-	sf, err := NewSessionFinalizer(sm, logger)
+	logger := createSessionFinalizerFixture(t)
+	sf, err := NewSessionFinalizer(logger)
 	require.NoError(t, err)
 
 	agentErr := &finalizerAgentError{
@@ -278,8 +237,8 @@ func TestFinalize_FailedSession_AgentError_EmptyDetail(t *testing.T) {
 }
 
 func TestFinalize_FailedSession_AgentError_NullDetail(t *testing.T) {
-	sm, logger := createSessionFinalizerFixture(t)
-	sf, err := NewSessionFinalizer(sm, logger)
+	logger := createSessionFinalizerFixture(t)
+	sf, err := NewSessionFinalizer(logger)
 	require.NoError(t, err)
 
 	agentErr := &finalizerAgentError{
@@ -310,8 +269,8 @@ func TestFinalize_FailedSession_AgentError_NullDetail(t *testing.T) {
 // =====================================================================
 
 func TestFinalize_FailedSession_RuntimeError_FullDetail(t *testing.T) {
-	sm, logger := createSessionFinalizerFixture(t)
-	sf, err := NewSessionFinalizer(sm, logger)
+	logger := createSessionFinalizerFixture(t)
+	sf, err := NewSessionFinalizer(logger)
 	require.NoError(t, err)
 
 	rtErr := &finalizerRuntimeError{
@@ -344,8 +303,8 @@ func TestFinalize_FailedSession_RuntimeError_FullDetail(t *testing.T) {
 }
 
 func TestFinalize_FailedSession_RuntimeError_EmptyDetail(t *testing.T) {
-	sm, logger := createSessionFinalizerFixture(t)
-	sf, err := NewSessionFinalizer(sm, logger)
+	logger := createSessionFinalizerFixture(t)
+	sf, err := NewSessionFinalizer(logger)
 	require.NoError(t, err)
 
 	rtErr := &finalizerRuntimeError{
@@ -371,58 +330,12 @@ func TestFinalize_FailedSession_RuntimeError_EmptyDetail(t *testing.T) {
 }
 
 // =====================================================================
-// Happy Path — Socket Cleanup
-// =====================================================================
-
-func TestFinalize_SocketDeleteIdempotent(t *testing.T) {
-	sm, logger := createSessionFinalizerFixture(t)
-	// DeleteSocket returns nil (idempotent — socket already deleted)
-	sf, err := NewSessionFinalizer(sm, logger)
-	require.NoError(t, err)
-
-	sess := &mockSessionForFinalizer{
-		status:       "completed",
-		workflowName: "TestWorkflow",
-	}
-
-	stdout, _ := captureStdoutStderr(t, func() {
-		sf.Finalize(sess)
-	})
-
-	sm.AssertCalled(t, "DeleteSocket")
-	assert.Contains(t, stdout, "completed successfully")
-}
-
-func TestFinalize_SocketDeleteWarning_ContinuesFinalization(t *testing.T) {
-	sm := &mockRuntimeSocketManagerForFinalizer{}
-	// DeleteSocket returns nil but internally socket manager logs warning "socket file not found"
-	sm.On("DeleteSocket").Return(nil)
-	logger := &mockLoggerForFinalizer{}
-
-	sf, err := NewSessionFinalizer(sm, logger)
-	require.NoError(t, err)
-
-	sess := &mockSessionForFinalizer{
-		status:       "completed",
-		workflowName: "TestWorkflow",
-	}
-
-	stdout, _ := captureStdoutStderr(t, func() {
-		sf.Finalize(sess)
-	})
-
-	// SessionFinalizer continues finalization even if socket deletion logs a warning
-	sm.AssertCalled(t, "DeleteSocket")
-	assert.Contains(t, stdout, "completed successfully")
-}
-
-// =====================================================================
 // Validation Failures — Session Status
 // =====================================================================
 
 func TestFinalize_NonTerminalStatus_Initializing(t *testing.T) {
-	sm, logger := createSessionFinalizerFixture(t)
-	sf, err := NewSessionFinalizer(sm, logger)
+	logger := createSessionFinalizerFixture(t)
+	sf, err := NewSessionFinalizer(logger)
 	require.NoError(t, err)
 
 	sess := &mockSessionForFinalizer{
@@ -431,7 +344,7 @@ func TestFinalize_NonTerminalStatus_Initializing(t *testing.T) {
 		workflowName: "TestWorkflow",
 	}
 
-	stdout, _ := captureStdoutStderr(t, func() {
+	stdout, stderr := captureStdoutStderr(t, func() {
 		sf.Finalize(sess)
 	})
 
@@ -439,30 +352,30 @@ func TestFinalize_NonTerminalStatus_Initializing(t *testing.T) {
 	warnings := logger.getWarnings()
 	found := false
 	for _, w := range warnings {
-		if strings.Contains(w, "SessionFinalizer called with non-terminal session status 'initializing'. This may indicate a programming error.") {
+		if strings.Contains(w, "SessionFinalizer called with non-terminal session status 'initializing'. This may indicate a programming error or signal interruption.") {
 			found = true
 			break
 		}
 	}
 	assert.True(t, found, "should log warning about non-terminal status 'initializing'")
 
-	// Should still delete socket
-	sm.AssertCalled(t, "DeleteSocket")
-
-	// Should print status as-is to stdout
-	assert.Contains(t, stdout, "Session test-id initializing. Workflow: TestWorkflow")
+	// Non-terminal status should print to stderr with "terminated with status" format
+	assert.Contains(t, stderr, "Session test-id terminated with status 'initializing'. Workflow: TestWorkflow")
+	assert.Empty(t, stdout, "non-terminal status should not print to stdout")
 }
 
 func TestFinalize_NonTerminalStatus_Running(t *testing.T) {
-	sm, logger := createSessionFinalizerFixture(t)
-	sf, err := NewSessionFinalizer(sm, logger)
+	logger := createSessionFinalizerFixture(t)
+	sf, err := NewSessionFinalizer(logger)
 	require.NoError(t, err)
 
 	sess := &mockSessionForFinalizer{
-		status: "running",
+		id:           "test-id",
+		status:       "running",
+		workflowName: "TestWorkflow",
 	}
 
-	captureStdoutStderr(t, func() {
+	stdout, stderr := captureStdoutStderr(t, func() {
 		sf.Finalize(sess)
 	})
 
@@ -470,15 +383,16 @@ func TestFinalize_NonTerminalStatus_Running(t *testing.T) {
 	warnings := logger.getWarnings()
 	found := false
 	for _, w := range warnings {
-		if strings.Contains(w, "SessionFinalizer called with non-terminal session status 'running'. This may indicate a programming error.") {
+		if strings.Contains(w, "SessionFinalizer called with non-terminal session status 'running'. This may indicate a programming error or signal interruption.") {
 			found = true
 			break
 		}
 	}
 	assert.True(t, found, "should log warning about non-terminal status 'running'")
 
-	// Finalization should still proceed
-	sm.AssertCalled(t, "DeleteSocket")
+	// Non-terminal status should print to stderr with "terminated with status" format
+	assert.Contains(t, stderr, "Session test-id terminated with status 'running'. Workflow: TestWorkflow")
+	assert.Empty(t, stdout, "non-terminal status should not print to stdout")
 }
 
 // =====================================================================
@@ -486,8 +400,8 @@ func TestFinalize_NonTerminalStatus_Running(t *testing.T) {
 // =====================================================================
 
 func TestFinalize_FailedSession_NilError(t *testing.T) {
-	sm, logger := createSessionFinalizerFixture(t)
-	sf, err := NewSessionFinalizer(sm, logger)
+	logger := createSessionFinalizerFixture(t)
+	sf, err := NewSessionFinalizer(logger)
 	require.NoError(t, err)
 
 	sess := &mockSessionForFinalizer{
@@ -514,8 +428,8 @@ func TestFinalize_FailedSession_NilError(t *testing.T) {
 // =====================================================================
 
 func TestFinalize_FailedSession_UnknownErrorType(t *testing.T) {
-	sm, logger := createSessionFinalizerFixture(t)
-	sf, err := NewSessionFinalizer(sm, logger)
+	logger := createSessionFinalizerFixture(t)
+	sf, err := NewSessionFinalizer(logger)
 	require.NoError(t, err)
 
 	sess := &mockSessionForFinalizer{
@@ -542,8 +456,8 @@ func TestFinalize_FailedSession_UnknownErrorType(t *testing.T) {
 // =====================================================================
 
 func TestFinalize_DetailSerializationFails(t *testing.T) {
-	sm, logger := createSessionFinalizerFixture(t)
-	sf, err := NewSessionFinalizer(sm, logger)
+	logger := createSessionFinalizerFixture(t)
+	sf, err := NewSessionFinalizer(logger)
 	require.NoError(t, err)
 
 	// func() is a Go function which is not JSON-serializable
@@ -581,8 +495,8 @@ func TestFinalize_DetailSerializationFails(t *testing.T) {
 // =====================================================================
 
 func TestFinalize_VeryLargeErrorMessage(t *testing.T) {
-	sm, logger := createSessionFinalizerFixture(t)
-	sf, err := NewSessionFinalizer(sm, logger)
+	logger := createSessionFinalizerFixture(t)
+	sf, err := NewSessionFinalizer(logger)
 	require.NoError(t, err)
 
 	largeMessage := strings.Repeat("x", 10*1024) // 10 KB
@@ -602,8 +516,8 @@ func TestFinalize_VeryLargeErrorMessage(t *testing.T) {
 }
 
 func TestFinalize_VeryLargeDetail(t *testing.T) {
-	sm, logger := createSessionFinalizerFixture(t)
-	sf, err := NewSessionFinalizer(sm, logger)
+	logger := createSessionFinalizerFixture(t)
+	sf, err := NewSessionFinalizer(logger)
 	require.NoError(t, err)
 
 	largeTrace := strings.Repeat("a", 1024*1024) // 1 MB
@@ -630,8 +544,8 @@ func TestFinalize_VeryLargeDetail(t *testing.T) {
 // =====================================================================
 
 func TestFinalize_SessionIDWithSpecialChars(t *testing.T) {
-	sm, logger := createSessionFinalizerFixture(t)
-	sf, err := NewSessionFinalizer(sm, logger)
+	logger := createSessionFinalizerFixture(t)
+	sf, err := NewSessionFinalizer(logger)
 	require.NoError(t, err)
 
 	sess := &mockSessionForFinalizer{
@@ -648,8 +562,8 @@ func TestFinalize_SessionIDWithSpecialChars(t *testing.T) {
 }
 
 func TestFinalize_WorkflowNameWithSpecialChars(t *testing.T) {
-	sm, logger := createSessionFinalizerFixture(t)
-	sf, err := NewSessionFinalizer(sm, logger)
+	logger := createSessionFinalizerFixture(t)
+	sf, err := NewSessionFinalizer(logger)
 	require.NoError(t, err)
 
 	sess := &mockSessionForFinalizer{
@@ -666,8 +580,8 @@ func TestFinalize_WorkflowNameWithSpecialChars(t *testing.T) {
 }
 
 func TestFinalize_ErrorMessageWithUnicode(t *testing.T) {
-	sm, logger := createSessionFinalizerFixture(t)
-	sf, err := NewSessionFinalizer(sm, logger)
+	logger := createSessionFinalizerFixture(t)
+	sf, err := NewSessionFinalizer(logger)
 	require.NoError(t, err)
 
 	agentErr := &finalizerAgentError{
@@ -690,8 +604,8 @@ func TestFinalize_ErrorMessageWithUnicode(t *testing.T) {
 // =====================================================================
 
 func TestFinalize_EmptySessionID(t *testing.T) {
-	sm, logger := createSessionFinalizerFixture(t)
-	sf, err := NewSessionFinalizer(sm, logger)
+	logger := createSessionFinalizerFixture(t)
+	sf, err := NewSessionFinalizer(logger)
 	require.NoError(t, err)
 
 	sess := &mockSessionForFinalizer{
@@ -708,8 +622,8 @@ func TestFinalize_EmptySessionID(t *testing.T) {
 }
 
 func TestFinalize_EmptyWorkflowName(t *testing.T) {
-	sm, logger := createSessionFinalizerFixture(t)
-	sf, err := NewSessionFinalizer(sm, logger)
+	logger := createSessionFinalizerFixture(t)
+	sf, err := NewSessionFinalizer(logger)
 	require.NoError(t, err)
 
 	sess := &mockSessionForFinalizer{
@@ -725,8 +639,8 @@ func TestFinalize_EmptyWorkflowName(t *testing.T) {
 }
 
 func TestFinalize_EmptyAgentRole(t *testing.T) {
-	sm, logger := createSessionFinalizerFixture(t)
-	sf, err := NewSessionFinalizer(sm, logger)
+	logger := createSessionFinalizerFixture(t)
+	sf, err := NewSessionFinalizer(logger)
 	require.NoError(t, err)
 
 	agentErr := &finalizerAgentError{
@@ -749,11 +663,9 @@ func TestFinalize_EmptyAgentRole(t *testing.T) {
 // =====================================================================
 
 func TestFinalize_CalledMultipleTimes(t *testing.T) {
-	sm := &mockRuntimeSocketManagerForFinalizer{}
-	sm.On("DeleteSocket").Return(nil)
 	logger := &mockLoggerForFinalizer{}
 
-	sf, err := NewSessionFinalizer(sm, logger)
+	sf, err := NewSessionFinalizer(logger)
 	require.NoError(t, err)
 
 	sess := &mockSessionForFinalizer{
@@ -767,8 +679,6 @@ func TestFinalize_CalledMultipleTimes(t *testing.T) {
 		})
 		assert.Contains(t, stdout, "completed successfully", "call %d should print success message", i)
 	}
-
-	assert.Equal(t, 3, sm.getDeleteCallCount(), "DeleteSocket should be called 3 times (idempotent)")
 }
 
 // =====================================================================
@@ -776,8 +686,8 @@ func TestFinalize_CalledMultipleTimes(t *testing.T) {
 // =====================================================================
 
 func TestFinalize_SessionFilesNotDeleted(t *testing.T) {
-	sm, logger := createSessionFinalizerFixture(t)
-	sf, err := NewSessionFinalizer(sm, logger)
+	logger := createSessionFinalizerFixture(t)
+	sf, err := NewSessionFinalizer(logger)
 	require.NoError(t, err)
 
 	// Create temporary session directory with session.json and events.jsonl
@@ -795,7 +705,7 @@ func TestFinalize_SessionFilesNotDeleted(t *testing.T) {
 		sf.Finalize(sess)
 	})
 
-	// Verify session directory and files still exist (only socket deleted)
+	// Verify session directory and files still exist (SessionFinalizer does not perform resource cleanup)
 	_, statErr := os.Stat(sessionDir)
 	assert.NoError(t, statErr, "session directory should still exist")
 	_, statErr = os.Stat(sessionDir + "/session.json")
@@ -809,11 +719,9 @@ func TestFinalize_SessionFilesNotDeleted(t *testing.T) {
 // =====================================================================
 
 func TestFinalize_NoReturnError(t *testing.T) {
-	sm := &mockRuntimeSocketManagerForFinalizer{}
-	sm.On("DeleteSocket").Return(nil)
 	logger := &mockLoggerForFinalizer{}
 
-	sf, err := NewSessionFinalizer(sm, logger)
+	sf, err := NewSessionFinalizer(logger)
 	require.NoError(t, err)
 
 	sess := &mockSessionForFinalizer{
@@ -828,8 +736,8 @@ func TestFinalize_NoReturnError(t *testing.T) {
 }
 
 func TestFinalize_OutputStreamClosed(t *testing.T) {
-	sm, logger := createSessionFinalizerFixture(t)
-	sf, err := NewSessionFinalizer(sm, logger)
+	logger := createSessionFinalizerFixture(t)
+	sf, err := NewSessionFinalizer(logger)
 	require.NoError(t, err)
 
 	sess := &mockSessionForFinalizer{
@@ -867,8 +775,8 @@ func TestFinalize_OutputStreamClosed(t *testing.T) {
 // =====================================================================
 
 func TestFinalize_CompletedStatus_NoErrorField(t *testing.T) {
-	sm, logger := createSessionFinalizerFixture(t)
-	sf, err := NewSessionFinalizer(sm, logger)
+	logger := createSessionFinalizerFixture(t)
+	sf, err := NewSessionFinalizer(logger)
 	require.NoError(t, err)
 
 	sess := &mockSessionForFinalizer{
@@ -884,8 +792,8 @@ func TestFinalize_CompletedStatus_NoErrorField(t *testing.T) {
 }
 
 func TestFinalize_FailedStatus_ErrorFieldPresent(t *testing.T) {
-	sm, logger := createSessionFinalizerFixture(t)
-	sf, err := NewSessionFinalizer(sm, logger)
+	logger := createSessionFinalizerFixture(t)
+	sf, err := NewSessionFinalizer(logger)
 	require.NoError(t, err)
 
 	agentErr := &finalizerAgentError{
@@ -901,29 +809,4 @@ func TestFinalize_FailedStatus_ErrorFieldPresent(t *testing.T) {
 	})
 
 	assert.Contains(t, stderr, "Error: test")
-}
-
-// =====================================================================
-// Mock / Dependency Interaction — RuntimeSocketManager
-// =====================================================================
-
-func TestFinalize_RuntimeSocketManagerDeleteSocketCalled(t *testing.T) {
-	sm := &mockRuntimeSocketManagerForFinalizer{}
-	sm.On("DeleteSocket").Return(nil)
-	logger := &mockLoggerForFinalizer{}
-
-	sf, err := NewSessionFinalizer(sm, logger)
-	require.NoError(t, err)
-
-	sess := &mockSessionForFinalizer{
-		status:       "completed",
-		workflowName: "TestWorkflow",
-	}
-
-	stdout, _ := captureStdoutStderr(t, func() {
-		sf.Finalize(sess)
-	})
-
-	sm.AssertCalled(t, "DeleteSocket")
-	assert.Contains(t, stdout, "completed successfully")
 }
