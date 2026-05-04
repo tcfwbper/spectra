@@ -22,21 +22,6 @@ type SessionDirectoryManager interface {
 	CreateSessionDirectory(sessionUUID string) error
 }
 
-// SessionForInitializer defines the Session interface required by SessionInitializer.
-type SessionForInitializer interface {
-	Run(terminationNotifier chan<- struct{}) error
-	Fail(err error, terminationNotifier chan<- struct{}) error
-	GetStatusSafe() string
-	GetID() string
-	GetWorkflowName() string
-	GetCurrentStateSafe() string
-	GetCreatedAt() int64
-	GetUpdatedAt() int64
-	GetEventHistory() []session.Event
-	GetSessionData() map[string]any
-	GetErrorSafe() error
-}
-
 // SessionInitializer orchestrates the complete initialization flow for creating a new session.
 type SessionInitializer struct {
 	projectRoot        string
@@ -303,6 +288,21 @@ func (sw *sessionWrapper) Run(terminationNotifier chan<- struct{}) error {
 
 	sw.Session.Status = "running"
 	sw.Session.UpdatedAt = time.Now().Unix()
+	return nil
+}
+
+func (sw *sessionWrapper) Done(terminationNotifier chan<- struct{}) error {
+	sw.mu.Lock()
+	defer sw.mu.Unlock()
+
+	sw.Session.Status = "completed"
+	sw.Session.UpdatedAt = time.Now().Unix()
+
+	select {
+	case terminationNotifier <- struct{}{}:
+	default:
+	}
+
 	return nil
 }
 
