@@ -1,10 +1,29 @@
 package runtime
 
-import "github.com/tcfwbper/spectra/entities"
+import (
+	"github.com/tcfwbper/spectra/entities"
+	"github.com/tcfwbper/spectra/entities/session"
+)
+
+// SessionForInitializer is the interface Runtime receives from SessionInitializer.
+type SessionForInitializer interface {
+	Run(terminationNotifier chan<- struct{}) error
+	Done(terminationNotifier chan<- struct{}) error
+	Fail(err error, terminationNotifier chan<- struct{}) error
+	GetStatusSafe() string
+	GetCurrentStateSafe() string
+	GetID() string
+	GetWorkflowName() string
+	GetCreatedAt() int64
+	GetUpdatedAt() int64
+	GetEventHistory() []session.Event
+	GetSessionData() map[string]any
+	GetErrorSafe() error
+}
 
 // SessionInitializerInterface is the interface Runtime uses for session initialization.
 type SessionInitializerInterface interface {
-	Initialize(workflowName string, projectRoot string, terminationNotifier chan<- struct{}) (SessionForInitializer, error)
+	Initialize(workflowName string, terminationNotifier chan<- struct{}) (SessionForInitializer, error)
 }
 
 // SessionFinalizerInterface is the interface Runtime uses for session finalization.
@@ -13,7 +32,9 @@ type SessionFinalizerInterface interface {
 }
 
 // RuntimeSocketManagerInterface is the interface Runtime uses for socket management.
+// CreateSocket() is part of this interface so its error can be injected in tests.
 type RuntimeSocketManagerInterface interface {
+	CreateSocket() error
 	Listen(handler MessageHandler) (<-chan error, <-chan struct{}, error)
 	DeleteSocket() error
 }
