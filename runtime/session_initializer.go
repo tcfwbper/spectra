@@ -39,27 +39,25 @@ type SessionForInitializer interface {
 
 // SessionInitializer orchestrates the complete initialization flow for creating a new session.
 type SessionInitializer struct {
-	projectRoot       string
-	wdLoader          WorkflowDefinitionLoader
-	dirManager        SessionDirectoryManager
-	timeoutDuration   time.Duration
+	projectRoot        string
+	wdLoader           WorkflowDefinitionLoader
+	dirManager         SessionDirectoryManager
+	timeoutDuration    time.Duration
 	sessionConstructor func(wfDef *storage.WorkflowDefinition, sessionUUID string) (SessionForInitializer, error)
 
 	// Test injection points
-	spectraFinderFunc     func() (string, error)
-	spectraFinderBlockCh  chan struct{}
-	fileAccessorFunc      func() error
-	socketManagerFunc     func() (RuntimeSocketManager, error)
-	metadataStoreFunc     func() (MetadataStore, error)
-	sessionRunErrorFunc   func() error
-	sessionRunBlockCh     chan struct{}
-	sessionRunCallbackFunc func(chan<- struct{})
+	spectraFinderFunc       func() (string, error)
+	spectraFinderBlockCh    chan struct{}
+	fileAccessorFunc        func() error
+	metadataStoreFunc       func() (MetadataStore, error)
+	sessionRunErrorFunc     func() error
+	sessionRunBlockCh       chan struct{}
+	sessionRunCallbackFunc  func(chan<- struct{})
 	sessionFailCallbackFunc func(error, chan<- struct{})
-	callOrderTracker      callOrderRecorder
-	wasDeleteSocketCalled atomic.Bool
-	wasSessionFailCalled  atomic.Bool
-	sessionFailErrorMu    sync.Mutex
-	sessionFailError      error
+	callOrderTracker        callOrderRecorder
+	wasSessionFailCalled    atomic.Bool
+	sessionFailErrorMu      sync.Mutex
+	sessionFailError        error
 }
 
 // callOrderRecorder is an interface for recording call order in tests.
@@ -107,22 +105,22 @@ func (si *SessionInitializer) defaultSessionConstructor(wfDef *storage.WorkflowD
 }
 
 // Initialize performs the complete initialization flow for a new session.
-func (si *SessionInitializer) Initialize(workflowName string, projectRoot string, terminationNotifier chan<- struct{}) (SessionForInitializer, error) {
+func (si *SessionInitializer) Initialize(workflowName string, terminationNotifier chan<- struct{}) (SessionForInitializer, error) {
 	// Validate terminationNotifier buffer capacity
 	if cap(terminationNotifier) < 2 {
 		return nil, fmt.Errorf("terminationNotifier channel must have buffer capacity >= 2, got %d", cap(terminationNotifier))
 	}
 
 	// Validate projectRoot
-	info, err := os.Stat(projectRoot)
+	info, err := os.Stat(si.projectRoot)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return nil, fmt.Errorf("project root does not exist: %s", projectRoot)
+			return nil, fmt.Errorf("project root does not exist: %s", si.projectRoot)
 		}
 		return nil, fmt.Errorf("failed to stat project root: %w", err)
 	}
 	if !info.IsDir() {
-		return nil, fmt.Errorf("project root is not a directory: %s", projectRoot)
+		return nil, fmt.Errorf("project root is not a directory: %s", si.projectRoot)
 	}
 
 	// Shared state for timeout handler
@@ -188,20 +186,7 @@ func (si *SessionInitializer) Initialize(workflowName string, projectRoot string
 	}
 	if si.fileAccessorFunc != nil {
 		if err := si.fileAccessorFunc(); err != nil {
-			return nil, fmt.Errorf("failed to initialize storage files: %w", err)
-		}
-	}
-
-	// Create runtime socket
-	if si.callOrderTracker != nil {
-		si.callOrderTracker.record("CreateSocket")
-	}
-	var socketManager RuntimeSocketManager
-	if si.socketManagerFunc != nil {
-		socketManager, err = si.socketManagerFunc()
-		if err != nil {
-			si.wasDeleteSocketCalled.Store(true)
-			return nil, fmt.Errorf("failed to create runtime socket: %w", err)
+			return sess, fmt.Errorf("failed to initialize storage files: %w", err)
 		}
 	}
 
@@ -212,18 +197,10 @@ func (si *SessionInitializer) Initialize(workflowName string, projectRoot string
 	if si.metadataStoreFunc != nil {
 		metadataStore, err := si.metadataStoreFunc()
 		if err != nil {
-			if socketManager != nil {
-				_ = socketManager.DeleteSocket()
-			}
-			si.wasDeleteSocketCalled.Store(true)
-			return nil, fmt.Errorf("failed to persist initial session metadata: %w", err)
+			return sess, fmt.Errorf("failed to persist initial session metadata: %w", err)
 		}
 		if err := metadataStore.Write(sess); err != nil {
-			if socketManager != nil {
-				_ = socketManager.DeleteSocket()
-			}
-			si.wasDeleteSocketCalled.Store(true)
-			return nil, fmt.Errorf("failed to persist initial session metadata: %w", err)
+			return sess, fmt.Errorf("failed to persist initial session metadata: %w", err)
 		}
 	}
 
@@ -251,11 +228,6 @@ func (si *SessionInitializer) Initialize(workflowName string, projectRoot string
 	}
 
 	if runErr != nil {
-		if socketManager != nil {
-			_ = socketManager.DeleteSocket()
-		}
-		si.wasDeleteSocketCalled.Store(true)
-
 		// Create RuntimeError and call Session.Fail
 		rtErr := fmt.Errorf("failed to transition session to running status: %w", runErr)
 		si.wasSessionFailCalled.Store(true)
@@ -269,7 +241,7 @@ func (si *SessionInitializer) Initialize(workflowName string, projectRoot string
 			_ = sess.Fail(rtErr, terminationNotifier)
 		}
 
-		return nil, fmt.Errorf("failed to transition session to running: %w", runErr)
+		return sess, fmt.Errorf("failed to transition session to running: %w", runErr)
 	}
 
 	// Mark initialization as completed

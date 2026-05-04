@@ -8,13 +8,7 @@ import (
 
 // SessionFinalizer orchestrates the cleanup flow when a session reaches a terminal state.
 type SessionFinalizer struct {
-	socketManager RuntimeSocketManager
-	logger        Logger
-}
-
-// RuntimeSocketManager defines the interface for runtime socket operations.
-type RuntimeSocketManager interface {
-	DeleteSocket() error
+	logger Logger
 }
 
 // Logger defines the interface for logging operations.
@@ -49,10 +43,9 @@ type RuntimeError interface {
 }
 
 // NewSessionFinalizer creates a new SessionFinalizer.
-func NewSessionFinalizer(socketManager RuntimeSocketManager, logger Logger) (*SessionFinalizer, error) {
+func NewSessionFinalizer(logger Logger) (*SessionFinalizer, error) {
 	return &SessionFinalizer{
-		socketManager: socketManager,
-		logger:        logger,
+		logger: logger,
 	}, nil
 }
 
@@ -62,11 +55,8 @@ func (sf *SessionFinalizer) Finalize(session SessionForFinalizer) {
 
 	// Validate terminal status
 	if status != "completed" && status != "failed" {
-		sf.logger.Warning(fmt.Sprintf("SessionFinalizer called with non-terminal session status '%s'. This may indicate a programming error.", status))
+		sf.logger.Warning(fmt.Sprintf("SessionFinalizer called with non-terminal session status '%s'. This may indicate a programming error or signal interruption.", status))
 	}
-
-	// Clean up socket (best-effort)
-	_ = sf.socketManager.DeleteSocket()
 
 	// Print status to appropriate output stream
 	switch status {
@@ -75,8 +65,8 @@ func (sf *SessionFinalizer) Finalize(session SessionForFinalizer) {
 	case "failed":
 		sf.printFailedStatus(session)
 	default:
-		// Non-terminal status - print to stdout
-		_, _ = fmt.Fprintf(os.Stdout, "Session %s %s. Workflow: %s\n",
+		// Non-terminal status - print to stderr with "terminated with status" format
+		_, _ = fmt.Fprintf(os.Stderr, "Session %s terminated with status '%s'. Workflow: %s\n",
 			session.GetID(), status, session.GetWorkflowName())
 	}
 }
