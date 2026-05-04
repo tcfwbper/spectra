@@ -9,13 +9,15 @@ import (
 
 const version = "v0.1.0"
 
-// exitError is a custom error that carries an exit code
+// exitError is a custom error that carries an exit code.
+// The error message is empty to avoid duplicate output when cobra prints it,
+// since the actual error message has already been printed to stderr by the command.
 type exitError struct {
 	code int
 }
 
 func (e *exitError) Error() string {
-	return fmt.Sprintf("exit code %d", e.code)
+	return ""
 }
 
 // SubcommandHandler defines the interface for subcommand handlers
@@ -32,6 +34,12 @@ type RootCommand struct {
 func (rc *RootCommand) Execute() int {
 	err := rc.Command.Execute()
 	if err != nil {
+		// Check if it's an exitError with a specific code
+		if exitErr, ok := err.(*exitError); ok {
+			return exitErr.code
+		}
+		// For other errors, print them to stderr
+		fmt.Fprintf(rc.Command.ErrOrStderr(), "Error: %s\n", err.Error())
 		return 1
 	}
 	return 0
@@ -80,9 +88,11 @@ func NewRootCommandWithHandlers(opts ...HandlerOption) *RootCommand {
 	}
 
 	rootCmd := &cobra.Command{
-		Use:     "spectra",
-		Short:   "Framework for defining and executing flexible AI agent workflows",
-		Version: version,
+		Use:           "spectra",
+		Short:         "Framework for defining and executing flexible AI agent workflows",
+		Version:       version,
+		SilenceErrors: true, // We handle error printing in RootCommand.Execute
+		SilenceUsage:  true, // Don't print usage on errors
 		Run: func(cmd *cobra.Command, args []string) {
 			_ = cmd.Help()
 		},
