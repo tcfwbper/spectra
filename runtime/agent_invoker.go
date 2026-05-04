@@ -2,6 +2,7 @@ package runtime
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -110,7 +111,7 @@ func (ai *AgentInvoker) InvokeAgent(nodeName string, message string, agentDef st
 
 	// Step 12: Construct command arguments
 	args := []string{
-		"--permission-mode", "bypassPermission",
+		"--permission-mode", "bypassPermissions",
 		"--model", agentDef.Model,
 		"--effort", agentDef.Effort,
 		"--system-prompt", agentDef.SystemPrompt,
@@ -150,6 +151,11 @@ func (ai *AgentInvoker) InvokeAgent(nodeName string, message string, agentDef st
 		fmt.Sprintf("SPECTRA_CLAUDE_SESSION_ID=%s", claudeSessionID),
 	)
 
+	// Redirect output so Claude is not attached to a TTY, which skips the
+	// workspace trust dialog (Claude skips it when stdout is not a TTY).
+	cmd.Stdout = io.Discard
+	cmd.Stderr = io.Discard
+
 	// Step 16: Start the process
 	if err := cmd.Start(); err != nil {
 		return fmt.Errorf("failed to start Claude CLI process: %v", err)
@@ -180,7 +186,7 @@ func (ai *AgentInvoker) CaptureCommandArgs(nodeName string, message string, agen
 
 	// Construct arguments
 	args := []string{
-		"--permission-mode", "bypassPermission",
+		"--permission-mode", "bypassPermissions",
 		"--model", agentDef.Model,
 		"--effort", agentDef.Effort,
 		"--system-prompt", agentDef.SystemPrompt,
@@ -235,10 +241,8 @@ func (ai *AgentInvoker) CaptureCommandEnv(nodeName string, message string, agent
 }
 
 // CaptureCommandOutputConfig is a test helper that returns output stream configuration.
-func (ai *AgentInvoker) CaptureCommandOutputConfig(nodeName string, message string, agentDef storage.AgentDefinition) (*os.File, *os.File) {
-	// AgentInvoker does NOT redirect output streams
-	// They inherit from parent process
-	return nil, nil
+func (ai *AgentInvoker) CaptureCommandOutputConfig(nodeName string, message string, agentDef storage.AgentDefinition) (io.Writer, io.Writer) {
+	return io.Discard, io.Discard
 }
 
 // SimulatePostStartFailure is a test helper for simulating post-start failures.

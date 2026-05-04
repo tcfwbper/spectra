@@ -21,9 +21,24 @@ import (
 
 // setupIsolatedSpectraProject creates an isolated temporary directory with a
 // fully initialized .spectra project structure including workflow definitions.
-func setupIsolatedSpectraProject(t *testing.T, workflowName string) string {
+// An optional entryNode argument overrides the default entry node name ("start").
+// Use a non-"start" entry node for tests that require the session to remain
+// active (e.g. signal-handling tests), since RunE2E auto-completes sessions
+// whose entry node is named "start".
+func setupIsolatedSpectraProject(t *testing.T, workflowName string, entryNode ...string) string {
 	t.Helper()
-	tmpDir := t.TempDir()
+
+	node := "start"
+	if len(entryNode) > 0 {
+		node = entryNode[0]
+	}
+
+	// Use os.MkdirTemp with a short prefix instead of t.TempDir() to keep the
+	// resulting Unix domain socket path under the 108-char OS limit.
+	// t.TempDir() embeds the full test name, making the path too long.
+	tmpDir, err := os.MkdirTemp("", "sp")
+	require.NoError(t, err)
+	t.Cleanup(func() { os.RemoveAll(tmpDir) })
 
 	// Create .spectra directory structure
 	spectraDir := filepath.Join(tmpDir, ".spectra")
@@ -31,34 +46,31 @@ func setupIsolatedSpectraProject(t *testing.T, workflowName string) string {
 	require.NoError(t, os.MkdirAll(filepath.Join(spectraDir, "workflows"), 0755))
 	require.NoError(t, os.MkdirAll(filepath.Join(spectraDir, "agents"), 0755))
 
-	// Create a minimal workflow definition file
+	// Create a minimal valid workflow definition.
+	// Uses only human-type nodes so no agent loader is required.
+	// The single transition from the entry node to "end" satisfies all
+	// structural constraints (non-empty transitions, exit transition with a
+	// corresponding transition that targets a human node, every non-entry
+	// node has an incoming transition).
 	workflowContent := []byte(`name: ` + workflowName + `
 description: Test workflow for e2e
-entry_node: start
+entry_node: ` + node + `
 nodes:
-  - name: start
-    type: agent
-    agent_role: test_agent
+  - name: ` + node + `
+    type: human
+  - name: end
+    type: human
+transitions:
+  - from_node: ` + node + `
+    event_type: user_input
+    to_node: end
 exit_transitions:
-  - from_node: start
-    event_type: done
-    to_node: __exit__
-transitions: []
+  - from_node: ` + node + `
+    event_type: user_input
+    to_node: end
 `)
 	workflowPath := filepath.Join(spectraDir, "workflows", workflowName+".yaml")
 	require.NoError(t, os.WriteFile(workflowPath, workflowContent, 0644))
-
-	// Create a minimal agent definition
-	agentContent := []byte(`role: test_agent
-model: test-model
-effort: low
-system_prompt: "You are a test agent."
-agent_root: "."
-allowed_tools: []
-disallowed_tools: []
-`)
-	agentPath := filepath.Join(spectraDir, "agents", "test_agent.yaml")
-	require.NoError(t, os.WriteFile(agentPath, agentContent, 0644))
 
 	return tmpDir
 }
@@ -181,7 +193,7 @@ func TestRuntime_ExitCode1_SessionFailed(t *testing.T) {
 }
 
 func TestRuntime_ExitCode130_SIGINT(t *testing.T) {
-	tmpDir := setupIsolatedSpectraProject(t, "TestWorkflow")
+	tmpDir := setupIsolatedSpectraProject(t, "TestWorkflow", "pending")
 
 	go func() {
 		time.Sleep(50 * time.Millisecond)
@@ -201,7 +213,7 @@ func TestRuntime_ExitCode143_SIGTERM(t *testing.T) {
 		t.Skip("SIGTERM not available on Windows")
 	}
 
-	tmpDir := setupIsolatedSpectraProject(t, "TestWorkflow")
+	tmpDir := setupIsolatedSpectraProject(t, "TestWorkflow", "pending")
 
 	go func() {
 		time.Sleep(50 * time.Millisecond)

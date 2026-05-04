@@ -380,22 +380,33 @@ func RunE2E(workflowName string, projectRoot string) error {
 			return fmt.Errorf("failed to initialize session: %w", err)
 		}
 		// Session exists, finalize it
-		sf := &SessionFinalizer{}
+		sf := &SessionFinalizer{logger: logger}
 		defer sf.Finalize(sess)
 		return fmt.Errorf("failed to initialize session: %w", err)
 	}
 
 	// Create SessionFinalizer
-	sf := &SessionFinalizer{}
+	sf := &SessionFinalizer{logger: logger}
 	defer func() {
-		if r := recover(); r != nil {
-			// Ignore panic
-		}
 		sf.Finalize(sess)
 	}()
 
 	// Create RuntimeSocketManager
 	sm := storage.NewRuntimeSocketManager(root, sess.GetID())
+
+	// Create the socket file before starting the listener
+	if err := sm.CreateSocket(); err != nil {
+		rtErr := &entities.RuntimeError{
+			Issuer:       "Runtime",
+			Message:      "failed to create socket",
+			Detail:       []byte(fmt.Sprintf("{\"error\":\"%s\"}", err.Error())),
+			FailingState: sess.GetCurrentStateSafe(),
+			SessionID:    parseUUID(sess.GetID()),
+			OccurredAt:   time.Now().Unix(),
+		}
+		_ = sess.Fail(rtErr, terminationNotifier)
+		return fmt.Errorf("failed to create socket: %w", err)
+	}
 
 	// Create MessageRouter (minimal implementation)
 	mr := &minimalMessageRouter{}

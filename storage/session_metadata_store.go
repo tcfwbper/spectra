@@ -19,6 +19,22 @@ type SessionMetadataStore struct {
 	metadataPath string
 }
 
+// SessionMetadataStoreAdapter wraps SessionMetadataStore to satisfy the
+// session.SessionMetadataStore interface, which expects Write(metadata SessionMetadata).
+type SessionMetadataStoreAdapter struct {
+	store *SessionMetadataStore
+}
+
+// NewSessionMetadataStoreAdapter creates an adapter wrapping a SessionMetadataStore.
+func NewSessionMetadataStoreAdapter(store *SessionMetadataStore) *SessionMetadataStoreAdapter {
+	return &SessionMetadataStoreAdapter{store: store}
+}
+
+// Write satisfies session.SessionMetadataStore by forwarding to the underlying store.
+func (a *SessionMetadataStoreAdapter) Write(metadata session.SessionMetadata) error {
+	return a.store.Write(&metadata)
+}
+
 // NewSessionMetadataStore creates a new SessionMetadataStore for the given session.
 func NewSessionMetadataStore(projectRoot string, sessionUUID uuid.UUID) *SessionMetadataStore {
 	metadataPath := GetSessionMetadataPath(projectRoot, sessionUUID.String())
