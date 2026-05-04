@@ -1,6 +1,10 @@
 package spectra
 
-import "time"
+import (
+	"fmt"
+	"io"
+	"time"
+)
 
 // MockSubcommandHandler is a mock implementation for testing subcommand handlers.
 type MockSubcommandHandler struct {
@@ -185,4 +189,78 @@ func (m *MockRuntime) SetSignalCh(ch chan struct{}) {
 // SetBlockDuration sets a duration that Run will sleep before returning.
 func (m *MockRuntime) SetBlockDuration(d time.Duration) {
 	m.blockDuration = d
+}
+
+// MockRunRuntime is a mock implementation of the Runtime interface for run command tests.
+// Unlike MockRuntime (which returns int), this mock's Run method returns an error,
+// matching the test spec's expectation that Runtime.Run(workflowName) returns error.
+type MockRunRuntime struct {
+	runCalled       bool
+	runCallCount    int
+	workflowName    string
+	err             error
+	blockDuration   time.Duration
+	panicValue      interface{}
+	stdout          io.Writer
+	finalizerOutput string
+}
+
+// NewMockRunRuntime creates a new MockRunRuntime that returns the given error.
+func NewMockRunRuntime(err error) *MockRunRuntime {
+	return &MockRunRuntime{err: err}
+}
+
+// NewMockRunRuntimeWithPanic creates a MockRunRuntime that panics with the given value.
+func NewMockRunRuntimeWithPanic(panicValue interface{}) *MockRunRuntime {
+	return &MockRunRuntime{panicValue: panicValue}
+}
+
+// Run records the call and returns the configured error.
+// If panicValue is set, Run panics instead of returning.
+// If blockDuration is set, Run sleeps before returning.
+// If finalizerOutput is set, Run writes it to stdout to simulate SessionFinalizer output.
+func (m *MockRunRuntime) Run(workflowName string) error {
+	m.runCalled = true
+	m.runCallCount++
+	m.workflowName = workflowName
+	if m.panicValue != nil {
+		panic(m.panicValue)
+	}
+	if m.blockDuration > 0 {
+		time.Sleep(m.blockDuration)
+	}
+	if m.finalizerOutput != "" && m.stdout != nil {
+		fmt.Fprint(m.stdout, m.finalizerOutput)
+	}
+	return m.err
+}
+
+// RunCalled returns whether Run was called.
+func (m *MockRunRuntime) RunCalled() bool {
+	return m.runCalled
+}
+
+// RunCallCount returns the number of times Run was called.
+func (m *MockRunRuntime) RunCallCount() int {
+	return m.runCallCount
+}
+
+// WorkflowName returns the workflow name passed to Run.
+func (m *MockRunRuntime) WorkflowName() string {
+	return m.workflowName
+}
+
+// SetBlockDuration sets a duration that Run will sleep before returning.
+func (m *MockRunRuntime) SetBlockDuration(d time.Duration) {
+	m.blockDuration = d
+}
+
+// SetStdout sets the stdout writer for simulating SessionFinalizer output.
+func (m *MockRunRuntime) SetStdout(w io.Writer) {
+	m.stdout = w
+}
+
+// SetFinalizerOutput sets the output that Run will write to stdout to simulate SessionFinalizer.
+func (m *MockRunRuntime) SetFinalizerOutput(output string) {
+	m.finalizerOutput = output
 }
