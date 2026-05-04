@@ -206,7 +206,7 @@
 
 | Test ID | Category | Description | Setup | Input | Expected |
 |---|---|---|---|---|---|
-| `TestRuntime_ListenerDoneCh_ImmediateClose` | `unit` | Handles listenerDoneCh closing before DeleteSocket returns. | Test fixture; listenerDoneCh closes immediately when DeleteSocket called (race: listener exits very fast) | `workflowName="TestWorkflow"` | Runtime waits for listenerDoneCh; channel already closed; wait returns immediately; SessionFinalizer called without delay |
+| `TestRuntime_ListenerDoneCh_ImmediateClose` | `unit` | Handles listenerDoneCh closing before DeleteSocket returns. | Test fixture; session completes normally (terminationNotifier receives signal via Session.Done inside SessionInitializer); use a custom socket manager wrapper whose DeleteSocket closes listenerDoneCh synchronously before returning, so the channel is already closed when the cleanup select runs | `workflowName="TestWorkflow"` | Runtime main event loop exits via terminationNotifier; in cleanup phase, `<-listenerDoneCh` select returns immediately because the channel was already closed by DeleteSocket; SessionFinalizer called without delay; Runtime returns `nil` |
 
 ### Edge Cases — Empty Error Message
 

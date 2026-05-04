@@ -2275,24 +2275,53 @@ func TestRuntime_ListenerDoneChClosedOnce(t *testing.T) {
 func TestRuntime_ListenerDoneCh_ImmediateClose(t *testing.T) {
 	f := newRuntimeTestFixture(t)
 
+	// Session completes normally: SessionInitializer calls Session.Done to send
+	// terminationNotifier signal, ensuring the main event loop exits via that path.
 	f.sessionInitializer.initFunc = func(workflowName string, tn chan<- struct{}) (SessionForInitializer, error) {
+		_ = f.session.Done(tn)
 		return f.session, nil
 	}
 
-	// listenerDoneCh closes immediately when DeleteSocket called
-	close(f.socketManager.listenDoneCh)
+	// Wrap the socket manager so that DeleteSocket closes listenerDoneCh
+	// synchronously before returning — this is the "race: listener exits very fast"
+	// scenario where the channel is already closed when the cleanup select runs.
+	immediateCloseSM := &immediateCloseSocketManager{
+		inner: f.socketManager,
+	}
 
-	go func() {
-		time.Sleep(10 * time.Millisecond)
-		f.session.mu.Lock()
-		f.session.status = "completed"
-		f.session.mu.Unlock()
-	}()
-
-	err := Run("TestWorkflow", f.spectraFinder.Find, f.sessionInitializer, f.sessionFinalizer, f.socketManager, f.messageRouter, f.logger)
+	err := Run("TestWorkflow", f.spectraFinder.Find, f.sessionInitializer, f.sessionFinalizer, immediateCloseSM, f.messageRouter, f.logger)
 
 	assert.NoError(t, err)
 	assert.True(t, f.sessionFinalizer.wasCalled(), "SessionFinalizer should be called without delay")
+}
+
+// immediateCloseSocketManager wraps mockRuntimeSocketManagerForRuntime and closes
+// listenDoneCh inside DeleteSocket to simulate a listener that exits very fast.
+type immediateCloseSocketManager struct {
+	inner *mockRuntimeSocketManagerForRuntime
+}
+
+func (m *immediateCloseSocketManager) CreateSocket() error {
+	return m.inner.CreateSocket()
+}
+
+func (m *immediateCloseSocketManager) Listen(handler MessageHandler) (<-chan error, <-chan struct{}, error) {
+	return m.inner.Listen(handler)
+}
+
+func (m *immediateCloseSocketManager) DeleteSocket() error {
+	err := m.inner.DeleteSocket()
+	// Close listenerDoneCh synchronously, simulating a listener that exits
+	// immediately once the socket is deleted.
+	m.inner.mu.Lock()
+	select {
+	case <-m.inner.listenDoneCh:
+		// already closed
+	default:
+		close(m.inner.listenDoneCh)
+	}
+	m.inner.mu.Unlock()
+	return err
 }
 
 // =====================================================================
