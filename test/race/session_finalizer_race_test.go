@@ -5,7 +5,6 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
 	"github.com/tcfwbper/spectra/runtime"
@@ -26,27 +25,6 @@ func (m *raceMockSessionForFinalizer) GetStatusSafe() string   { return m.status
 func (m *raceMockSessionForFinalizer) GetWorkflowName() string { return m.workflowName }
 func (m *raceMockSessionForFinalizer) GetErrorSafe() error     { return m.err }
 
-// raceMockRSMForFinalizer is a thread-safe mock RuntimeSocketManager for race tests.
-type raceMockRSMForFinalizer struct {
-	mock.Mock
-	mu              sync.Mutex
-	deleteCallCount int
-}
-
-func (m *raceMockRSMForFinalizer) DeleteSocket() error {
-	m.mu.Lock()
-	m.deleteCallCount++
-	m.mu.Unlock()
-	args := m.Called()
-	return args.Error(0)
-}
-
-func (m *raceMockRSMForFinalizer) getDeleteCallCount() int {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	return m.deleteCallCount
-}
-
 // raceMockLoggerForFinalizer is a thread-safe logger for race tests.
 type raceMockLoggerForFinalizer struct {
 	mu       sync.Mutex
@@ -64,11 +42,9 @@ func (m *raceMockLoggerForFinalizer) Warning(msg string) {
 // =====================================================================
 
 func TestFinalize_ConcurrentCalls(t *testing.T) {
-	sm := &raceMockRSMForFinalizer{}
-	sm.On("DeleteSocket").Return(nil)
 	logger := &raceMockLoggerForFinalizer{}
 
-	sf, err := runtime.NewSessionFinalizer(sm, logger)
+	sf, err := runtime.NewSessionFinalizer(logger)
 	require.NoError(t, err)
 
 	sess := &raceMockSessionForFinalizer{
@@ -98,20 +74,14 @@ func TestFinalize_ConcurrentCalls(t *testing.T) {
 
 	wg.Wait()
 
-	// All calls should complete; DeleteSocket should be called 5 times
-	count := sm.getDeleteCallCount()
-	if count != goroutines {
-		t.Errorf("expected DeleteSocket called %d times, got %d", goroutines, count)
-	}
+	// All calls should complete without panic; success message printed 5 times
+	// No resource cleanup is performed by SessionFinalizer
 }
 
 func TestFinalize_ConcurrentSocketDeletion(t *testing.T) {
-	sm := &raceMockRSMForFinalizer{}
-	// DeleteSocket is idempotent: first real delete, rest are no-ops
-	sm.On("DeleteSocket").Return(nil)
 	logger := &raceMockLoggerForFinalizer{}
 
-	sf, err := runtime.NewSessionFinalizer(sm, logger)
+	sf, err := runtime.NewSessionFinalizer(logger)
 	require.NoError(t, err)
 
 	sess := &raceMockSessionForFinalizer{
@@ -141,9 +111,5 @@ func TestFinalize_ConcurrentSocketDeletion(t *testing.T) {
 
 	wg.Wait()
 
-	// All calls should complete without panic
-	count := sm.getDeleteCallCount()
-	if count != goroutines {
-		t.Errorf("expected DeleteSocket called %d times, got %d", goroutines, count)
-	}
+	// All calls should complete without panic; no resource cleanup by SessionFinalizer
 }
