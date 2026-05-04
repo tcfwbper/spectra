@@ -2,6 +2,7 @@ package runtime
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -242,7 +243,7 @@ func TestAgentInvoker_CommandConstruction_AllFlags(t *testing.T) {
 	capturedArgs := invoker.CaptureCommandArgs("Node", "prompt", agentDef)
 
 	assert.Contains(t, capturedArgs, "--permission-mode")
-	assert.Contains(t, capturedArgs, "bypassPermission")
+	assert.Contains(t, capturedArgs, "bypassPermissions")
 	assert.Contains(t, capturedArgs, "--model")
 	assert.Contains(t, capturedArgs, "sonnet")
 	assert.Contains(t, capturedArgs, "--effort")
@@ -463,8 +464,8 @@ func TestAgentInvoker_NoOutputCapture(t *testing.T) {
 
 	stdout, stderr := invoker.CaptureCommandOutputConfig("Node", "prompt", agentDef)
 
-	assert.Nil(t, stdout, "stdout should not be redirected (inherit from parent)")
-	assert.Nil(t, stderr, "stderr should not be redirected (inherit from parent)")
+	assert.Equal(t, io.Discard, stdout, "stdout should be redirected to io.Discard to prevent TTY trust dialog")
+	assert.Equal(t, io.Discard, stderr, "stderr should be redirected to io.Discard to prevent TTY trust dialog")
 }
 
 // --- Validation Failures — Session Data ---

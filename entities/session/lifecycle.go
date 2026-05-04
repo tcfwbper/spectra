@@ -23,8 +23,12 @@ func (s *Session) Run(terminationNotifier chan<- struct{}) error {
 	s.mu.Unlock()
 
 	// Attempt persistence (best-effort)
-	if err := s.metadataStore.Write(s.SessionMetadata); err != nil {
-		s.logger.Warning(fmt.Sprintf("Run persistence failed: %v", err))
+	if s.metadataStore != nil {
+		if err := s.metadataStore.Write(s.SessionMetadata); err != nil {
+			if s.logger != nil {
+				s.logger.Warning(fmt.Sprintf("Run persistence failed: %v", err))
+			}
+		}
 	}
 
 	return nil
@@ -48,8 +52,12 @@ func (s *Session) Done(terminationNotifier chan<- struct{}) error {
 	s.mu.Unlock()
 
 	// Attempt persistence (best-effort)
-	if err := s.metadataStore.Write(s.SessionMetadata); err != nil {
-		s.logger.Warning(fmt.Sprintf("Done persistence failed: %v", err))
+	if s.metadataStore != nil {
+		if err := s.metadataStore.Write(s.SessionMetadata); err != nil {
+			if s.logger != nil {
+				s.logger.Warning(fmt.Sprintf("Done persistence failed: %v", err))
+			}
+		}
 	}
 
 	// Send termination notification (non-blocking)
@@ -103,8 +111,12 @@ func (s *Session) Fail(err error, terminationNotifier chan<- struct{}) error {
 	s.mu.Unlock()
 
 	// Attempt persistence (best-effort)
-	if persistErr := s.metadataStore.Write(s.SessionMetadata); persistErr != nil {
-		s.logger.Warning(fmt.Sprintf("Fail persistence failed: %v", persistErr))
+	if s.metadataStore != nil {
+		if persistErr := s.metadataStore.Write(s.SessionMetadata); persistErr != nil {
+			if s.logger != nil {
+				s.logger.Warning(fmt.Sprintf("Fail persistence failed: %v", persistErr))
+			}
+		}
 	}
 
 	// Send termination notification (non-blocking)

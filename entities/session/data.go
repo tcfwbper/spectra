@@ -35,8 +35,12 @@ func (s *Session) UpdateSessionDataSafe(key string, value any) error {
 	s.UpdatedAt = time.Now().Unix()
 
 	// Attempt persistence (best-effort)
-	if err := s.metadataStore.Write(s.SessionMetadata); err != nil {
-		s.logger.Warning(fmt.Sprintf("UpdateSessionDataSafe persistence failed: %v", err))
+	if s.metadataStore != nil {
+		if err := s.metadataStore.Write(s.SessionMetadata); err != nil {
+			if s.logger != nil {
+				s.logger.Warning(fmt.Sprintf("UpdateSessionDataSafe persistence failed: %v", err))
+			}
+		}
 	}
 
 	return nil

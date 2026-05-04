@@ -61,3 +61,15 @@ type RuntimeError struct {
 func (e *RuntimeError) Error() string {
 	return e.Message
 }
+
+// NewSession constructs a Session with the given metadata and runtime dependencies.
+// metadataStore, eventStore, and logger are required for persistence and warning logging.
+func NewSession(metadata SessionMetadata, metadataStore SessionMetadataStore, eventStore EventStore, logger Logger) *Session {
+	return &Session{
+		SessionMetadata: metadata,
+		EventHistory:    []Event{},
+		metadataStore:   metadataStore,
+		eventStore:      eventStore,
+		logger:          logger,
+	}
+}

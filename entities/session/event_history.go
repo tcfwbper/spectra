@@ -33,8 +33,12 @@ func (s *Session) UpdateEventHistorySafe(event Event) error {
 	s.UpdatedAt = time.Now().Unix()
 
 	// Attempt persistence to EventStore (best-effort)
-	if err := s.eventStore.WriteEvent(event); err != nil {
-		s.logger.Warning(fmt.Sprintf("UpdateEventHistorySafe: EventStore persistence failed: %v", err))
+	if s.eventStore != nil {
+		if err := s.eventStore.WriteEvent(event); err != nil {
+			if s.logger != nil {
+				s.logger.Warning(fmt.Sprintf("UpdateEventHistorySafe: EventStore persistence failed: %v", err))
+			}
+		}
 	}
 
 	return nil

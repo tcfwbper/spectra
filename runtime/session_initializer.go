@@ -72,20 +72,24 @@ func NewSessionInitializer(projectRoot string, wdLoader WorkflowDefinitionLoader
 
 func (si *SessionInitializer) defaultSessionConstructor(wfDef *storage.WorkflowDefinition, sessionUUID string) (SessionForInitializer, error) {
 	now := time.Now().Unix()
-	sess := &session.Session{
-		SessionMetadata: session.SessionMetadata{
-			ID:           sessionUUID,
-			WorkflowName: wfDef.Name,
-			Status:       "initializing",
-			CreatedAt:    now,
-			UpdatedAt:    now,
-			CurrentState: wfDef.EntryNode,
-			SessionData:  make(map[string]any),
-			Error:        nil,
-		},
-		EventHistory: []session.Event{},
+	sessionID, err := uuid.Parse(sessionUUID)
+	if err != nil {
+		return nil, fmt.Errorf("invalid session UUID: %w", err)
 	}
-
+	eventStore := storage.NewSessionEventStore(si.projectRoot, sessionID)
+	metadataStore := storage.NewSessionMetadataStoreAdapter(storage.NewSessionMetadataStore(si.projectRoot, sessionID))
+	logger := &sessionStdLogger{}
+	metadata := session.SessionMetadata{
+		ID:           sessionUUID,
+		WorkflowName: wfDef.Name,
+		Status:       "initializing",
+		CreatedAt:    now,
+		UpdatedAt:    now,
+		CurrentState: wfDef.EntryNode,
+		SessionData:  make(map[string]any),
+		Error:        nil,
+	}
+	sess := session.NewSession(metadata, metadataStore, eventStore, logger)
 	return &sessionWrapper{Session: sess}, nil
 }
 
@@ -272,6 +276,11 @@ func (si *SessionInitializer) handleTimeout(sessionMu *sync.Mutex, sess *Session
 	}
 }
 
+// sessionStdLogger is a minimal session.Logger implementation that writes warnings to stderr.
+type sessionStdLogger struct{}
+
+func (l *sessionStdLogger) Warning(msg string) { fmt.Fprintln(os.Stderr, msg) }
+
 // sessionWrapper wraps session.Session to implement SessionForInitializer.
 type sessionWrapper struct {
 	Session *session.Session
@@ -378,4 +387,20 @@ func (sw *sessionWrapper) GetErrorSafe() error {
 	sw.mu.RLock()
 	defer sw.mu.RUnlock()
 	return sw.Session.Error
+}
+
+func (sw *sessionWrapper) GetSessionDataSafe(key string) (any, bool) {
+	return sw.Session.GetSessionDataSafe(key)
+}
+
+func (sw *sessionWrapper) UpdateSessionDataSafe(key string, value any) error {
+	return sw.Session.UpdateSessionDataSafe(key, value)
+}
+
+func (sw *sessionWrapper) UpdateCurrentStateSafe(newState string) error {
+	return sw.Session.UpdateCurrentStateSafe(newState)
+}
+
+func (sw *sessionWrapper) UpdateEventHistorySafe(event session.Event) error {
+	return sw.Session.UpdateEventHistorySafe(event)
 }

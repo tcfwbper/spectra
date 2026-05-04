@@ -10,7 +10,9 @@ import (
 func (s *Session) UpdateCurrentStateSafe(newState string) error {
 	// Validate newState is non-empty before acquiring lock
 	if newState == "" {
-		s.logger.Warning("UpdateCurrentStateSafe called with empty newState; in-memory state unchanged")
+		if s.logger != nil {
+			s.logger.Warning("UpdateCurrentStateSafe called with empty newState; in-memory state unchanged")
+		}
 		return nil
 	}
 
@@ -23,8 +25,12 @@ func (s *Session) UpdateCurrentStateSafe(newState string) error {
 	s.UpdatedAt = time.Now().Unix()
 
 	// Attempt persistence (best-effort)
-	if err := s.metadataStore.Write(s.SessionMetadata); err != nil {
-		s.logger.Warning(fmt.Sprintf("UpdateCurrentStateSafe persistence failed: %v", err))
+	if s.metadataStore != nil {
+		if err := s.metadataStore.Write(s.SessionMetadata); err != nil {
+			if s.logger != nil {
+				s.logger.Warning(fmt.Sprintf("UpdateCurrentStateSafe persistence failed: %v", err))
+			}
+		}
 	}
 
 	return nil
