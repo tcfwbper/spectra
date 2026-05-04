@@ -1,7 +1,6 @@
 package runtime
 
 import (
-	"sync/atomic"
 	"time"
 )
 
@@ -23,13 +22,6 @@ func (si *SessionInitializer) SetSessionRunError(err error) {
 func (si *SessionInitializer) SetMetadataWriteError(err error) {
 	si.metadataStoreFunc = func() (MetadataStore, error) {
 		return nil, err
-	}
-}
-
-// SetSocketCreateError configures the initializer to fail during socket creation.
-func (si *SessionInitializer) SetSocketCreateError(err error) {
-	si.socketManagerFunc = func() (RuntimeSocketManager, error) {
-		return &mockSocketManagerForHelper{}, err
 	}
 }
 
@@ -60,11 +52,6 @@ func (si *SessionInitializer) SetCallOrderTracker(tracker callOrderRecorder) {
 	si.callOrderTracker = tracker
 }
 
-// WasDeleteSocketCalled returns whether DeleteSocket was called.
-func (si *SessionInitializer) WasDeleteSocketCalled() bool {
-	return si.wasDeleteSocketCalled.Load()
-}
-
 // WasSessionFailCalled returns whether Session.Fail was called.
 func (si *SessionInitializer) WasSessionFailCalled() bool {
 	return si.wasSessionFailCalled.Load()
@@ -75,18 +62,4 @@ func (si *SessionInitializer) GetSessionFailError() error {
 	si.sessionFailErrorMu.Lock()
 	defer si.sessionFailErrorMu.Unlock()
 	return si.sessionFailError
-}
-
-// mockSocketManagerForHelper is a simple mock for test helpers.
-type mockSocketManagerForHelper struct {
-	deleteSocketCalled atomic.Bool
-}
-
-func (m *mockSocketManagerForHelper) DeleteSocket() error {
-	m.deleteSocketCalled.Store(true)
-	return nil
-}
-
-func (m *mockSocketManagerForHelper) CreateSocket() error {
-	return nil
 }
