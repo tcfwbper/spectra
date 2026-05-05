@@ -10,7 +10,7 @@ A Node represents a discrete step in a workflow where either an AI agent or a hu
 - Owns: immutability guarantee for all fields after construction.
 - Owns: conditional format validation (AgentRole required when Type is agent, forbidden when Type is human).
 - Delegates: name uniqueness within a workflow to the workflow-level aggregator.
-- Delegates: referential integrity of AgentRole (whether the agent actually exists) to the workflow-level aggregator.
+- Delegates: referential integrity of AgentRole (whether the agent actually exists) to the I/O loader layer.
 - Delegates: runtime dispatch behavior (invoking agents, waiting for human input) to the runtime.
 - Must not: perform any I/O, network access, or filesystem operations.
 - Must not: reference or import any module outside the `components` package.
