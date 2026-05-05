@@ -48,3 +48,6 @@ func (re *RuntimeError) SessionID() string { return re.sessionError.SessionID() 
 
 // FailingState returns the state machine node where the error occurred.
 func (re *RuntimeError) FailingState() string { return re.sessionError.FailingState() }
+
+// Error implements the error interface.
+func (re *RuntimeError) Error() string { return re.sessionError.Message() }

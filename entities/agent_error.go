@@ -43,3 +43,6 @@ func (ae *AgentError) SessionID() string { return ae.sessionError.SessionID() }
 
 // FailingState returns the state machine node where the error occurred.
 func (ae *AgentError) FailingState() string { return ae.sessionError.FailingState() }
+
+// Error implements the error interface.
+func (ae *AgentError) Error() string { return ae.sessionError.Message() }
