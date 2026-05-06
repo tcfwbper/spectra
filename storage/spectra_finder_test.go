@@ -13,7 +13,6 @@ import (
 // --- Happy Path — SpectraFinder ---
 
 func TestSpectraFinder_FoundInStartDir(t *testing.T) {
-	t.Skip("scaffolded: awaiting production source storage/spectra_finder.go")
 
 	dir := makeTempDirWithSpectra(t)
 
@@ -24,7 +23,6 @@ func TestSpectraFinder_FoundInStartDir(t *testing.T) {
 }
 
 func TestSpectraFinder_FoundInParent(t *testing.T) {
-	t.Skip("scaffolded: awaiting production source storage/spectra_finder.go")
 
 	dir := makeTempDirWithSpectra(t)
 	subDir := filepath.Join(dir, "sub", "deep")
@@ -37,7 +35,6 @@ func TestSpectraFinder_FoundInParent(t *testing.T) {
 }
 
 func TestSpectraFinder_FoundNearestAncestor(t *testing.T) {
-	t.Skip("scaffolded: awaiting production source storage/spectra_finder.go")
 
 	dir := makeTempDir(t)
 	// Create .spectra at root level
@@ -57,7 +54,6 @@ func TestSpectraFinder_FoundNearestAncestor(t *testing.T) {
 }
 
 func TestSpectraFinder_EmptyStartDirUsesCwd(t *testing.T) {
-	t.Skip("scaffolded: awaiting production source storage/spectra_finder.go with Getwd seam")
 
 	dir := makeTempDirWithSpectra(t)
 
@@ -74,7 +70,6 @@ func TestSpectraFinder_EmptyStartDirUsesCwd(t *testing.T) {
 }
 
 func TestSpectraFinder_RelativeStartDir(t *testing.T) {
-	t.Skip("scaffolded: awaiting production source storage/spectra_finder.go")
 
 	dir := makeTempDirWithSpectra(t)
 
@@ -95,7 +90,6 @@ func TestSpectraFinder_RelativeStartDir(t *testing.T) {
 // --- Error Propagation ---
 
 func TestSpectraFinder_NotFoundReturnsErrNotInitialized(t *testing.T) {
-	t.Skip("scaffolded: awaiting production source storage/spectra_finder.go")
 
 	dir := makeTempDir(t)
 	deepDir := filepath.Join(dir, "a", "b", "c")
@@ -111,7 +105,6 @@ func TestSpectraFinder_PermissionDeniedReturnsErrNotInitialized(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("permission test not reliable on Windows")
 	}
-	t.Skip("scaffolded: awaiting production source storage/spectra_finder.go")
 
 	dir := makeTempDir(t)
 	restricted := filepath.Join(dir, "restricted")
@@ -131,7 +124,6 @@ func TestSpectraFinder_PermissionDeniedReturnsErrNotInitialized(t *testing.T) {
 // --- Validation Failures ---
 
 func TestSpectraFinder_NonExistentStartDir(t *testing.T) {
-	t.Skip("scaffolded: awaiting production source storage/spectra_finder.go")
 
 	_, err := FindSpectraRoot("/tmp/non-existent-path-abc123")
 
@@ -141,7 +133,6 @@ func TestSpectraFinder_NonExistentStartDir(t *testing.T) {
 }
 
 func TestSpectraFinder_StartDirIsFile(t *testing.T) {
-	t.Skip("scaffolded: awaiting production source storage/spectra_finder.go")
 
 	dir := makeTempDir(t)
 	filePath := filepath.Join(dir, "afile.txt")
@@ -155,7 +146,6 @@ func TestSpectraFinder_StartDirIsFile(t *testing.T) {
 }
 
 func TestSpectraFinder_GetwdFails(t *testing.T) {
-	t.Skip("scaffolded: awaiting production source storage/spectra_finder.go with Getwd seam/test hook")
 
 	// This test requires either:
 	// 1. A test seam to inject a failing Getwd, or
@@ -171,7 +161,6 @@ func TestSpectraFinder_GetwdFails(t *testing.T) {
 // --- Boundary Values — startDir ---
 
 func TestSpectraFinder_StartDirIsRoot(t *testing.T) {
-	t.Skip("scaffolded: awaiting production source storage/spectra_finder.go")
 
 	_, err := FindSpectraRoot("/")
 
@@ -180,7 +169,6 @@ func TestSpectraFinder_StartDirIsRoot(t *testing.T) {
 }
 
 func TestSpectraFinder_SpectraExistsAsFile(t *testing.T) {
-	t.Skip("scaffolded: awaiting production source storage/spectra_finder.go")
 
 	dir := makeTempDir(t)
 	// Create parent with .spectra as directory
@@ -202,7 +190,6 @@ func TestSpectraFinder_SymlinkLoop(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("symlink test not reliable on Windows")
 	}
-	t.Skip("scaffolded: awaiting production source storage/spectra_finder.go")
 
 	dir := makeTempDir(t)
 	aDir := filepath.Join(dir, "a")

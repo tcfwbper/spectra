@@ -9,7 +9,6 @@ import (
 )
 
 func TestStorageLayout_ConcurrentAccess(t *testing.T) {
-	t.Skip("scaffolded: awaiting production source storage/storage_layout.go (Get* functions)")
 
 	const goroutines = 20
 	projectRoot := "/home/user/project"

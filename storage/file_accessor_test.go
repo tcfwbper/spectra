@@ -14,7 +14,6 @@ import (
 // --- Happy Path — FileAccessor ---
 
 func TestFileAccessor_FileExists(t *testing.T) {
-	t.Skip("scaffolded: awaiting production source storage/file_accessor.go")
 
 	dir := makeTempDir(t)
 	filePath := filepath.Join(dir, "existing.txt")
@@ -34,7 +33,6 @@ func TestFileAccessor_FileExists(t *testing.T) {
 }
 
 func TestFileAccessor_FileNotExistsCallbackCreates(t *testing.T) {
-	t.Skip("scaffolded: awaiting production source storage/file_accessor.go")
 
 	dir := makeTempDir(t)
 	filePath := filepath.Join(dir, "newfile.txt")
@@ -56,7 +54,6 @@ func TestFileAccessor_FileNotExistsCallbackCreates(t *testing.T) {
 // --- Error Propagation ---
 
 func TestFileAccessor_CallbackReturnsError(t *testing.T) {
-	t.Skip("scaffolded: awaiting production source storage/file_accessor.go")
 
 	dir := makeTempDir(t)
 	filePath := filepath.Join(dir, "missing.txt")
@@ -74,7 +71,6 @@ func TestFileAccessor_CallbackReturnsError(t *testing.T) {
 }
 
 func TestFileAccessor_CallbackSucceedsButFileNotCreated(t *testing.T) {
-	t.Skip("scaffolded: awaiting production source storage/file_accessor.go")
 
 	dir := makeTempDir(t)
 	filePath := filepath.Join(dir, "ghost.txt")
@@ -94,7 +90,6 @@ func TestFileAccessor_InitialStatPermissionDenied(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("permission test not reliable on Windows")
 	}
-	t.Skip("scaffolded: awaiting production source storage/file_accessor.go")
 
 	dir := makeTempDir(t)
 	restrictedDir := filepath.Join(dir, "restricted")
@@ -121,7 +116,6 @@ func TestFileAccessor_PostCallbackStatPermissionDenied(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("permission test not reliable on Windows")
 	}
-	t.Skip("scaffolded: awaiting production source storage/file_accessor.go")
 
 	dir := makeTempDir(t)
 	filePath := filepath.Join(dir, "lockdown.txt")
@@ -148,7 +142,6 @@ func TestFileAccessor_PostCallbackStatPermissionDenied(t *testing.T) {
 }
 
 func TestFileAccessor_CallbackPanics(t *testing.T) {
-	t.Skip("scaffolded: awaiting production source storage/file_accessor.go")
 
 	dir := makeTempDir(t)
 	filePath := filepath.Join(dir, "panic.txt")
@@ -165,7 +158,6 @@ func TestFileAccessor_CallbackPanics(t *testing.T) {
 // --- Null / Empty Input ---
 
 func TestFileAccessor_EmptyFilePath(t *testing.T) {
-	t.Skip("scaffolded: awaiting production source storage/file_accessor.go")
 
 	prepare := func() error {
 		return nil
@@ -177,7 +169,6 @@ func TestFileAccessor_EmptyFilePath(t *testing.T) {
 }
 
 func TestFileAccessor_NilCallbackFileNotExists(t *testing.T) {
-	t.Skip("scaffolded: awaiting production source storage/file_accessor.go")
 
 	dir := makeTempDir(t)
 	filePath := filepath.Join(dir, "noexist.txt")
@@ -190,7 +181,6 @@ func TestFileAccessor_NilCallbackFileNotExists(t *testing.T) {
 // --- Boundary Values — filePath ---
 
 func TestFileAccessor_FilePathIsDirectory(t *testing.T) {
-	t.Skip("scaffolded: awaiting production source storage/file_accessor.go")
 
 	dir := makeTempDir(t)
 	subDir := filepath.Join(dir, "subdir")
@@ -212,7 +202,6 @@ func TestFileAccessor_FilePathIsDirectory(t *testing.T) {
 // --- Idempotency ---
 
 func TestFileAccessor_IndependentInvocations(t *testing.T) {
-	t.Skip("scaffolded: awaiting production source storage/file_accessor.go")
 
 	dir := makeTempDir(t)
 	filePath := filepath.Join(dir, "idempotent.txt")

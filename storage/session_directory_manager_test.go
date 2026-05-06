@@ -13,7 +13,6 @@ import (
 // --- Happy Path — EnsureSessionsDirectory ---
 
 func TestEnsureSessionsDirectory_CreatesWhenMissing(t *testing.T) {
-	t.Skip("scaffolded: awaiting production source storage/session_directory_manager.go")
 
 	dir := makeTempDirWithSpectra(t)
 
@@ -28,7 +27,6 @@ func TestEnsureSessionsDirectory_CreatesWhenMissing(t *testing.T) {
 }
 
 func TestEnsureSessionsDirectory_AlreadyExists(t *testing.T) {
-	t.Skip("scaffolded: awaiting production source storage/session_directory_manager.go")
 
 	dir := makeTempDirWithSessions(t)
 
@@ -40,7 +38,6 @@ func TestEnsureSessionsDirectory_AlreadyExists(t *testing.T) {
 // --- Idempotency ---
 
 func TestEnsureSessionsDirectory_Idempotent(t *testing.T) {
-	t.Skip("scaffolded: awaiting production source storage/session_directory_manager.go")
 
 	dir := makeTempDirWithSpectra(t)
 
@@ -59,7 +56,6 @@ func TestEnsureSessionsDirectory_Idempotent(t *testing.T) {
 // --- Error Propagation ---
 
 func TestEnsureSessionsDirectory_SpectraDirMissing(t *testing.T) {
-	t.Skip("scaffolded: awaiting production source storage/session_directory_manager.go")
 
 	dir := makeTempDir(t) // no .spectra/ directory
 
@@ -70,7 +66,6 @@ func TestEnsureSessionsDirectory_SpectraDirMissing(t *testing.T) {
 }
 
 func TestEnsureSessionsDirectory_SpectraDirIsFile(t *testing.T) {
-	t.Skip("scaffolded: awaiting production source storage/session_directory_manager.go")
 
 	dir := makeTempDirWithSpectraAsFile(t)
 
@@ -84,7 +79,6 @@ func TestEnsureSessionsDirectory_MkdirPermissionDenied(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("permission test not reliable on Windows")
 	}
-	t.Skip("scaffolded: awaiting production source storage/session_directory_manager.go")
 
 	dir := makeTempDirWithReadOnlySpectra(t)
 
@@ -98,7 +92,6 @@ func TestEnsureSessionsDirectory_MkdirPermissionDenied(t *testing.T) {
 // --- Happy Path — CreateSessionDirectory ---
 
 func TestCreateSessionDirectory_Success(t *testing.T) {
-	t.Skip("scaffolded: awaiting production source storage/session_directory_manager.go")
 
 	dir := makeTempDirWithSessions(t)
 	uuid := "550e8400-e29b-41d4-a716-446655440000"
@@ -114,7 +107,6 @@ func TestCreateSessionDirectory_Success(t *testing.T) {
 }
 
 func TestCreateSessionDirectory_EnsuresParent(t *testing.T) {
-	t.Skip("scaffolded: awaiting production source storage/session_directory_manager.go")
 
 	dir := makeTempDirWithSpectra(t) // has .spectra/ but not sessions/
 	uuid := "550e8400-e29b-41d4-a716-446655440000"
@@ -133,7 +125,6 @@ func TestCreateSessionDirectory_EnsuresParent(t *testing.T) {
 // --- Validation Failures ---
 
 func TestCreateSessionDirectory_AlreadyExists(t *testing.T) {
-	t.Skip("scaffolded: awaiting production source storage/session_directory_manager.go")
 
 	uuid := "550e8400-e29b-41d4-a716-446655440000"
 	dir := makeTempDirWithSessionDir(t, uuid)
@@ -145,7 +136,6 @@ func TestCreateSessionDirectory_AlreadyExists(t *testing.T) {
 }
 
 func TestCreateSessionDirectory_SpectraDirMissing(t *testing.T) {
-	t.Skip("scaffolded: awaiting production source storage/session_directory_manager.go")
 
 	dir := makeTempDir(t) // no .spectra/
 
@@ -159,7 +149,6 @@ func TestCreateSessionDirectory_MkdirFails(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("permission test not reliable on Windows")
 	}
-	t.Skip("scaffolded: awaiting production source storage/session_directory_manager.go")
 
 	dir := makeTempDirWithReadOnlySessions(t)
 
@@ -172,7 +161,6 @@ func TestCreateSessionDirectory_MkdirFails(t *testing.T) {
 // --- Null / Empty Input ---
 
 func TestCreateSessionDirectory_EmptyUUID(t *testing.T) {
-	t.Skip("scaffolded: awaiting production source storage/session_directory_manager.go")
 
 	dir := makeTempDirWithSessions(t)
 
@@ -185,7 +173,6 @@ func TestCreateSessionDirectory_EmptyUUID(t *testing.T) {
 // --- Boundary Values — sessionUUID ---
 
 func TestCreateSessionDirectory_UUIDWithPathSeparator(t *testing.T) {
-	t.Skip("scaffolded: awaiting production source storage/session_directory_manager.go")
 
 	dir := makeTempDirWithSessions(t)
 

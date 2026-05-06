@@ -12,7 +12,6 @@ import (
 )
 
 func TestCreateSessionDirectory_ConcurrentSameUUID(t *testing.T) {
-	t.Skip("scaffolded: awaiting production source storage/session_directory_manager.go (CreateSessionDirectory, ErrSessionDirExists)")
 
 	// Setup: Create temp directory with `.spectra/sessions/`
 	dir := t.TempDir()
