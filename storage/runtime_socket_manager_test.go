@@ -93,13 +93,22 @@ func (m *mockMessageHandler) allCalls() []mockHandleCall {
 
 // --- Fixture Builders for RuntimeSocketManager tests ---
 
-// makeSocketTestDir creates a temp dir with the session directory structure and returns
-// the projectRoot and the expected socket path.
+// makeSocketTestDir creates a temp dir with a short path to stay within Unix domain
+// socket path length limits (~108 chars). Returns the projectRoot and socket path.
 func makeSocketTestDir(t *testing.T) (projectRoot string, socketPath string) {
 	t.Helper()
-	projectRoot = makeTempDirWithSessionDir(t, testSessionUUID)
-	socketPath = filepath.Join(projectRoot, ".spectra", "sessions", testSessionUUID, RuntimeSocketFile)
-	return projectRoot, socketPath
+	// Use a short temp dir to keep total socket path under Unix limit (~108 chars).
+	dir, err := os.MkdirTemp("", "s")
+	if err != nil {
+		t.Fatalf("makeSocketTestDir: %v", err)
+	}
+	t.Cleanup(func() { os.RemoveAll(dir) })
+	sessionDir := filepath.Join(dir, ".spectra", "sessions", testSessionUUID)
+	if err := os.MkdirAll(sessionDir, 0755); err != nil {
+		t.Fatalf("makeSocketTestDir: %v", err)
+	}
+	socketPath = filepath.Join(sessionDir, RuntimeSocketFile)
+	return dir, socketPath
 }
 
 // dialSocket connects a client to the given Unix domain socket path.
@@ -143,7 +152,6 @@ func parseResponse(t *testing.T, raw string) map[string]string {
 // --- Happy Path — Construction ---
 
 func TestNewRuntimeSocketManager_StoresSocketPath(t *testing.T) {
-	t.Skip("scaffolded: awaiting production surface NewRuntimeSocketManager in storage/runtime_socket_manager.go")
 
 	projectRoot := makeTempDirWithSessionDir(t, testSessionUUID)
 	ml := newMockLogger()
@@ -158,7 +166,6 @@ func TestNewRuntimeSocketManager_StoresSocketPath(t *testing.T) {
 }
 
 func TestNewRuntimeSocketManager_NoIO(t *testing.T) {
-	t.Skip("scaffolded: awaiting production surface NewRuntimeSocketManager in storage/runtime_socket_manager.go")
 
 	ml := newMockLogger()
 
@@ -172,7 +179,6 @@ func TestNewRuntimeSocketManager_NoIO(t *testing.T) {
 // --- Happy Path — CreateSocket ---
 
 func TestCreateSocket_CreatesSocketFile(t *testing.T) {
-	t.Skip("scaffolded: awaiting production surface NewRuntimeSocketManager, CreateSocket in storage/runtime_socket_manager.go")
 
 	projectRoot, socketPath := makeSocketTestDir(t)
 	ml := newMockLogger()
@@ -189,7 +195,6 @@ func TestCreateSocket_FilePermissions(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("Unix socket permission test not applicable on Windows")
 	}
-	t.Skip("scaffolded: awaiting production surface NewRuntimeSocketManager, CreateSocket in storage/runtime_socket_manager.go")
 
 	projectRoot, socketPath := makeSocketTestDir(t)
 	ml := newMockLogger()
@@ -206,7 +211,6 @@ func TestCreateSocket_FilePermissions(t *testing.T) {
 // --- Happy Path — Listen ---
 
 func TestListen_ReturnsChannels(t *testing.T) {
-	t.Skip("scaffolded: awaiting production surface NewRuntimeSocketManager, CreateSocket, Listen in storage/runtime_socket_manager.go")
 
 	projectRoot, _ := makeSocketTestDir(t)
 	ml := newMockLogger()
@@ -225,7 +229,6 @@ func TestListen_ReturnsChannels(t *testing.T) {
 }
 
 func TestListen_AcceptsConnection(t *testing.T) {
-	t.Skip("scaffolded: awaiting production surface NewRuntimeSocketManager, CreateSocket, Listen in storage/runtime_socket_manager.go")
 
 	projectRoot, socketPath := makeSocketTestDir(t)
 	ml := newMockLogger()
@@ -244,7 +247,6 @@ func TestListen_AcceptsConnection(t *testing.T) {
 }
 
 func TestListen_DispatchesToHandler(t *testing.T) {
-	t.Skip("scaffolded: awaiting production surface NewRuntimeSocketManager, CreateSocket, Listen in storage/runtime_socket_manager.go")
 
 	projectRoot, socketPath := makeSocketTestDir(t)
 	ml := newMockLogger()
@@ -268,7 +270,6 @@ func TestListen_DispatchesToHandler(t *testing.T) {
 }
 
 func TestListen_SendsResponseToClient(t *testing.T) {
-	t.Skip("scaffolded: awaiting production surface NewRuntimeSocketManager, CreateSocket, Listen in storage/runtime_socket_manager.go")
 
 	projectRoot, socketPath := makeSocketTestDir(t)
 	ml := newMockLogger()
@@ -291,7 +292,6 @@ func TestListen_SendsResponseToClient(t *testing.T) {
 }
 
 func TestListen_ClosesConnectionAfterResponse(t *testing.T) {
-	t.Skip("scaffolded: awaiting production surface NewRuntimeSocketManager, CreateSocket, Listen in storage/runtime_socket_manager.go")
 
 	projectRoot, socketPath := makeSocketTestDir(t)
 	ml := newMockLogger()
@@ -319,7 +319,6 @@ func TestListen_ClosesConnectionAfterResponse(t *testing.T) {
 // --- Error Propagation ---
 
 func TestCreateSocket_SocketAlreadyExists(t *testing.T) {
-	t.Skip("scaffolded: awaiting production surface NewRuntimeSocketManager, CreateSocket in storage/runtime_socket_manager.go")
 
 	projectRoot, socketPath := makeSocketTestDir(t)
 	ml := newMockLogger()
@@ -336,7 +335,6 @@ func TestCreateSocket_SocketAlreadyExists(t *testing.T) {
 }
 
 func TestCreateSocket_DirectoryMissing(t *testing.T) {
-	t.Skip("scaffolded: awaiting production surface NewRuntimeSocketManager, CreateSocket in storage/runtime_socket_manager.go")
 
 	ml := newMockLogger()
 	// Point to a non-existent directory
@@ -352,7 +350,6 @@ func TestCreateSocket_PermissionDenied(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("permission test not reliable on Windows")
 	}
-	t.Skip("scaffolded: awaiting production surface NewRuntimeSocketManager, CreateSocket in storage/runtime_socket_manager.go")
 
 	projectRoot := makeTempDirWithSessionDir(t, testSessionUUID)
 	sessionDir := filepath.Join(projectRoot, ".spectra", "sessions", testSessionUUID)
@@ -369,7 +366,6 @@ func TestCreateSocket_PermissionDenied(t *testing.T) {
 }
 
 func TestListen_BeforeCreateSocket(t *testing.T) {
-	t.Skip("scaffolded: awaiting production surface NewRuntimeSocketManager, Listen in storage/runtime_socket_manager.go")
 
 	projectRoot := makeTempDirWithSessionDir(t, testSessionUUID)
 	ml := newMockLogger()
@@ -386,7 +382,6 @@ func TestListen_BeforeCreateSocket(t *testing.T) {
 }
 
 func TestListen_BindFailure(t *testing.T) {
-	t.Skip("scaffolded: awaiting production surface NewRuntimeSocketManager, CreateSocket, Listen in storage/runtime_socket_manager.go")
 
 	projectRoot, socketPath := makeSocketTestDir(t)
 	ml := newMockLogger()
@@ -407,7 +402,6 @@ func TestListen_BindFailure(t *testing.T) {
 // --- Happy Path — DeleteSocket ---
 
 func TestDeleteSocket_RemovesFile(t *testing.T) {
-	t.Skip("scaffolded: awaiting production surface NewRuntimeSocketManager, CreateSocket, Listen, DeleteSocket in storage/runtime_socket_manager.go")
 
 	projectRoot, socketPath := makeSocketTestDir(t)
 	ml := newMockLogger()
@@ -427,7 +421,6 @@ func TestDeleteSocket_RemovesFile(t *testing.T) {
 }
 
 func TestDeleteSocket_ClosesListener(t *testing.T) {
-	t.Skip("scaffolded: awaiting production surface NewRuntimeSocketManager, CreateSocket, Listen, DeleteSocket in storage/runtime_socket_manager.go")
 
 	projectRoot, _ := makeSocketTestDir(t)
 	ml := newMockLogger()
@@ -453,7 +446,6 @@ func TestDeleteSocket_ClosesListener(t *testing.T) {
 // --- Idempotency ---
 
 func TestDeleteSocket_Idempotent(t *testing.T) {
-	t.Skip("scaffolded: awaiting production surface NewRuntimeSocketManager, CreateSocket, Listen, DeleteSocket in storage/runtime_socket_manager.go")
 
 	projectRoot, _ := makeSocketTestDir(t)
 	ml := newMockLogger()
@@ -475,7 +467,6 @@ func TestDeleteSocket_Idempotent(t *testing.T) {
 }
 
 func TestDeleteSocket_FileAlreadyGone(t *testing.T) {
-	t.Skip("scaffolded: awaiting production surface NewRuntimeSocketManager, CreateSocket, Listen, DeleteSocket in storage/runtime_socket_manager.go")
 
 	projectRoot, socketPath := makeSocketTestDir(t)
 	ml := newMockLogger()
@@ -500,7 +491,6 @@ func TestDeleteSocket_FileAlreadyGone(t *testing.T) {
 // --- Validation Failures ---
 
 func TestPerConnection_MalformedJSON(t *testing.T) {
-	t.Skip("scaffolded: awaiting production surface NewRuntimeSocketManager, CreateSocket, Listen in storage/runtime_socket_manager.go")
 
 	projectRoot, socketPath := makeSocketTestDir(t)
 	ml := newMockLogger()
@@ -524,7 +514,6 @@ func TestPerConnection_MalformedJSON(t *testing.T) {
 }
 
 func TestPerConnection_MissingTypeField(t *testing.T) {
-	t.Skip("scaffolded: awaiting production surface NewRuntimeSocketManager, CreateSocket, Listen in storage/runtime_socket_manager.go")
 
 	projectRoot, socketPath := makeSocketTestDir(t)
 	ml := newMockLogger()
@@ -547,7 +536,6 @@ func TestPerConnection_MissingTypeField(t *testing.T) {
 }
 
 func TestPerConnection_InvalidTypeValue(t *testing.T) {
-	t.Skip("scaffolded: awaiting production surface NewRuntimeSocketManager, CreateSocket, Listen in storage/runtime_socket_manager.go")
 
 	projectRoot, socketPath := makeSocketTestDir(t)
 	ml := newMockLogger()
@@ -570,7 +558,6 @@ func TestPerConnection_InvalidTypeValue(t *testing.T) {
 }
 
 func TestPerConnection_MissingPayload(t *testing.T) {
-	t.Skip("scaffolded: awaiting production surface NewRuntimeSocketManager, CreateSocket, Listen in storage/runtime_socket_manager.go")
 
 	projectRoot, socketPath := makeSocketTestDir(t)
 	ml := newMockLogger()
@@ -593,7 +580,6 @@ func TestPerConnection_MissingPayload(t *testing.T) {
 }
 
 func TestPerConnection_PayloadNotObject(t *testing.T) {
-	t.Skip("scaffolded: awaiting production surface NewRuntimeSocketManager, CreateSocket, Listen in storage/runtime_socket_manager.go")
 
 	projectRoot, socketPath := makeSocketTestDir(t)
 	ml := newMockLogger()
@@ -616,7 +602,6 @@ func TestPerConnection_PayloadNotObject(t *testing.T) {
 }
 
 func TestPerConnection_PayloadArray(t *testing.T) {
-	t.Skip("scaffolded: awaiting production surface NewRuntimeSocketManager, CreateSocket, Listen in storage/runtime_socket_manager.go")
 
 	projectRoot, socketPath := makeSocketTestDir(t)
 	ml := newMockLogger()
@@ -639,7 +624,6 @@ func TestPerConnection_PayloadArray(t *testing.T) {
 }
 
 func TestPerConnection_ClientClosesWithoutSending(t *testing.T) {
-	t.Skip("scaffolded: awaiting production surface NewRuntimeSocketManager, CreateSocket, Listen in storage/runtime_socket_manager.go")
 
 	projectRoot, socketPath := makeSocketTestDir(t)
 	ml := newMockLogger()
@@ -665,7 +649,6 @@ func TestPerConnection_ClientClosesWithoutSending(t *testing.T) {
 // --- Boundary Values — Message Size ---
 
 func TestPerConnection_ExceedsMaxSize(t *testing.T) {
-	t.Skip("scaffolded: awaiting production surface NewRuntimeSocketManager, CreateSocket, Listen in storage/runtime_socket_manager.go")
 
 	projectRoot, socketPath := makeSocketTestDir(t)
 	ml := newMockLogger()
@@ -700,7 +683,6 @@ func TestPerConnection_ExceedsMaxSize(t *testing.T) {
 }
 
 func TestPerConnection_AtMaxSize(t *testing.T) {
-	t.Skip("scaffolded: awaiting production surface NewRuntimeSocketManager, CreateSocket, Listen in storage/runtime_socket_manager.go")
 
 	projectRoot, socketPath := makeSocketTestDir(t)
 	ml := newMockLogger()
@@ -735,7 +717,6 @@ func TestPerConnection_AtMaxSize(t *testing.T) {
 // --- Null / Empty Input ---
 
 func TestPerConnection_EmptyClaudeSessionID(t *testing.T) {
-	t.Skip("scaffolded: awaiting production surface NewRuntimeSocketManager, CreateSocket, Listen in storage/runtime_socket_manager.go")
 
 	projectRoot, socketPath := makeSocketTestDir(t)
 	ml := newMockLogger()
@@ -758,7 +739,6 @@ func TestPerConnection_EmptyClaudeSessionID(t *testing.T) {
 }
 
 func TestPerConnection_WithClaudeSessionID(t *testing.T) {
-	t.Skip("scaffolded: awaiting production surface NewRuntimeSocketManager, CreateSocket, Listen in storage/runtime_socket_manager.go")
 
 	projectRoot, socketPath := makeSocketTestDir(t)
 	ml := newMockLogger()
@@ -781,7 +761,6 @@ func TestPerConnection_WithClaudeSessionID(t *testing.T) {
 }
 
 func TestPerConnection_EmptyMessageInResponse(t *testing.T) {
-	t.Skip("scaffolded: awaiting production surface NewRuntimeSocketManager, CreateSocket, Listen in storage/runtime_socket_manager.go")
 
 	projectRoot, socketPath := makeSocketTestDir(t)
 	ml := newMockLogger()
@@ -804,7 +783,6 @@ func TestPerConnection_EmptyMessageInResponse(t *testing.T) {
 // --- Mock / Dependency Interaction ---
 
 func TestConstruction_CallsStorageLayout(t *testing.T) {
-	t.Skip("scaffolded: awaiting production surface NewRuntimeSocketManager in storage/runtime_socket_manager.go")
 
 	// GetRuntimeSocketPath is a package-level function; constructor should compose via it.
 	// Verify by observing that CreateSocket creates the file at the correct path.
@@ -818,7 +796,6 @@ func TestConstruction_CallsStorageLayout(t *testing.T) {
 }
 
 func TestPerConnection_InvokesNewRuntimeMessage(t *testing.T) {
-	t.Skip("scaffolded: awaiting production surface NewRuntimeSocketManager, CreateSocket, Listen in storage/runtime_socket_manager.go")
 
 	projectRoot, socketPath := makeSocketTestDir(t)
 	ml := newMockLogger()
@@ -846,7 +823,6 @@ func TestDeleteSocket_LogsOnFileDeletionFailure(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("permission test not reliable on Windows")
 	}
-	t.Skip("scaffolded: awaiting production surface NewRuntimeSocketManager, CreateSocket, Listen, DeleteSocket in storage/runtime_socket_manager.go")
 
 	projectRoot, _ := makeSocketTestDir(t)
 	ml := newMockLogger()
@@ -871,7 +847,6 @@ func TestDeleteSocket_LogsOnFileDeletionFailure(t *testing.T) {
 }
 
 func TestPerConnection_LogsOnSendFailure(t *testing.T) {
-	t.Skip("scaffolded: awaiting production surface NewRuntimeSocketManager, CreateSocket, Listen in storage/runtime_socket_manager.go")
 
 	projectRoot, socketPath := makeSocketTestDir(t)
 	ml := newMockLogger()
@@ -904,7 +879,6 @@ func TestPerConnection_LogsOnSendFailure(t *testing.T) {
 // --- Concurrent Behaviour ---
 
 func TestListen_MultipleSimultaneousConnections(t *testing.T) {
-	t.Skip("scaffolded: awaiting production surface NewRuntimeSocketManager, CreateSocket, Listen in storage/runtime_socket_manager.go")
 
 	projectRoot, socketPath := makeSocketTestDir(t)
 	ml := newMockLogger()
@@ -941,7 +915,6 @@ func TestListen_MultipleSimultaneousConnections(t *testing.T) {
 }
 
 func TestPerConnection_IsolationOnError(t *testing.T) {
-	t.Skip("scaffolded: awaiting production surface NewRuntimeSocketManager, CreateSocket, Listen in storage/runtime_socket_manager.go")
 
 	projectRoot, socketPath := makeSocketTestDir(t)
 	ml := newMockLogger()
@@ -970,7 +943,6 @@ func TestPerConnection_IsolationOnError(t *testing.T) {
 }
 
 func TestPerConnection_HandlerPanicCrashesGoroutine(t *testing.T) {
-	t.Skip("scaffolded: awaiting production surface NewRuntimeSocketManager, CreateSocket, Listen in storage/runtime_socket_manager.go")
 
 	projectRoot, socketPath := makeSocketTestDir(t)
 	ml := newMockLogger()
@@ -1012,7 +984,6 @@ func TestPerConnection_HandlerPanicCrashesGoroutine(t *testing.T) {
 // --- Resource Cleanup ---
 
 func TestDeleteSocket_ClosesActiveConnections(t *testing.T) {
-	t.Skip("scaffolded: awaiting production surface NewRuntimeSocketManager, CreateSocket, Listen, DeleteSocket in storage/runtime_socket_manager.go")
 
 	projectRoot, socketPath := makeSocketTestDir(t)
 	ml := newMockLogger()
@@ -1066,7 +1037,6 @@ func TestDeleteSocket_ClosesActiveConnections(t *testing.T) {
 }
 
 func TestListen_ContextCancellation(t *testing.T) {
-	t.Skip("scaffolded: awaiting production surface NewRuntimeSocketManager, CreateSocket, Listen in storage/runtime_socket_manager.go")
 
 	projectRoot, socketPath := makeSocketTestDir(t)
 	ml := newMockLogger()
@@ -1095,7 +1065,6 @@ func TestListen_ContextCancellation(t *testing.T) {
 // --- State Transitions ---
 
 func TestPerConnection_SingleRequestResponse(t *testing.T) {
-	t.Skip("scaffolded: awaiting production surface NewRuntimeSocketManager, CreateSocket, Listen in storage/runtime_socket_manager.go")
 
 	projectRoot, socketPath := makeSocketTestDir(t)
 	ml := newMockLogger()
@@ -1131,7 +1100,6 @@ func TestPerConnection_SingleRequestResponse(t *testing.T) {
 // --- Asynchronous Flow ---
 
 func TestListen_ListenerErrChannel(t *testing.T) {
-	t.Skip("scaffolded: awaiting production surface NewRuntimeSocketManager, CreateSocket, Listen in storage/runtime_socket_manager.go")
 
 	projectRoot, socketPath := makeSocketTestDir(t)
 	ml := newMockLogger()
@@ -1162,7 +1130,6 @@ func TestListen_ListenerErrChannel(t *testing.T) {
 }
 
 func TestListen_DoneChannelClosedAfterDelete(t *testing.T) {
-	t.Skip("scaffolded: awaiting production surface NewRuntimeSocketManager, CreateSocket, Listen, DeleteSocket in storage/runtime_socket_manager.go")
 
 	projectRoot, _ := makeSocketTestDir(t)
 	ml := newMockLogger()
