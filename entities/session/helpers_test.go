@@ -2,7 +2,9 @@ package session
 
 import (
 	"encoding/json"
+	"reflect"
 	"testing"
+	"unsafe"
 
 	"github.com/spectra-ai/spectra/entities"
 )
@@ -155,4 +157,32 @@ func newTestEventEmptyPayload(t *testing.T, id string) *entities.Event {
 		t.Fatalf("newTestEventEmptyPayload: unexpected error: %v", err)
 	}
 	return ev
+}
+
+// newTestEventUnchecked constructs an Event with arbitrary field values for
+// validation tests that must exercise Session-owned checks with invalid inputs.
+func newTestEventUnchecked(t *testing.T, id string, eventType string, message string, payload json.RawMessage, emittedBy string, emittedAt int64, sessionID string) entities.Event {
+	t.Helper()
+
+	var event entities.Event
+	setUnexportedField(t, &event, "id", id)
+	setUnexportedField(t, &event, "eventType", eventType)
+	setUnexportedField(t, &event, "message", message)
+	setUnexportedField(t, &event, "payload", payload)
+	setUnexportedField(t, &event, "emittedBy", emittedBy)
+	setUnexportedField(t, &event, "emittedAt", emittedAt)
+	setUnexportedField(t, &event, "sessionID", sessionID)
+
+	return event
+}
+
+func setUnexportedField(t *testing.T, target any, fieldName string, value any) {
+	t.Helper()
+
+	field := reflect.ValueOf(target).Elem().FieldByName(fieldName)
+	if !field.IsValid() {
+		t.Fatalf("setUnexportedField: unknown field %q", fieldName)
+	}
+
+	reflect.NewAt(field.Type(), unsafe.Pointer(field.UnsafeAddr())).Elem().Set(reflect.ValueOf(value))
 }

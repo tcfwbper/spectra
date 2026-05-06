@@ -1,6 +1,7 @@
 package session
 
 import (
+	"encoding/json"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -69,27 +70,70 @@ func TestUpdateEventHistorySafe_UpdatesUpdatedAt(t *testing.T) {
 // --- Validation Failures ---
 
 func TestUpdateEventHistorySafe_MissingID(t *testing.T) {
-	t.Skip("blocked: entities.Event validates at construction; need test-only Event builder or session accepts struct with exported fields to test session-level validation of empty ID")
+	s := newTestSession(t)
+	ev := newTestEventUnchecked(t, "", testEventType, "msg", json.RawMessage(`{}`), testEmittedBy, testEmittedAt, testSessionID)
+
+	err := s.UpdateEventHistorySafe(ev)
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "ID is required")
+	assert.Empty(t, s.EventHistory)
 }
 
 func TestUpdateEventHistorySafe_MissingType(t *testing.T) {
-	t.Skip("blocked: entities.Event validates at construction; need test-only Event builder or session accepts struct with exported fields to test session-level validation of empty Type")
+	s := newTestSession(t)
+	ev := newTestEventUnchecked(t, testEventID, "", "msg", json.RawMessage(`{}`), testEmittedBy, testEmittedAt, testSessionID)
+
+	err := s.UpdateEventHistorySafe(ev)
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "Type is required")
+	assert.Empty(t, s.EventHistory)
 }
 
 func TestUpdateEventHistorySafe_MissingSessionID(t *testing.T) {
-	t.Skip("blocked: entities.Event validates at construction; need test-only Event builder or session accepts struct with exported fields to test session-level validation of empty SessionID")
+	s := newTestSession(t)
+	ev := newTestEventUnchecked(t, testEventID, testEventType, "msg", json.RawMessage(`{}`), testEmittedBy, testEmittedAt, "")
+
+	err := s.UpdateEventHistorySafe(ev)
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "SessionID is required")
+	assert.Empty(t, s.EventHistory)
 }
 
 func TestUpdateEventHistorySafe_InvalidEmittedAt(t *testing.T) {
-	t.Skip("blocked: entities.Event validates at construction; need test-only Event builder or session accepts struct with exported fields to test session-level validation of EmittedAt <= 0")
+	s := newTestSession(t)
+	ev := newTestEventUnchecked(t, testEventID, testEventType, "msg", json.RawMessage(`{}`), testEmittedBy, 0, testSessionID)
+
+	err := s.UpdateEventHistorySafe(ev)
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "EmittedAt is required")
+	assert.Empty(t, s.EventHistory)
 }
 
 func TestUpdateEventHistorySafe_MissingEmittedBy(t *testing.T) {
-	t.Skip("blocked: entities.Event validates at construction; need test-only Event builder or session accepts struct with exported fields to test session-level validation of empty EmittedBy")
+	s := newTestSession(t)
+	ev := newTestEventUnchecked(t, testEventID, testEventType, "msg", json.RawMessage(`{}`), "", testEmittedAt, testSessionID)
+
+	err := s.UpdateEventHistorySafe(ev)
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "EmittedBy is required")
+	assert.Empty(t, s.EventHistory)
 }
 
 func TestUpdateEventHistorySafe_ValidationOrder(t *testing.T) {
-	t.Skip("blocked: entities.Event validates at construction; need test-only Event builder to test session-level validation order (ID checked first)")
+	s := newTestSession(t)
+	// All required fields are invalid — ID should be checked first per spec.
+	ev := newTestEventUnchecked(t, "", "", "msg", json.RawMessage(`{}`), "", 0, "")
+
+	err := s.UpdateEventHistorySafe(ev)
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "ID is required")
+	assert.Empty(t, s.EventHistory)
 }
 
 // --- Idempotency ---
