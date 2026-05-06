@@ -64,7 +64,7 @@ SessionMetadata is not invoked; it is constructed as part of Session initializat
 
 8. **SessionData Never Nil**: `SessionData` must never be nil; it is initialized as an empty map `map[string]any{}` if there are no entries.
 
-9. **JSON Serialization Compatibility**: All field types must be JSON-serializable. The Error field's dynamic type (`*AgentError` or `*RuntimeError`) must implement JSON marshaling.
+9. **JSON Serialization Compatibility**: All field types must be JSON-serializable. The Error field's dynamic type (`*AgentError` or `*RuntimeError`) exposes getter methods sufficient for external serializers; these entities are not required to implement `json.Marshaler` themselves. Serialization logic is owned by the persistence layer (SessionMetadataStore).
 
 10. **Error Field Omitempty**: When Error is nil, it is omitted from JSON serialization (enforced via `omitempty` JSON struct tag).
 

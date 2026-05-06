@@ -14,6 +14,7 @@ An Event is a typed signal entity that drives state transitions in the workflow 
 - Must not: reference or import any module outside the `entities` package.
 - Must not: be constructed via struct literal — must use the provided constructor.
 - Must not: modify session state or evaluate transitions.
+- Must not: implement custom MarshalJSON — serialization of Event for persistence is entirely owned by EventStore, which reads fields via getter methods.
 
 ## Dependencies
 

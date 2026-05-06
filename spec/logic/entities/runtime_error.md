@@ -14,6 +14,7 @@ RuntimeError is a failure entity representing an unrecoverable error raised by a
 - Must not: perform any I/O, network access, or filesystem operations.
 - Must not: reference or import any module outside the `entities` package.
 - Must not: be constructed via struct literal — must use the provided constructor.
+- Must not: implement custom MarshalJSON — serialization of RuntimeError for persistence is entirely owned by SessionMetadataStore, which reads fields via getter methods.
 
 ## Dependencies
 
