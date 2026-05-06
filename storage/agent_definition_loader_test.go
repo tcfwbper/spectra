@@ -71,8 +71,6 @@ func makeAgentRootDir(t *testing.T, projectRoot, relPath string) {
 // --- Happy Path Tests ---
 
 func TestAgentDefinitionLoader_Load_ValidDefinition(t *testing.T) {
-	t.Skip("scaffolded: requires storage.AgentDefinitionLoader and storage.NewAgentDefinitionLoader (production type not yet implemented)")
-
 	projectRoot := makeTempDirWithAgents(t)
 	agentRoot := "src"
 	makeAgentRootDir(t, projectRoot, agentRoot)
@@ -91,7 +89,6 @@ func TestAgentDefinitionLoader_Load_ValidDefinition(t *testing.T) {
 }
 
 func TestAgentDefinitionLoader_Load_RoleDerivedFromFilename(t *testing.T) {
-	t.Skip("scaffolded: requires storage.AgentDefinitionLoader and storage.NewAgentDefinitionLoader (production type not yet implemented)")
 
 	projectRoot := makeTempDirWithAgents(t)
 	agentRoot := "arch"
@@ -107,7 +104,6 @@ func TestAgentDefinitionLoader_Load_RoleDerivedFromFilename(t *testing.T) {
 }
 
 func TestAgentDefinitionLoader_Load_AllowedToolsAndDisallowedTools(t *testing.T) {
-	t.Skip("scaffolded: requires storage.AgentDefinitionLoader and storage.NewAgentDefinitionLoader (production type not yet implemented)")
 
 	projectRoot := makeTempDirWithAgents(t)
 	agentRoot := "worker"
@@ -128,7 +124,6 @@ func TestAgentDefinitionLoader_Load_AllowedToolsAndDisallowedTools(t *testing.T)
 }
 
 func TestAgentDefinitionLoader_Load_MissingToolsFields(t *testing.T) {
-	t.Skip("scaffolded: requires storage.AgentDefinitionLoader and storage.NewAgentDefinitionLoader (production type not yet implemented)")
 
 	projectRoot := makeTempDirWithAgents(t)
 	agentRoot := "simple"
@@ -145,7 +140,6 @@ func TestAgentDefinitionLoader_Load_MissingToolsFields(t *testing.T) {
 }
 
 func TestAgentDefinitionLoader_Load_AgentRootDot(t *testing.T) {
-	t.Skip("scaffolded: requires storage.AgentDefinitionLoader and storage.NewAgentDefinitionLoader (production type not yet implemented)")
 
 	projectRoot := makeTempDirWithAgents(t)
 	// agentRoot "." resolves to projectRoot itself, which already exists.
@@ -159,7 +153,6 @@ func TestAgentDefinitionLoader_Load_AgentRootDot(t *testing.T) {
 }
 
 func TestAgentDefinitionLoader_Load_AgentRootSymlinkToDir(t *testing.T) {
-	t.Skip("scaffolded: requires storage.AgentDefinitionLoader and storage.NewAgentDefinitionLoader (production type not yet implemented)")
 
 	projectRoot := makeTempDirWithAgents(t)
 
@@ -183,7 +176,6 @@ func TestAgentDefinitionLoader_Load_AgentRootSymlinkToDir(t *testing.T) {
 // --- Error Propagation Tests ---
 
 func TestAgentDefinitionLoader_Load_FileNotFound(t *testing.T) {
-	t.Skip("scaffolded: requires storage.AgentDefinitionLoader and storage.NewAgentDefinitionLoader (production type not yet implemented)")
 
 	projectRoot := makeTempDirWithAgents(t)
 
@@ -196,7 +188,6 @@ func TestAgentDefinitionLoader_Load_FileNotFound(t *testing.T) {
 }
 
 func TestAgentDefinitionLoader_Load_ReadPermissionDenied(t *testing.T) {
-	t.Skip("scaffolded: requires storage.AgentDefinitionLoader and storage.NewAgentDefinitionLoader (production type not yet implemented)")
 
 	projectRoot := makeTempDirWithAgents(t)
 	writeAgentYAML(t, projectRoot, "Locked", validAgentYAML("claude-sonnet-4-20250514", "high", "Locked.", "src"))
@@ -216,7 +207,6 @@ func TestAgentDefinitionLoader_Load_ReadPermissionDenied(t *testing.T) {
 }
 
 func TestAgentDefinitionLoader_Load_YamlSyntaxError(t *testing.T) {
-	t.Skip("scaffolded: requires storage.AgentDefinitionLoader and storage.NewAgentDefinitionLoader (production type not yet implemented)")
 
 	projectRoot := makeTempDirWithAgents(t)
 	writeAgentYAML(t, projectRoot, "Bad", "model: \"unclosed\n  bad: [indent")
@@ -230,7 +220,6 @@ func TestAgentDefinitionLoader_Load_YamlSyntaxError(t *testing.T) {
 }
 
 func TestAgentDefinitionLoader_Load_YamlUnknownField(t *testing.T) {
-	t.Skip("scaffolded: requires storage.AgentDefinitionLoader and storage.NewAgentDefinitionLoader (production type not yet implemented)")
 
 	projectRoot := makeTempDirWithAgents(t)
 	yaml := validAgentYAML("claude-sonnet-4-20250514", "high", "Agent.", "src") + "customField: value\n"
@@ -245,7 +234,6 @@ func TestAgentDefinitionLoader_Load_YamlUnknownField(t *testing.T) {
 }
 
 func TestAgentDefinitionLoader_Load_YamlSnakeCaseField(t *testing.T) {
-	t.Skip("scaffolded: requires storage.AgentDefinitionLoader and storage.NewAgentDefinitionLoader (production type not yet implemented)")
 
 	projectRoot := makeTempDirWithAgents(t)
 	// Use snake_case system_prompt instead of camelCase systemPrompt.
@@ -264,7 +252,6 @@ func TestAgentDefinitionLoader_Load_YamlSnakeCaseField(t *testing.T) {
 }
 
 func TestAgentDefinitionLoader_Load_ConstructorValidationFails(t *testing.T) {
-	t.Skip("scaffolded: requires storage.AgentDefinitionLoader and storage.NewAgentDefinitionLoader (production type not yet implemented)")
 
 	projectRoot := makeTempDirWithAgents(t)
 	// Empty model triggers constructor error.
@@ -283,7 +270,6 @@ func TestAgentDefinitionLoader_Load_ConstructorValidationFails(t *testing.T) {
 }
 
 func TestAgentDefinitionLoader_Load_AgentRootNotExists(t *testing.T) {
-	t.Skip("scaffolded: requires storage.AgentDefinitionLoader and storage.NewAgentDefinitionLoader (production type not yet implemented)")
 
 	projectRoot := makeTempDirWithAgents(t)
 	// Reference agentRoot that does not exist.
@@ -298,7 +284,6 @@ func TestAgentDefinitionLoader_Load_AgentRootNotExists(t *testing.T) {
 }
 
 func TestAgentDefinitionLoader_Load_AgentRootIsFile(t *testing.T) {
-	t.Skip("scaffolded: requires storage.AgentDefinitionLoader and storage.NewAgentDefinitionLoader (production type not yet implemented)")
 
 	projectRoot := makeTempDirWithAgents(t)
 	// Create a regular file where a directory is expected.
@@ -316,7 +301,6 @@ func TestAgentDefinitionLoader_Load_AgentRootIsFile(t *testing.T) {
 }
 
 func TestAgentDefinitionLoader_Load_AgentRootSymlinkBroken(t *testing.T) {
-	t.Skip("scaffolded: requires storage.AgentDefinitionLoader and storage.NewAgentDefinitionLoader (production type not yet implemented)")
 
 	projectRoot := makeTempDirWithAgents(t)
 	// Create a dangling symlink.
@@ -336,7 +320,6 @@ func TestAgentDefinitionLoader_Load_AgentRootSymlinkBroken(t *testing.T) {
 // --- Null / Empty Input Tests ---
 
 func TestAgentDefinitionLoader_Load_EmptyAgentRole(t *testing.T) {
-	t.Skip("scaffolded: requires storage.AgentDefinitionLoader and storage.NewAgentDefinitionLoader (production type not yet implemented)")
 
 	projectRoot := makeTempDirWithAgents(t)
 
@@ -349,7 +332,6 @@ func TestAgentDefinitionLoader_Load_EmptyAgentRole(t *testing.T) {
 }
 
 func TestAgentDefinitionLoader_Load_EmptyYamlFile(t *testing.T) {
-	t.Skip("scaffolded: requires storage.AgentDefinitionLoader and storage.NewAgentDefinitionLoader (production type not yet implemented)")
 
 	projectRoot := makeTempDirWithAgents(t)
 	writeAgentYAML(t, projectRoot, "Empty", "")
@@ -365,7 +347,6 @@ func TestAgentDefinitionLoader_Load_EmptyYamlFile(t *testing.T) {
 // --- Boundary Values Tests ---
 
 func TestAgentDefinitionLoader_Load_PathTraversal(t *testing.T) {
-	t.Skip("scaffolded: requires storage.AgentDefinitionLoader and storage.NewAgentDefinitionLoader (production type not yet implemented)")
 
 	projectRoot := makeTempDirWithAgents(t)
 
@@ -378,7 +359,6 @@ func TestAgentDefinitionLoader_Load_PathTraversal(t *testing.T) {
 // --- Idempotency Tests ---
 
 func TestAgentDefinitionLoader_Load_NoCaching(t *testing.T) {
-	t.Skip("scaffolded: requires storage.AgentDefinitionLoader and storage.NewAgentDefinitionLoader (production type not yet implemented)")
 
 	projectRoot := makeTempDirWithAgents(t)
 	agentRoot := "src"
@@ -406,7 +386,6 @@ func TestAgentDefinitionLoader_Load_NoCaching(t *testing.T) {
 // --- Concurrent Behaviour Tests ---
 
 func TestAgentDefinitionLoader_Load_ConcurrentAccess(t *testing.T) {
-	t.Skip("scaffolded: requires storage.AgentDefinitionLoader and storage.NewAgentDefinitionLoader (production type not yet implemented)")
 
 	projectRoot := makeTempDirWithAgents(t)
 	agentRoot := "shared"

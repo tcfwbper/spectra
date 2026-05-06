@@ -198,7 +198,6 @@ func writeWorkflowYAML(t *testing.T, projectRoot, name, content string) {
 // --- Happy Path Tests ---
 
 func TestWorkflowDefinitionLoader_Load_ValidDefinition(t *testing.T) {
-	t.Skip("scaffolded: requires storage.WorkflowDefinitionLoader and storage.NewWorkflowDefinitionLoader (production type not yet implemented)")
 
 	projectRoot := makeTempDirWithWorkflows(t)
 	writeWorkflowYAML(t, projectRoot, "MyWorkflow", validWorkflowYAML("A test workflow"))
@@ -218,7 +217,6 @@ func TestWorkflowDefinitionLoader_Load_ValidDefinition(t *testing.T) {
 }
 
 func TestWorkflowDefinitionLoader_Load_NameDerivedFromFilename(t *testing.T) {
-	t.Skip("scaffolded: requires storage.WorkflowDefinitionLoader and storage.NewWorkflowDefinitionLoader (production type not yet implemented)")
 
 	projectRoot := makeTempDirWithWorkflows(t)
 	writeWorkflowYAML(t, projectRoot, "CodeReview", validWorkflowYAML("Code review workflow"))
@@ -233,7 +231,6 @@ func TestWorkflowDefinitionLoader_Load_NameDerivedFromFilename(t *testing.T) {
 }
 
 func TestWorkflowDefinitionLoader_Load_EmptyDescription(t *testing.T) {
-	t.Skip("scaffolded: requires storage.WorkflowDefinitionLoader and storage.NewWorkflowDefinitionLoader (production type not yet implemented)")
 
 	projectRoot := makeTempDirWithWorkflows(t)
 	// YAML without description field.
@@ -270,7 +267,6 @@ exitTransitions:
 }
 
 func TestWorkflowDefinitionLoader_Load_MultipleAgentNodes(t *testing.T) {
-	t.Skip("scaffolded: requires storage.WorkflowDefinitionLoader and storage.NewWorkflowDefinitionLoader (production type not yet implemented)")
 
 	projectRoot := makeTempDirWithWorkflows(t)
 	writeWorkflowYAML(t, projectRoot, "Multi", validWorkflowYAMLMultipleAgents())
@@ -291,7 +287,6 @@ func TestWorkflowDefinitionLoader_Load_MultipleAgentNodes(t *testing.T) {
 // --- Error Propagation Tests ---
 
 func TestWorkflowDefinitionLoader_Load_FileNotFound(t *testing.T) {
-	t.Skip("scaffolded: requires storage.WorkflowDefinitionLoader and storage.NewWorkflowDefinitionLoader (production type not yet implemented)")
 
 	projectRoot := makeTempDirWithWorkflows(t)
 
@@ -305,7 +300,6 @@ func TestWorkflowDefinitionLoader_Load_FileNotFound(t *testing.T) {
 }
 
 func TestWorkflowDefinitionLoader_Load_ReadPermissionDenied(t *testing.T) {
-	t.Skip("scaffolded: requires storage.WorkflowDefinitionLoader and storage.NewWorkflowDefinitionLoader (production type not yet implemented)")
 
 	projectRoot := makeTempDirWithWorkflows(t)
 	writeWorkflowYAML(t, projectRoot, "Locked", validWorkflowYAML("Locked workflow"))
@@ -326,7 +320,6 @@ func TestWorkflowDefinitionLoader_Load_ReadPermissionDenied(t *testing.T) {
 }
 
 func TestWorkflowDefinitionLoader_Load_YamlSyntaxError(t *testing.T) {
-	t.Skip("scaffolded: requires storage.WorkflowDefinitionLoader and storage.NewWorkflowDefinitionLoader (production type not yet implemented)")
 
 	projectRoot := makeTempDirWithWorkflows(t)
 	writeWorkflowYAML(t, projectRoot, "Bad", "entryNode: \"unclosed\n  bad: [indent")
@@ -341,7 +334,6 @@ func TestWorkflowDefinitionLoader_Load_YamlSyntaxError(t *testing.T) {
 }
 
 func TestWorkflowDefinitionLoader_Load_YamlUnknownField(t *testing.T) {
-	t.Skip("scaffolded: requires storage.WorkflowDefinitionLoader and storage.NewWorkflowDefinitionLoader (production type not yet implemented)")
 
 	projectRoot := makeTempDirWithWorkflows(t)
 	yaml := validWorkflowYAML("Extra field") + "customField: value\n"
@@ -357,7 +349,6 @@ func TestWorkflowDefinitionLoader_Load_YamlUnknownField(t *testing.T) {
 }
 
 func TestWorkflowDefinitionLoader_Load_YamlSnakeCaseField(t *testing.T) {
-	t.Skip("scaffolded: requires storage.WorkflowDefinitionLoader and storage.NewWorkflowDefinitionLoader (production type not yet implemented)")
 
 	projectRoot := makeTempDirWithWorkflows(t)
 	// Use snake_case entry_node instead of camelCase entryNode.
@@ -387,7 +378,6 @@ exitTransitions:
 }
 
 func TestWorkflowDefinitionLoader_Load_NodeConstructorFails_WithName(t *testing.T) {
-	t.Skip("scaffolded: requires storage.WorkflowDefinitionLoader and storage.NewWorkflowDefinitionLoader (production type not yet implemented)")
 
 	projectRoot := makeTempDirWithWorkflows(t)
 	// Node with valid name but invalid type "bot".
@@ -418,7 +408,6 @@ exitTransitions:
 }
 
 func TestWorkflowDefinitionLoader_Load_NodeConstructorFails_EmptyName(t *testing.T) {
-	t.Skip("scaffolded: requires storage.WorkflowDefinitionLoader and storage.NewWorkflowDefinitionLoader (production type not yet implemented)")
 
 	projectRoot := makeTempDirWithWorkflows(t)
 	// Node with empty name field.
@@ -449,7 +438,6 @@ exitTransitions:
 }
 
 func TestWorkflowDefinitionLoader_Load_TransitionConstructorFails(t *testing.T) {
-	t.Skip("scaffolded: requires storage.WorkflowDefinitionLoader and storage.NewWorkflowDefinitionLoader (production type not yet implemented)")
 
 	projectRoot := makeTempDirWithWorkflows(t)
 	// Transition where fromNode == toNode.
@@ -484,7 +472,6 @@ exitTransitions:
 }
 
 func TestWorkflowDefinitionLoader_Load_ExitTransitionConstructorFails(t *testing.T) {
-	t.Skip("scaffolded: requires storage.WorkflowDefinitionLoader and storage.NewWorkflowDefinitionLoader (production type not yet implemented)")
 
 	projectRoot := makeTempDirWithWorkflows(t)
 	// ExitTransition with empty fields that would cause constructor failure.
@@ -522,7 +509,6 @@ exitTransitions:
 }
 
 func TestWorkflowDefinitionLoader_Load_WorkflowDefinitionConstructorFails(t *testing.T) {
-	t.Skip("scaffolded: requires storage.WorkflowDefinitionLoader and storage.NewWorkflowDefinitionLoader (production type not yet implemented)")
 
 	projectRoot := makeTempDirWithWorkflows(t)
 	// Duplicate (fromNode, eventType) pair triggers WorkflowDefinition constructor error.
@@ -570,7 +556,6 @@ exitTransitions:
 }
 
 func TestWorkflowDefinitionLoader_Load_AgentRoleNotFound(t *testing.T) {
-	t.Skip("scaffolded: requires storage.WorkflowDefinitionLoader and storage.NewWorkflowDefinitionLoader (production type not yet implemented)")
 
 	projectRoot := makeTempDirWithWorkflows(t)
 	// Workflow with agent node referencing "NonExistent" role.
@@ -608,7 +593,6 @@ exitTransitions:
 }
 
 func TestWorkflowDefinitionLoader_Load_AgentRoleValidationFails(t *testing.T) {
-	t.Skip("scaffolded: requires storage.WorkflowDefinitionLoader and storage.NewWorkflowDefinitionLoader (production type not yet implemented)")
 
 	projectRoot := makeTempDirWithWorkflows(t)
 	writeWorkflowYAML(t, projectRoot, "InvalidAgent", validWorkflowYAML("Agent validation fails"))
@@ -626,7 +610,6 @@ func TestWorkflowDefinitionLoader_Load_AgentRoleValidationFails(t *testing.T) {
 // --- Null / Empty Input Tests ---
 
 func TestWorkflowDefinitionLoader_Load_EmptyWorkflowName(t *testing.T) {
-	t.Skip("scaffolded: requires storage.WorkflowDefinitionLoader and storage.NewWorkflowDefinitionLoader (production type not yet implemented)")
 
 	projectRoot := makeTempDirWithWorkflows(t)
 
@@ -640,7 +623,6 @@ func TestWorkflowDefinitionLoader_Load_EmptyWorkflowName(t *testing.T) {
 }
 
 func TestWorkflowDefinitionLoader_Load_EmptyYamlFile(t *testing.T) {
-	t.Skip("scaffolded: requires storage.WorkflowDefinitionLoader and storage.NewWorkflowDefinitionLoader (production type not yet implemented)")
 
 	projectRoot := makeTempDirWithWorkflows(t)
 	writeWorkflowYAML(t, projectRoot, "Empty", "")
@@ -655,7 +637,6 @@ func TestWorkflowDefinitionLoader_Load_EmptyYamlFile(t *testing.T) {
 }
 
 func TestWorkflowDefinitionLoader_Load_EmptyNodesArray(t *testing.T) {
-	t.Skip("scaffolded: requires storage.WorkflowDefinitionLoader and storage.NewWorkflowDefinitionLoader (production type not yet implemented)")
 
 	projectRoot := makeTempDirWithWorkflows(t)
 	yaml := `description: "No nodes"
@@ -682,7 +663,6 @@ exitTransitions:
 }
 
 func TestWorkflowDefinitionLoader_Load_EmptyTransitionsArray(t *testing.T) {
-	t.Skip("scaffolded: requires storage.WorkflowDefinitionLoader and storage.NewWorkflowDefinitionLoader (production type not yet implemented)")
 
 	projectRoot := makeTempDirWithWorkflows(t)
 	yaml := `description: "No transitions"
@@ -713,7 +693,6 @@ exitTransitions:
 }
 
 func TestWorkflowDefinitionLoader_Load_EmptyExitTransitionsArray(t *testing.T) {
-	t.Skip("scaffolded: requires storage.WorkflowDefinitionLoader and storage.NewWorkflowDefinitionLoader (production type not yet implemented)")
 
 	projectRoot := makeTempDirWithWorkflows(t)
 	yaml := `description: "No exit transitions"
@@ -749,7 +728,6 @@ exitTransitions: []
 // --- Boundary Values Tests ---
 
 func TestWorkflowDefinitionLoader_Load_PathTraversal(t *testing.T) {
-	t.Skip("scaffolded: requires storage.WorkflowDefinitionLoader and storage.NewWorkflowDefinitionLoader (production type not yet implemented)")
 
 	projectRoot := makeTempDirWithWorkflows(t)
 
@@ -763,7 +741,6 @@ func TestWorkflowDefinitionLoader_Load_PathTraversal(t *testing.T) {
 // --- Mock / Dependency Interaction Tests ---
 
 func TestWorkflowDefinitionLoader_Load_AgentLoaderNotCalledForHumanNodes(t *testing.T) {
-	t.Skip("scaffolded: requires storage.WorkflowDefinitionLoader and storage.NewWorkflowDefinitionLoader (production type not yet implemented)")
 
 	projectRoot := makeTempDirWithWorkflows(t)
 	writeWorkflowYAML(t, projectRoot, "HumanOnly", validWorkflowYAMLHumanOnly())
@@ -783,7 +760,6 @@ func TestWorkflowDefinitionLoader_Load_AgentLoaderNotCalledForHumanNodes(t *test
 }
 
 func TestWorkflowDefinitionLoader_Load_AgentLoaderFailFast(t *testing.T) {
-	t.Skip("scaffolded: requires storage.WorkflowDefinitionLoader and storage.NewWorkflowDefinitionLoader (production type not yet implemented)")
 
 	projectRoot := makeTempDirWithWorkflows(t)
 	writeWorkflowYAML(t, projectRoot, "TwoAgents", validWorkflowYAMLMultipleAgents())
@@ -803,7 +779,6 @@ func TestWorkflowDefinitionLoader_Load_AgentLoaderFailFast(t *testing.T) {
 }
 
 func TestWorkflowDefinitionLoader_Load_NodeConstructionFailFast(t *testing.T) {
-	t.Skip("scaffolded: requires storage.WorkflowDefinitionLoader and storage.NewWorkflowDefinitionLoader (production type not yet implemented)")
 
 	projectRoot := makeTempDirWithWorkflows(t)
 	// First node is invalid (bad type), second is valid.
@@ -840,7 +815,6 @@ exitTransitions:
 // --- Idempotency Tests ---
 
 func TestWorkflowDefinitionLoader_Load_NoCaching(t *testing.T) {
-	t.Skip("scaffolded: requires storage.WorkflowDefinitionLoader and storage.NewWorkflowDefinitionLoader (production type not yet implemented)")
 
 	projectRoot := makeTempDirWithWorkflows(t)
 	writeWorkflowYAML(t, projectRoot, "Mutable", validWorkflowYAML("version one"))
@@ -865,7 +839,6 @@ func TestWorkflowDefinitionLoader_Load_NoCaching(t *testing.T) {
 // --- Concurrent Behaviour Tests ---
 
 func TestWorkflowDefinitionLoader_Load_ConcurrentAccess(t *testing.T) {
-	t.Skip("scaffolded: requires storage.WorkflowDefinitionLoader and storage.NewWorkflowDefinitionLoader (production type not yet implemented)")
 
 	projectRoot := makeTempDirWithWorkflows(t)
 	writeWorkflowYAML(t, projectRoot, "Shared", validWorkflowYAML("Shared workflow"))
