@@ -8,7 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/spectra-ai/spectra/entities"
+	"github.com/tcfwbper/spectra/entities"
 )
 
 func TestUpdateEventHistorySafe_ConcurrentAppends(t *testing.T) {

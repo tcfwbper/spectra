@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/spectra-ai/spectra/entities"
+	"github.com/tcfwbper/spectra/entities"
 )
 
 // UpdateEventHistorySafe validates the event and appends it to EventHistory

@@ -6,7 +6,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/spectra-ai/spectra/logger"
+	"github.com/tcfwbper/spectra/logger"
 )
 
 // TestSlogLogger_ConcurrentCalls verifies that concurrent calls from multiple

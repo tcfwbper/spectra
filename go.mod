@@ -1,4 +1,4 @@
-module github.com/spectra-ai/spectra
+module github.com/tcfwbper/spectra
 
 go 1.25.6
 

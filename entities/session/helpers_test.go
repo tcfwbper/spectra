@@ -6,7 +6,7 @@ import (
 	"testing"
 	"unsafe"
 
-	"github.com/spectra-ai/spectra/entities"
+	"github.com/tcfwbper/spectra/entities"
 )
 
 // --- Test Constants ---

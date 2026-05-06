@@ -4,7 +4,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/spectra-ai/spectra/logger"
+	"github.com/tcfwbper/spectra/logger"
 )
 
 // TestNopLogger_ConcurrentCalls verifies that concurrent calls from multiple

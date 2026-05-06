@@ -9,7 +9,7 @@ import (
 
 	"gopkg.in/yaml.v3"
 
-	"github.com/spectra-ai/spectra/components"
+	"github.com/tcfwbper/spectra/components"
 )
 
 // agentYAML is the internal representation for strict YAML parsing of agent

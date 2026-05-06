@@ -11,8 +11,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/spectra-ai/spectra/entities"
-	"github.com/spectra-ai/spectra/logger"
+	"github.com/tcfwbper/spectra/entities"
+	"github.com/tcfwbper/spectra/logger"
 )
 
 // --- Mock Logger for EventStore tests ---

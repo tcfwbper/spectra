@@ -7,8 +7,8 @@ import (
 	"path/filepath"
 	"syscall"
 
-	"github.com/spectra-ai/spectra/entities"
-	"github.com/spectra-ai/spectra/entities/session"
+	"github.com/tcfwbper/spectra/entities"
+	"github.com/tcfwbper/spectra/entities/session"
 )
 
 // SessionMetadataStore manages persistent storage of SessionMetadata for a single session.

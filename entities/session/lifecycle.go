@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/spectra-ai/spectra/entities"
+	"github.com/tcfwbper/spectra/entities"
 )
 
 // Run transitions the session from "initializing" to "running".

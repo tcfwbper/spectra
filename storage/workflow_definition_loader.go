@@ -8,7 +8,7 @@ import (
 
 	"gopkg.in/yaml.v3"
 
-	"github.com/spectra-ai/spectra/components"
+	"github.com/tcfwbper/spectra/components"
 )
 
 // AgentLoader is the interface that WorkflowDefinitionLoader depends on for

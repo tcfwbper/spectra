@@ -10,8 +10,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/spectra-ai/spectra/entities"
-	"github.com/spectra-ai/spectra/entities/session"
+	"github.com/tcfwbper/spectra/entities"
+	"github.com/tcfwbper/spectra/entities/session"
 )
 
 // --- Fixture Builders for SessionMetadataStore tests ---

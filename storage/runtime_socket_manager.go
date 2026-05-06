@@ -10,8 +10,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/spectra-ai/spectra/entities"
-	"github.com/spectra-ai/spectra/logger"
+	"github.com/tcfwbper/spectra/entities"
+	"github.com/tcfwbper/spectra/logger"
 )
 
 // socketFileCheckInterval controls how often the accept loop checks for

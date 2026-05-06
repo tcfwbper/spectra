@@ -4,8 +4,8 @@ import (
 	"encoding/json"
 	"testing"
 
-	"github.com/spectra-ai/spectra/entities"
-	"github.com/spectra-ai/spectra/entities/session"
+	"github.com/tcfwbper/spectra/entities"
+	"github.com/tcfwbper/spectra/entities/session"
 )
 
 // --- Test Constants ---

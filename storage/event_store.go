@@ -8,8 +8,8 @@ import (
 	"path/filepath"
 	"syscall"
 
-	"github.com/spectra-ai/spectra/entities"
-	"github.com/spectra-ai/spectra/logger"
+	"github.com/tcfwbper/spectra/entities"
+	"github.com/tcfwbper/spectra/logger"
 )
 
 // EventStore manages persistent storage of event history for a single session.
