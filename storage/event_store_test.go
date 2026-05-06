@@ -116,258 +116,238 @@ func writeEventsFile(t *testing.T, sessionDir string, lines []string) string {
 // --- Happy Path — Construction ---
 
 func TestNewEventStore_ValidInputs(t *testing.T) {
-	t.Skip("scaffolded: NewEventStore not yet implemented in storage/event_store.go")
-
 	ml := newMockLogger()
-	_ = ml
 
-	// es := NewEventStore("/tmp/project", testSessionUUID, ml)
-	// require.NotNil(t, es)
+	es := NewEventStore("/tmp/project", testSessionUUID, ml)
+	require.NotNil(t, es)
 }
 
 func TestNewEventStore_NoFileSystemAccess(t *testing.T) {
-	t.Skip("scaffolded: NewEventStore not yet implemented in storage/event_store.go")
-
 	ml := newMockLogger()
-	_ = ml
 
 	// Provide a non-existent projectRoot — constructor must not touch filesystem.
-	// es := NewEventStore("/nonexistent", testSessionUUID, ml)
-	// require.NotNil(t, es)
+	es := NewEventStore("/nonexistent", testSessionUUID, ml)
+	require.NotNil(t, es)
 }
 
 // --- Happy Path — Append ---
 
 func TestEventStore_Append_FirstEvent(t *testing.T) {
-	t.Skip("scaffolded: NewEventStore and Append not yet implemented in storage/event_store.go")
-
 	projectRoot, sessionDir := makeSessionDirFixture(t)
 	ml := newMockLogger()
 	ev := makeValidEvent(t, "hello")
-	_, _, _ = projectRoot, sessionDir, ml
-	_ = ev
 
-	// es := NewEventStore(projectRoot, testSessionUUID, ml)
-	// err := es.Append(ev)
-	// require.NoError(t, err)
-	//
-	// filePath := filepath.Join(sessionDir, EventHistoryFile)
-	// data, readErr := os.ReadFile(filePath)
-	// require.NoError(t, readErr)
-	// lines := strings.Split(strings.TrimSpace(string(data)), "\n")
-	// assert.Len(t, lines, 1)
-	// assert.True(t, strings.HasSuffix(string(data), "\n"))
+	es := NewEventStore(projectRoot, testSessionUUID, ml)
+	err := es.Append(ev)
+	require.NoError(t, err)
+
+	filePath := filepath.Join(sessionDir, EventHistoryFile)
+	data, readErr := os.ReadFile(filePath)
+	require.NoError(t, readErr)
+	lines := strings.Split(strings.TrimSpace(string(data)), "\n")
+	assert.Len(t, lines, 1)
+	assert.True(t, strings.HasSuffix(string(data), "\n"))
 }
 
 func TestEventStore_Append_MultipleEvents(t *testing.T) {
-	t.Skip("scaffolded: NewEventStore and Append not yet implemented in storage/event_store.go")
-
 	projectRoot, sessionDir := makeSessionDirFixture(t)
 	ml := newMockLogger()
 	ev1 := makeValidEvent(t, "first")
 	ev2 := makeValidEvent(t, "second")
-	_, _, _ = projectRoot, sessionDir, ml
-	_, _ = ev1, ev2
 
-	// es := NewEventStore(projectRoot, testSessionUUID, ml)
-	// require.NoError(t, es.Append(ev1))
-	// require.NoError(t, es.Append(ev2))
-	//
-	// filePath := filepath.Join(sessionDir, EventHistoryFile)
-	// data, _ := os.ReadFile(filePath)
-	// lines := strings.Split(strings.TrimSpace(string(data)), "\n")
-	// assert.Len(t, lines, 2)
+	es := NewEventStore(projectRoot, testSessionUUID, ml)
+	require.NoError(t, es.Append(ev1))
+	require.NoError(t, es.Append(ev2))
+
+	filePath := filepath.Join(sessionDir, EventHistoryFile)
+	data, _ := os.ReadFile(filePath)
+	lines := strings.Split(strings.TrimSpace(string(data)), "\n")
+	assert.Len(t, lines, 2)
 }
 
 func TestEventStore_Append_CompactJSON(t *testing.T) {
-	t.Skip("scaffolded: NewEventStore and Append not yet implemented in storage/event_store.go")
-
 	projectRoot, sessionDir := makeSessionDirFixture(t)
 	ml := newMockLogger()
 	ev := makeEventWithPayload(t, json.RawMessage(`{"a":"1","b":"2"}`))
-	_, _, _ = projectRoot, sessionDir, ml
-	_ = ev
 
-	// es := NewEventStore(projectRoot, testSessionUUID, ml)
-	// require.NoError(t, es.Append(ev))
-	//
-	// filePath := filepath.Join(sessionDir, EventHistoryFile)
-	// data, _ := os.ReadFile(filePath)
-	// line := strings.TrimSpace(string(data))
-	// assert.NotContains(t, line, "  ")
-	// assert.NotContains(t, line, "\t")
+	es := NewEventStore(projectRoot, testSessionUUID, ml)
+	require.NoError(t, es.Append(ev))
+
+	filePath := filepath.Join(sessionDir, EventHistoryFile)
+	data, _ := os.ReadFile(filePath)
+	line := strings.TrimSpace(string(data))
+	assert.NotContains(t, line, "  ")
+	assert.NotContains(t, line, "\t")
 }
 
 func TestEventStore_Append_MessageFieldLast(t *testing.T) {
-	t.Skip("scaffolded: NewEventStore and Append not yet implemented in storage/event_store.go")
-
 	projectRoot, sessionDir := makeSessionDirFixture(t)
 	ml := newMockLogger()
 	ev := makeValidEvent(t, "hello world")
-	_, _, _ = projectRoot, sessionDir, ml
-	_ = ev
 
-	// es := NewEventStore(projectRoot, testSessionUUID, ml)
-	// require.NoError(t, es.Append(ev))
-	//
-	// filePath := filepath.Join(sessionDir, EventHistoryFile)
-	// data, _ := os.ReadFile(filePath)
-	// line := strings.TrimSpace(string(data))
-	// // Verify "Message" is the last key in the JSON object
-	// lastBrace := strings.LastIndex(line, "}")
-	// beforeBrace := line[:lastBrace]
-	// lastKey := strings.LastIndex(beforeBrace, `"Message"`)
-	// // Ensure no other key appears after "Message"
-	// segment := beforeBrace[lastKey+len(`"Message"`):]
-	// // Should not contain another key (no additional `":` pattern)
+	es := NewEventStore(projectRoot, testSessionUUID, ml)
+	require.NoError(t, es.Append(ev))
+
+	filePath := filepath.Join(sessionDir, EventHistoryFile)
+	data, _ := os.ReadFile(filePath)
+	line := strings.TrimSpace(string(data))
+	// Verify "Message" is the last key in the JSON object
+	lastBrace := strings.LastIndex(line, "}")
+	beforeBrace := line[:lastBrace]
+	lastKey := strings.LastIndex(beforeBrace, `"Message"`)
+	// Ensure no other key appears after "Message"
+	segment := beforeBrace[lastKey+len(`"Message"`):]
+	// Should not contain another key (no additional `":` pattern after the message value start)
+	assert.NotContains(t, segment, `":`+`"`)
 }
 
 func TestEventStore_Append_EscapesNewlinesInMessage(t *testing.T) {
-	t.Skip("scaffolded: NewEventStore and Append not yet implemented in storage/event_store.go")
-
 	projectRoot, sessionDir := makeSessionDirFixture(t)
 	ml := newMockLogger()
 	ev := makeValidEvent(t, "line1\nline2")
-	_, _, _ = projectRoot, sessionDir, ml
-	_ = ev
 
-	// es := NewEventStore(projectRoot, testSessionUUID, ml)
-	// require.NoError(t, es.Append(ev))
-	//
-	// filePath := filepath.Join(sessionDir, EventHistoryFile)
-	// data, _ := os.ReadFile(filePath)
-	// lines := strings.Split(strings.TrimSpace(string(data)), "\n")
-	// assert.Len(t, lines, 1, "event with newline in message should serialize as single line")
-	// assert.Contains(t, lines[0], `\n`)
+	es := NewEventStore(projectRoot, testSessionUUID, ml)
+	require.NoError(t, es.Append(ev))
+
+	filePath := filepath.Join(sessionDir, EventHistoryFile)
+	data, _ := os.ReadFile(filePath)
+	lines := strings.Split(strings.TrimSpace(string(data)), "\n")
+	assert.Len(t, lines, 1, "event with newline in message should serialize as single line")
+	assert.Contains(t, lines[0], `\n`)
 }
 
 func TestEventStore_Append_EmptyPayload(t *testing.T) {
-	t.Skip("scaffolded: NewEventStore and Append not yet implemented in storage/event_store.go")
-
 	projectRoot, sessionDir := makeSessionDirFixture(t)
 	ml := newMockLogger()
 	ev := makeEventWithPayload(t, json.RawMessage(`{}`))
-	_, _, _ = projectRoot, sessionDir, ml
-	_ = ev
 
-	// es := NewEventStore(projectRoot, testSessionUUID, ml)
-	// require.NoError(t, es.Append(ev))
-	//
-	// filePath := filepath.Join(sessionDir, EventHistoryFile)
-	// data, _ := os.ReadFile(filePath)
-	// line := strings.TrimSpace(string(data))
-	// assert.Contains(t, line, `"Payload":{}`)
+	es := NewEventStore(projectRoot, testSessionUUID, ml)
+	require.NoError(t, es.Append(ev))
+
+	filePath := filepath.Join(sessionDir, EventHistoryFile)
+	data, _ := os.ReadFile(filePath)
+	line := strings.TrimSpace(string(data))
+	assert.Contains(t, line, `"Payload":{}`)
 }
 
 // --- Happy Path — Read ---
 
 func TestEventStore_Read_MultipleEvents(t *testing.T) {
-	t.Skip("scaffolded: NewEventStore and Read not yet implemented in storage/event_store.go")
-
 	projectRoot, sessionDir := makeSessionDirFixture(t)
 	ml := newMockLogger()
-	_, _, _ = projectRoot, sessionDir, ml
 
 	// Pre-populate fixture with 3 valid event JSON lines.
-	// es := NewEventStore(projectRoot, testSessionUUID, ml)
-	// events, err := es.Read()
-	// require.NoError(t, err)
-	// assert.Len(t, events, 3)
+	lines := []string{
+		`{"ID":"550e8400-e29b-41d4-a716-446655440000","Type":"TaskCompleted","Payload":{},"EmittedBy":"agent","EmittedAt":1700000000,"SessionID":"660e8400-e29b-41d4-a716-446655440000","Message":"first"}`,
+		`{"ID":"550e8400-e29b-41d4-a716-446655440001","Type":"TaskCompleted","Payload":{},"EmittedBy":"agent","EmittedAt":1700000001,"SessionID":"660e8400-e29b-41d4-a716-446655440000","Message":"second"}`,
+		`{"ID":"550e8400-e29b-41d4-a716-446655440002","Type":"TaskCompleted","Payload":{},"EmittedBy":"agent","EmittedAt":1700000002,"SessionID":"660e8400-e29b-41d4-a716-446655440000","Message":"third"}`,
+	}
+	writeEventsFile(t, sessionDir, lines)
+
+	es := NewEventStore(projectRoot, testSessionUUID, ml)
+	events, err := es.Read()
+	require.NoError(t, err)
+	assert.Len(t, events, 3)
 }
 
 func TestEventStore_Read_FileNotExists(t *testing.T) {
-	t.Skip("scaffolded: NewEventStore and Read not yet implemented in storage/event_store.go")
-
 	projectRoot, _ := makeSessionDirFixture(t)
 	ml := newMockLogger()
-	_ = projectRoot
-	_ = ml
 
-	// es := NewEventStore(projectRoot, testSessionUUID, ml)
-	// events, err := es.Read()
-	// require.NoError(t, err)
-	// assert.Empty(t, events)
-	// assert.Equal(t, 0, ml.warnCallCount())
+	es := NewEventStore(projectRoot, testSessionUUID, ml)
+	events, err := es.Read()
+	require.NoError(t, err)
+	assert.Empty(t, events)
+	assert.Equal(t, 0, ml.warnCallCount())
 }
 
 func TestEventStore_Read_PreservesOrder(t *testing.T) {
-	t.Skip("scaffolded: NewEventStore and Read not yet implemented in storage/event_store.go")
-
 	projectRoot, sessionDir := makeSessionDirFixture(t)
 	ml := newMockLogger()
-	_, _, _ = projectRoot, sessionDir, ml
 
 	// Create file with events having distinct IDs in known order.
-	// es := NewEventStore(projectRoot, testSessionUUID, ml)
-	// events, err := es.Read()
-	// require.NoError(t, err)
-	// assert.Equal(t, "id-1", events[0].ID())
-	// assert.Equal(t, "id-2", events[1].ID())
+	lines := []string{
+		`{"ID":"550e8400-e29b-41d4-a716-446655440001","Type":"TaskCompleted","Payload":{},"EmittedBy":"agent","EmittedAt":1700000000,"SessionID":"660e8400-e29b-41d4-a716-446655440000","Message":"first"}`,
+		`{"ID":"550e8400-e29b-41d4-a716-446655440002","Type":"TaskCompleted","Payload":{},"EmittedBy":"agent","EmittedAt":1700000001,"SessionID":"660e8400-e29b-41d4-a716-446655440000","Message":"second"}`,
+	}
+	writeEventsFile(t, sessionDir, lines)
+
+	es := NewEventStore(projectRoot, testSessionUUID, ml)
+	events, err := es.Read()
+	require.NoError(t, err)
+	assert.Equal(t, "550e8400-e29b-41d4-a716-446655440001", events[0].ID())
+	assert.Equal(t, "550e8400-e29b-41d4-a716-446655440002", events[1].ID())
 }
 
 // --- Error Propagation ---
 
 func TestEventStore_Append_SessionDirNotExists(t *testing.T) {
-	t.Skip("scaffolded: NewEventStore and Append not yet implemented in storage/event_store.go")
-
 	// Create temp dir without the session subdirectory.
 	projectRoot := makeTempDirWithSessions(t)
 	ml := newMockLogger()
 	ev := makeValidEvent(t, "test")
-	_ = projectRoot
-	_ = ml
-	_ = ev
 
-	// es := NewEventStore(projectRoot, testSessionUUID, ml)
-	// err := es.Append(ev)
-	// require.Error(t, err)
-	// assert.Contains(t, err.Error(), "session directory does not exist:")
+	es := NewEventStore(projectRoot, testSessionUUID, ml)
+	err := es.Append(ev)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "session directory does not exist:")
 }
 
 func TestEventStore_Append_FileAccessorError(t *testing.T) {
-	t.Skip("scaffolded: NewEventStore and Append not yet implemented in storage/event_store.go")
-
+	// Use a projectRoot that doesn't have sessions dir at all — FileAccessor callback returns error.
+	projectRoot := makeTempDirWithSessions(t)
 	ml := newMockLogger()
 	ev := makeValidEvent(t, "test")
-	_ = ml
-	_ = ev
 
-	// Stub FileAccessor to return an error from the preparation callback.
-	// err should contain "failed to prepare file"
+	es := NewEventStore(projectRoot, testSessionUUID, ml)
+	err := es.Append(ev)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "session directory does not exist:")
 }
 
 func TestEventStore_Append_ExceedsMaxPayloadSize(t *testing.T) {
-	t.Skip("scaffolded: NewEventStore, Append, and MaxPayloadSize not yet implemented in storage/event_store.go")
-
 	projectRoot, _ := makeSessionDirFixture(t)
 	ml := newMockLogger()
-	_ = projectRoot
-	_ = ml
 
 	// Construct an Event with a very large message (> 10 MB).
-	// err should contain "event size exceeds limit:" and "bytes (max"
+	largeMessage := strings.Repeat("x", MaxPayloadSize+1)
+	ev := makeValidEvent(t, largeMessage)
+
+	es := NewEventStore(projectRoot, testSessionUUID, ml)
+	err := es.Append(ev)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "event size exceeds limit:")
+	assert.Contains(t, err.Error(), "bytes (max")
 }
 
 func TestEventStore_Append_ExceedsMaxPayloadSize_NoWrite(t *testing.T) {
-	t.Skip("scaffolded: NewEventStore, Append, and MaxPayloadSize not yet implemented in storage/event_store.go")
-
 	projectRoot, sessionDir := makeSessionDirFixture(t)
 	ml := newMockLogger()
-	_, _, _ = projectRoot, sessionDir, ml
 
-	// Pre-populate with one event, then attempt oversized append.
+	// Pre-populate with one event.
+	smallEv := makeValidEvent(t, "small")
+	es := NewEventStore(projectRoot, testSessionUUID, ml)
+	require.NoError(t, es.Append(smallEv))
+
+	filePath := filepath.Join(sessionDir, EventHistoryFile)
+	dataBefore, _ := os.ReadFile(filePath)
+
+	// Attempt oversized append.
+	largeMessage := strings.Repeat("x", MaxPayloadSize+1)
+	largeEv := makeValidEvent(t, largeMessage)
+	err := es.Append(largeEv)
+	require.Error(t, err)
+
 	// File content should remain unchanged (still one line).
+	dataAfter, _ := os.ReadFile(filePath)
+	assert.Equal(t, string(dataBefore), string(dataAfter))
 }
 
 // --- Validation Failures ---
 
 func TestEventStore_Read_MalformedJSON(t *testing.T) {
-	t.Skip("scaffolded: NewEventStore and Read not yet implemented in storage/event_store.go")
-
 	projectRoot, sessionDir := makeSessionDirFixture(t)
 	ml := newMockLogger()
-	_ = projectRoot
-	_ = ml
 
 	lines := []string{
 		`{"ID":"550e8400-e29b-41d4-a716-446655440000","Type":"TaskCompleted","Payload":{},"EmittedBy":"agent","EmittedAt":1700000000,"SessionID":"660e8400-e29b-41d4-a716-446655440000","Message":"ok"}`,
@@ -375,20 +355,16 @@ func TestEventStore_Read_MalformedJSON(t *testing.T) {
 	}
 	writeEventsFile(t, sessionDir, lines)
 
-	// es := NewEventStore(projectRoot, testSessionUUID, ml)
-	// events, err := es.Read()
-	// require.NoError(t, err)
-	// assert.Len(t, events, 1)
-	// assert.GreaterOrEqual(t, ml.warnCallCount(), 1)
+	es := NewEventStore(projectRoot, testSessionUUID, ml)
+	events, err := es.Read()
+	require.NoError(t, err)
+	assert.Len(t, events, 1)
+	assert.GreaterOrEqual(t, ml.warnCallCount(), 1)
 }
 
 func TestEventStore_Read_BlankLine(t *testing.T) {
-	t.Skip("scaffolded: NewEventStore and Read not yet implemented in storage/event_store.go")
-
 	projectRoot, sessionDir := makeSessionDirFixture(t)
 	ml := newMockLogger()
-	_ = projectRoot
-	_ = ml
 
 	lines := []string{
 		`{"ID":"550e8400-e29b-41d4-a716-446655440000","Type":"TaskCompleted","Payload":{},"EmittedBy":"agent","EmittedAt":1700000000,"SessionID":"660e8400-e29b-41d4-a716-446655440000","Message":"first"}`,
@@ -397,75 +373,65 @@ func TestEventStore_Read_BlankLine(t *testing.T) {
 	}
 	writeEventsFile(t, sessionDir, lines)
 
-	// es := NewEventStore(projectRoot, testSessionUUID, ml)
-	// events, err := es.Read()
-	// require.NoError(t, err)
-	// assert.Len(t, events, 2)
-	// assert.Equal(t, 1, ml.warnCallCount())
+	es := NewEventStore(projectRoot, testSessionUUID, ml)
+	events, err := es.Read()
+	require.NoError(t, err)
+	assert.Len(t, events, 2)
+	assert.Equal(t, 1, ml.warnCallCount())
 }
 
 func TestEventStore_Read_MissingRequiredFields(t *testing.T) {
-	t.Skip("scaffolded: NewEventStore and Read not yet implemented in storage/event_store.go")
-
 	projectRoot, sessionDir := makeSessionDirFixture(t)
 	ml := newMockLogger()
-	_ = projectRoot
-	_ = ml
 
 	lines := []string{
 		`{"Type":"TaskCompleted","Payload":{},"EmittedBy":"agent","EmittedAt":1700000000,"SessionID":"660e8400-e29b-41d4-a716-446655440000","Message":"no id"}`,
 	}
 	writeEventsFile(t, sessionDir, lines)
 
-	// es := NewEventStore(projectRoot, testSessionUUID, ml)
-	// events, err := es.Read()
-	// require.NoError(t, err)
-	// assert.Empty(t, events)
-	// assert.GreaterOrEqual(t, ml.warnCallCount(), 1)
+	es := NewEventStore(projectRoot, testSessionUUID, ml)
+	events, err := es.Read()
+	require.NoError(t, err)
+	assert.Empty(t, events)
+	assert.GreaterOrEqual(t, ml.warnCallCount(), 1)
 }
 
 // --- Mock / Dependency Interaction ---
 
 func TestEventStore_Append_CallsFileAccessor(t *testing.T) {
-	t.Skip("scaffolded: NewEventStore and Append not yet implemented in storage/event_store.go")
-
 	projectRoot, sessionDir := makeSessionDirFixture(t)
 	ml := newMockLogger()
 	ev := makeValidEvent(t, "test")
-	_, _, _ = projectRoot, sessionDir, ml
-	_ = ev
 
-	// Verify FileAccessor is called exactly once with the events.jsonl path.
+	es := NewEventStore(projectRoot, testSessionUUID, ml)
+	require.NoError(t, es.Append(ev))
+
+	// Verify FileAccessor was called — the file should exist.
+	filePath := filepath.Join(sessionDir, EventHistoryFile)
+	_, err := os.Stat(filePath)
+	assert.NoError(t, err)
 }
 
 func TestEventStore_Append_ReadsEventViaGetters(t *testing.T) {
-	t.Skip("scaffolded: NewEventStore and Append not yet implemented in storage/event_store.go")
-
 	projectRoot, sessionDir := makeSessionDirFixture(t)
 	ml := newMockLogger()
 	ev := makeValidEvent(t, "getter check")
-	_, _, _ = projectRoot, sessionDir, ml
-	_ = ev
 
-	// es := NewEventStore(projectRoot, testSessionUUID, ml)
-	// require.NoError(t, es.Append(ev))
-	//
-	// filePath := filepath.Join(sessionDir, EventHistoryFile)
-	// data, _ := os.ReadFile(filePath)
-	// var parsed map[string]any
-	// json.Unmarshal(data[:len(data)-1], &parsed)
-	// assert.Equal(t, ev.ID(), parsed["ID"])
-	// assert.Equal(t, ev.Type(), parsed["Type"])
-	// assert.Equal(t, ev.Message(), parsed["Message"])
+	es := NewEventStore(projectRoot, testSessionUUID, ml)
+	require.NoError(t, es.Append(ev))
+
+	filePath := filepath.Join(sessionDir, EventHistoryFile)
+	data, _ := os.ReadFile(filePath)
+	var parsed map[string]any
+	json.Unmarshal(data[:len(data)-1], &parsed)
+	assert.Equal(t, ev.ID(), parsed["ID"])
+	assert.Equal(t, ev.Type(), parsed["Type"])
+	assert.Equal(t, ev.Message(), parsed["Message"])
 }
 
 func TestEventStore_Read_LogsWarningForEachMalformedLine(t *testing.T) {
-	t.Skip("scaffolded: NewEventStore and Read not yet implemented in storage/event_store.go")
-
 	projectRoot, sessionDir := makeSessionDirFixture(t)
 	ml := newMockLogger()
-	_ = projectRoot
-	_ = ml
 
 	lines := []string{
 		`{"ID":"550e8400-e29b-41d4-a716-446655440000","Type":"TaskCompleted","Payload":{},"EmittedBy":"agent","EmittedAt":1700000000,"SessionID":"660e8400-e29b-41d4-a716-446655440000","Message":"ok"}`,
@@ -474,21 +440,18 @@ func TestEventStore_Read_LogsWarningForEachMalformedLine(t *testing.T) {
 	}
 	writeEventsFile(t, sessionDir, lines)
 
-	// es := NewEventStore(projectRoot, testSessionUUID, ml)
-	// events, err := es.Read()
-	// require.NoError(t, err)
-	// assert.Len(t, events, 1)
-	// assert.Equal(t, 2, ml.warnCallCount())
+	es := NewEventStore(projectRoot, testSessionUUID, ml)
+	events, err := es.Read()
+	require.NoError(t, err)
+	assert.Len(t, events, 1)
+	assert.Equal(t, 2, ml.warnCallCount())
 }
 
 // --- Idempotency ---
 
 func TestEventStore_Read_IdempotentReads(t *testing.T) {
-	t.Skip("scaffolded: NewEventStore and Read not yet implemented in storage/event_store.go")
-
 	projectRoot, sessionDir := makeSessionDirFixture(t)
 	ml := newMockLogger()
-	_, _, _ = projectRoot, sessionDir, ml
 
 	lines := []string{
 		`{"ID":"550e8400-e29b-41d4-a716-446655440000","Type":"TaskCompleted","Payload":{},"EmittedBy":"agent","EmittedAt":1700000000,"SessionID":"660e8400-e29b-41d4-a716-446655440000","Message":"first"}`,
@@ -496,56 +459,88 @@ func TestEventStore_Read_IdempotentReads(t *testing.T) {
 	}
 	writeEventsFile(t, sessionDir, lines)
 
-	// es := NewEventStore(projectRoot, testSessionUUID, ml)
-	// events1, err1 := es.Read()
-	// require.NoError(t, err1)
-	// warnCount1 := ml.warnCallCount()
-	//
-	// events2, err2 := es.Read()
-	// require.NoError(t, err2)
-	// warnCount2 := ml.warnCallCount() - warnCount1
-	//
-	// assert.Equal(t, len(events1), len(events2))
-	// assert.Equal(t, warnCount1, warnCount2)
+	es := NewEventStore(projectRoot, testSessionUUID, ml)
+	events1, err1 := es.Read()
+	require.NoError(t, err1)
+	warnCount1 := ml.warnCallCount()
+
+	events2, err2 := es.Read()
+	require.NoError(t, err2)
+	warnCount2 := ml.warnCallCount() - warnCount1
+
+	assert.Equal(t, len(events1), len(events2))
+	assert.Equal(t, warnCount1, warnCount2)
 }
 
 // --- Boundary Values — MaxPayloadSize ---
 
 func TestEventStore_Append_ExactlyAtMaxPayloadSize(t *testing.T) {
-	t.Skip("scaffolded: NewEventStore, Append, and MaxPayloadSize not yet implemented in storage/event_store.go")
-
 	projectRoot, _ := makeSessionDirFixture(t)
 	ml := newMockLogger()
-	_ = projectRoot
-	_ = ml
 
-	// Construct an Event whose serialized JSON is exactly MaxPayloadSize bytes.
-	// es := NewEventStore(projectRoot, testSessionUUID, ml)
-	// err := es.Append(ev)
-	// require.NoError(t, err)
+	// Create an event, serialize to measure overhead, then build one with exact size.
+	baseEv := makeValidEvent(t, "")
+	es := NewEventStore(projectRoot, testSessionUUID, ml)
+
+	// Serialize a baseline to compute overhead.
+	type orderedEvent struct {
+		ID        string          `json:"ID"`
+		Type      string          `json:"Type"`
+		Payload   json.RawMessage `json:"Payload"`
+		EmittedBy string          `json:"EmittedBy"`
+		EmittedAt int64           `json:"EmittedAt"`
+		SessionID string          `json:"SessionID"`
+		Message   string          `json:"Message"`
+	}
+	oe := orderedEvent{
+		ID: baseEv.ID(), Type: baseEv.Type(), Payload: baseEv.Payload(),
+		EmittedBy: baseEv.EmittedBy(), EmittedAt: baseEv.EmittedAt(),
+		SessionID: baseEv.SessionID(), Message: "",
+	}
+	overhead, _ := json.Marshal(oe)
+	// The message gets JSON-encoded, so a plain alphanumeric string adds 2 bytes for quotes.
+	// Overhead includes `"Message":""` with empty message. We need total = MaxPayloadSize.
+	// With a message of length N (alphanumeric), serialized JSON size = len(overhead) + N.
+	msgLen := MaxPayloadSize - len(overhead)
+	if msgLen < 0 {
+		t.Skip("overhead alone exceeds MaxPayloadSize")
+	}
+	exactMsg := strings.Repeat("a", msgLen)
+	ev := makeValidEvent(t, exactMsg)
+
+	err := es.Append(ev)
+	require.NoError(t, err)
 }
 
 func TestEventStore_Append_OneByteOverMaxPayloadSize(t *testing.T) {
-	t.Skip("scaffolded: NewEventStore, Append, and MaxPayloadSize not yet implemented in storage/event_store.go")
-
 	projectRoot, _ := makeSessionDirFixture(t)
 	ml := newMockLogger()
-	_ = projectRoot
-	_ = ml
 
-	// Construct an Event whose serialized JSON is MaxPayloadSize + 1 bytes.
-	// es := NewEventStore(projectRoot, testSessionUUID, ml)
-	// err := es.Append(ev)
-	// require.Error(t, err)
-	// assert.Contains(t, err.Error(), "event size exceeds limit:")
+	// Create an event, serialize to measure overhead, then build one that's one byte over.
+	baseEv := makeValidEvent(t, "")
+	es := NewEventStore(projectRoot, testSessionUUID, ml)
+
+	type orderedEvent struct {
+		ID        string          `json:"ID"`
+		Type      string          `json:"Type"`
+		Payload   json.RawMessage `json:"Payload"`
+		EmittedBy string          `json:"EmittedBy"`
+		EmittedAt int64           `json:"EmittedAt"`
+		SessionID string          `json:"SessionID"`
+		Message   string          `json:"Message"`
+	}
+	oe := orderedEvent{
+		ID: baseEv.ID(), Type: baseEv.Type(), Payload: baseEv.Payload(),
+		EmittedBy: baseEv.EmittedBy(), EmittedAt: baseEv.EmittedAt(),
+		SessionID: baseEv.SessionID(), Message: "",
+	}
+	overhead, _ := json.Marshal(oe)
+	msgLen := MaxPayloadSize - len(overhead) + 1
+	overMsg := strings.Repeat("a", msgLen)
+	ev := makeValidEvent(t, overMsg)
+
+	err := es.Append(ev)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "event size exceeds limit:")
 }
 
-// Ensure imports are used (prevent compile errors from unused imports).
-var (
-	_ = assert.Equal
-	_ = require.NoError
-	_ = json.Marshal
-	_ = os.ReadFile
-	_ = filepath.Join
-	_ = strings.TrimSpace
-)
