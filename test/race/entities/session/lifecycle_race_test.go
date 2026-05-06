@@ -29,18 +29,24 @@ func TestRunAndFail_Concurrent(t *testing.T) {
 
 	wg.Wait()
 
-	// Exactly one should succeed; the other should return a precondition error
-	if runErr == nil {
-		// Run succeeded => Fail should have returned an error
-		assert.Error(t, failErr)
-		assert.Equal(t, "running", s.GetStatusSafe())
-	} else if failErr == nil {
-		// Fail succeeded => Run should have returned an error
-		assert.Error(t, runErr)
-		assert.Equal(t, "failed", s.GetStatusSafe())
-		assert.NotNil(t, s.GetErrorSafe())
-	} else {
-		// Both failed — should not happen with a valid session in "initializing"
-		t.Fatalf("both Run and Fail returned errors: run=%v, fail=%v", runErr, failErr)
+	assert.NoError(t, failErr)
+	assert.Equal(t, "failed", s.GetStatusSafe())
+	assert.Same(t, agentErr, s.GetErrorSafe())
+
+	if runErr != nil {
+		assert.EqualError(t, runErr, "cannot run session: status is 'failed', expected 'initializing'")
+	}
+
+	select {
+	case <-ch:
+		// OK: Fail always sends exactly one termination notification.
+	default:
+		t.Fatal("expected notification on terminationNotifier channel")
+	}
+
+	select {
+	case <-ch:
+		t.Fatal("unexpected second notification on terminationNotifier channel")
+	default:
 	}
 }

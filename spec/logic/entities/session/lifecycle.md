@@ -129,7 +129,7 @@ All three methods return `error`. Possible errors:
   Expected: Send blocks indefinitely. Under correct usage the channel capacity >= 2 and at most one Done xor Fail succeeds per session, so this cannot occur.
 
 - **Condition**: Concurrent `Run` and `Fail` during initialization.
-  Expected: Serialized by the write lock. Whichever acquires the lock first wins; the other observes the new status and returns its precondition error.
+  Expected: Serialized by the write lock. If `Fail` acquires the lock first, `Run` observes status `"failed"` and returns its precondition error. If `Run` acquires the lock first, `Fail` subsequently succeeds from `"running"`, records the error, and the final status is `"failed"`.
 
 ## Related
 
