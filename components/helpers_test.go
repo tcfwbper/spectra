@@ -13,4 +13,10 @@ const (
 	validEventType2 = "Approved"
 	validEventType3 = "Completed"
 	validDesc       = "Reviews code"
+
+	// Valid agent definition defaults for reuse.
+	validModel        = "claude-sonnet-4-20250514"
+	validEffort       = "high"
+	validSystemPrompt = "You are an architect."
+	validAgentRoot    = "spec"
 )
