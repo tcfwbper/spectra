@@ -50,7 +50,7 @@ type AgentLoader interface {
 2. When `Load(workflowName)` is called, composes the file path using `StorageLayout.GetWorkflowPath(projectRoot, workflowName)`.
 3. Reads the file using `os.ReadFile`. If the file does not exist (`os.ErrNotExist`), returns error: `"workflow definition not found: <workflowName>"`. If another read error occurs, returns error: `"failed to read workflow definition '<workflowName>': <error>"`.
 4. Parses the YAML content using a strict YAML decoder with unknown field rejection enabled (`yaml.Decoder` with `KnownFields(true)`). If parsing fails, returns error: `"failed to parse workflow definition '<workflowName>': <yaml error>"`.
-5. Derives the `Name` value from the `workflowName` parameter (filename without `.yaml` extension). The Name is not read from YAML content.
+5. Derives the `Name` value from the `workflowName` parameter (filename without `.yaml` extension). The YAML file does not contain a `name` field; strict parsing will reject any YAML that includes one.
 6. Constructs each Node by calling `NewNode(name, nodeType, agentRole, description)` with parsed fields. If any constructor fails, returns error: `"workflow definition '<workflowName>' validation failed: node '<nodeName>': <constructor error>"`. If the node name cannot be determined from YAML (empty or missing), uses the zero-based index as fallback: `"workflow definition '<workflowName>' validation failed: node[<index>]: <constructor error>"`. Fails fast on first error.
 7. Constructs each Transition by calling `NewTransition(fromNode, eventType, toNode)` with parsed fields. If any constructor fails, returns error: `"workflow definition '<workflowName>' validation failed: transition (from '<fromNode>', event '<eventType>', to '<toNode>'): <constructor error>"`. If fields are empty, uses whatever values are available. Fails fast on first error.
 8. Constructs each ExitTransition by calling `NewExitTransition(fromNode, eventType, toNode)` with parsed fields. If any constructor fails, returns error: `"workflow definition '<workflowName>' validation failed: exit_transition (from '<fromNode>', event '<eventType>', to '<toNode>'): <constructor error>"`. Fails fast on first error.
@@ -108,7 +108,7 @@ type AgentLoader interface {
 5. **Thread-Safe**: Safe to call concurrently without synchronization.
 6. **No File Locking**: Read-only operations do not require locks.
 7. **Strict YAML Parsing**: Unknown fields in YAML must be rejected (KnownFields mode).
-8. **Name From Filename**: Name is derived from the filename parameter, never from YAML content.
+8. **Name From Filename Only**: Name is derived from the filename parameter. The workflow YAML file does not contain a `name` field; if present, strict parsing will reject it as an unknown field.
 9. **Fail Fast**: Returns immediately on first error at each construction phase (nodes → transitions → exit transitions → workflow → agent refs).
 10. **Path Composition Delegation**: Must use StorageLayout for workflow file path composition.
 11. **Agent Reference Integrity at Load Time**: Every agent node's `agent_role` must be loadable via the injected AgentLoader. The runtime never receives a WorkflowDefinition with unresolvable agent references.
@@ -126,6 +126,9 @@ type AgentLoader interface {
 
 - Condition: YAML contains an unknown field (e.g., `customField: value`).
   Expected: Strict parser rejects it. Returns parse error.
+
+- Condition: YAML contains a `name` field (legacy or mistakenly added).
+  Expected: Strict parser rejects it as an unknown field. Returns parse error. Name is derived exclusively from filename.
 
 - Condition: YAML uses snake_case field names (e.g., `entry_node` instead of `entryNode`).
   Expected: Strict parser treats as unknown field and rejects. Returns parse error.

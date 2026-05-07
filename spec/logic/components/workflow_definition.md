@@ -113,7 +113,7 @@ Construction constraint: Must be constructed via `NewWorkflowDefinition(...)`. D
 13. **Reachability**: Every non-entry Node has at least one incoming Transition.
 14. **Immutability**: Once constructed, no field may be modified. All access is via exported getter methods.
 15. **Construction Only Via Constructor**: Must be constructed via `NewWorkflowDefinition`. Direct struct literal construction is forbidden.
-16. **No Name in YAML**: The Name value does not originate from YAML file content. It is provided externally by the loader (derived from filename).
+16. **Name From Filename Only**: The Name value is provided externally by the loader (derived from filename). The workflow YAML file does not contain a `name` field.
 17. **No AgentRole Existence Check**: WorkflowDefinition does not verify that Node.AgentRole values correspond to existing AgentDefinition instances. This is the I/O loader layer's responsibility.
 
 ## Edge Cases
