@@ -28,7 +28,7 @@
 
 | Test ID | Category | Description | Setup | Input | Expected |
 |---|---|---|---|---|---|
-| `TestListen_ReturnsChannels` | `unit` | Returns error channel, done channel, and nil error on success. | Create temp directory; call `CreateSocket()` successfully. Provide a no-op `MessageHandler` and a context. | Call `Listen(ctx, handler)` | Returns non-nil `listenerErrCh`, non-nil `listenerDoneCh`, nil error |
+| `TestListen_ReturnsChannels` | `unit` | Returns error channel, done channel, and nil error on success. | Create temp directory; call `CreateSocket()` successfully. Provide a no-op `MessageHandler`. | Call `Listen(handler)` | Returns non-nil `listenerErrCh`, non-nil `listenerDoneCh`, nil error |
 | `TestListen_AcceptsConnection` | `unit` | Accepts a client connection on the socket. | Create temp directory; call `CreateSocket()` and `Listen()`. Connect a client via Unix domain socket dial. | Client dials the socket path | Client connection succeeds without error |
 | `TestListen_DispatchesToHandler` | `unit` | Dispatches a valid message to MessageHandler with correct sessionUUID. | Create temp directory; call `CreateSocket()` and `Listen()` with a mock `MessageHandler`. Connect client and send valid JSON message. | Client sends `{"type":"event","payload":{"key":"val"}}` | Mock `MessageHandler.Handle` called with the stored `sessionUUID` and a `RuntimeMessage` with type `"event"` |
 | `TestListen_SendsResponseToClient` | `unit` | Serializes and sends RuntimeResponse back to the client. | Create temp directory; call `CreateSocket()` and `Listen()` with a mock `MessageHandler` that returns a success response. Connect client and send valid message. | Client sends valid message and reads response | Client receives `{"status":"success","message":"ok"}\n` |
@@ -41,22 +41,22 @@
 | `TestCreateSocket_SocketAlreadyExists` | `unit` | Returns descriptive error when socket file already exists. | Create temp directory; create a file at the socket path before calling `CreateSocket()`. | Call `CreateSocket()` | Returns error containing `"runtime socket file already exists:"` and the socket path |
 | `TestCreateSocket_DirectoryMissing` | `unit` | Returns error when parent directory does not exist. | Construct manager with socket path in a nonexistent directory. | Call `CreateSocket()` | Returns error containing `"failed to create runtime socket:"` |
 | `TestCreateSocket_PermissionDenied` | `unit` | Returns error when directory is not writable. | Create temp directory with permissions `0555` (read/execute only). Construct manager with socket path inside it. | Call `CreateSocket()` | Returns error containing `"failed to create runtime socket:"` |
-| `TestListen_BeforeCreateSocket` | `unit` | Returns error when Listen is called before CreateSocket. | Construct manager without calling `CreateSocket()`. | Call `Listen(ctx, handler)` | Returns nil channels and error `"runtime socket not created: call CreateSocket() first"` |
-| `TestListen_BindFailure` | `unit` | Returns synchronous error when bind/listen fails. | Create temp directory; call `CreateSocket()` then delete the socket file externally before `Listen()`. | Call `Listen(ctx, handler)` | Returns error containing `"failed to listen on runtime socket:"` |
+| `TestListen_BeforeCreateSocket` | `unit` | Returns error when Listen is called before CreateSocket. | Construct manager without calling `CreateSocket()`. | Call `Listen(handler)` | Returns nil channels and error `"runtime socket not created: call CreateSocket() first"` |
+| `TestListen_BindFailure` | `unit` | Returns synchronous error when bind/listen fails. | Create temp directory; call `CreateSocket()` then delete the socket file externally before `Listen()`. | Call `Listen(handler)` | Returns error containing `"failed to listen on runtime socket:"` |
 
 ### Happy Path — DeleteSocket
 
 | Test ID | Category | Description | Setup | Input | Expected |
 |---|---|---|---|---|---|
-| `TestDeleteSocket_RemovesFile` | `unit` | Deletes the socket file from the filesystem. | Create temp directory; call `CreateSocket()` and `Listen()`. | Call `DeleteSocket(ctx)` | Socket file no longer exists at path |
-| `TestDeleteSocket_ClosesListener` | `unit` | Stops the listener and closes the done channel. | Create temp directory; call `CreateSocket()` and `Listen()`. | Call `DeleteSocket(ctx)` then read from `listenerDoneCh` | `listenerDoneCh` is closed (read returns immediately) |
+| `TestDeleteSocket_RemovesFile` | `unit` | Deletes the socket file from the filesystem. | Create temp directory; call `CreateSocket()` and `Listen()`. | Call `DeleteSocket()` | Socket file no longer exists at path |
+| `TestDeleteSocket_ClosesListener` | `unit` | Stops the listener and closes the done channel. | Create temp directory; call `CreateSocket()` and `Listen()`. | Call `DeleteSocket()` then read from `listenerDoneCh` | `listenerDoneCh` is closed (read returns immediately) |
 
 ### Idempotency
 
 | Test ID | Category | Description | Setup | Input | Expected |
 |---|---|---|---|---|---|
-| `TestDeleteSocket_Idempotent` | `unit` | Calling DeleteSocket multiple times does not error. | Create temp directory; call `CreateSocket()` and `Listen()`. Call `DeleteSocket(ctx)` once. | Call `DeleteSocket(ctx)` again | Returns without error or panic |
-| `TestDeleteSocket_FileAlreadyGone` | `unit` | Returns without error when socket file does not exist. | Create temp directory; call `CreateSocket()` and `Listen()`. Manually remove socket file. | Call `DeleteSocket(ctx)` | Returns without error; no warning logged |
+| `TestDeleteSocket_Idempotent` | `unit` | Calling DeleteSocket multiple times does not error. | Create temp directory; call `CreateSocket()` and `Listen()`. Call `DeleteSocket()` once. | Call `DeleteSocket()` again | Returns without error or panic |
+| `TestDeleteSocket_FileAlreadyGone` | `unit` | Returns without error when socket file does not exist. | Create temp directory; call `CreateSocket()` and `Listen()`. Manually remove socket file. | Call `DeleteSocket()` | Returns without error; no warning logged |
 
 ### Validation Failures
 
@@ -91,7 +91,7 @@
 |---|---|---|---|---|---|
 | `TestConstruction_CallsStorageLayout` | `unit` | Constructor calls StorageLayout.GetRuntimeSocketPath with correct args. | Stub `StorageLayout.GetRuntimeSocketPath` to capture arguments. | `projectRoot="/proj"`, `sessionUUID="uuid-1"` | `GetRuntimeSocketPath` called with `"/proj"` and `"uuid-1"` |
 | `TestPerConnection_InvokesNewRuntimeMessage` | `unit` | Constructs RuntimeMessage via NewRuntimeMessage after protocol validation. | Create temp directory; call `CreateSocket()` and `Listen()` with mock `MessageHandler`. Connect client. | Client sends `{"type":"error","payload":{"detail":"x"},"claudeSessionID":"c1"}\n` | MessageHandler.Handle receives a RuntimeMessage with Type `"error"`, Payload containing `{"detail":"x"}`, ClaudeSessionID `"c1"` |
-| `TestDeleteSocket_LogsOnFileDeletionFailure` | `unit` | Logs a warning when socket file deletion fails. | Create temp directory; call `CreateSocket()` and `Listen()`. Make socket file undeletable (e.g., remove write permission on parent dir). | Call `DeleteSocket(ctx)` | logger.Warn called with message containing `"failed to delete runtime socket:"` |
+| `TestDeleteSocket_LogsOnFileDeletionFailure` | `unit` | Logs a warning when socket file deletion fails. | Create temp directory; call `CreateSocket()` and `Listen()`. Make socket file undeletable (e.g., remove write permission on parent dir). | Call `DeleteSocket()` | logger.Warn called with message containing `"failed to delete runtime socket:"` |
 | `TestPerConnection_LogsOnSendFailure` | `unit` | Logs a warning when response send fails due to client disconnect. | Create temp directory; call `CreateSocket()` and `Listen()` with mock logger and a slow `MessageHandler`. Connect client, send valid message, then close client connection before handler returns. | MessageHandler returns after client disconnect | logger.Warn called with message containing `"failed to send response to client:"` |
 
 ### Concurrent Behaviour
@@ -106,8 +106,8 @@
 
 | Test ID | Category | Description | Setup | Input | Expected |
 |---|---|---|---|---|---|
-| `TestDeleteSocket_ClosesActiveConnections` | `unit` | DeleteSocket closes all active connections immediately. | Create temp directory; call `CreateSocket()` and `Listen()` with a slow `MessageHandler` (blocks on a channel). Connect a client and send a valid message (handler blocks). | Call `DeleteSocket(ctx)` while handler is blocked | Client connection is closed (read returns error); `listenerDoneCh` is closed |
-| `TestListen_ContextCancellation` | `unit` | Cancelling context stops the accept loop. | Create temp directory; call `CreateSocket()` and `Listen()` with a cancellable context. | Cancel the context | `listenerDoneCh` is closed; new connection attempts are refused |
+| `TestDeleteSocket_ClosesActiveConnections` | `unit` | DeleteSocket closes all active connections immediately. | Create temp directory; call `CreateSocket()` and `Listen()` with a slow `MessageHandler` (blocks on a channel). Connect a client and send a valid message (handler blocks). | Call `DeleteSocket()` while handler is blocked | Client connection is closed (read returns error); `listenerDoneCh` is closed |
+| `TestDeleteSocket_WhileAcceptLoopWaiting` | `unit` | DeleteSocket stops the accept loop when it is waiting for a new connection. | Create temp directory; call `CreateSocket()` and `Listen()`. No clients connected (accept loop is idle/waiting). | Call `DeleteSocket()` | Accept loop exits; socket file deleted; `listenerDoneCh` is closed |
 
 ### State Transitions
 
@@ -120,4 +120,4 @@
 | Test ID | Category | Description | Setup | Input | Expected |
 |---|---|---|---|---|---|
 | `TestListen_ListenerErrChannel` | `unit` | Listener error channel receives fatal accept-loop error. | Create temp directory; call `CreateSocket()` and `Listen()`. Simulate accept failure by closing the underlying listener externally (not via DeleteSocket). | Read from `listenerErrCh` | Receives error containing `"listener accept loop failed:"` |
-| `TestListen_DoneChannelClosedAfterDelete` | `unit` | Done channel is closed after DeleteSocket completes. | Create temp directory; call `CreateSocket()` and `Listen()`. | Call `DeleteSocket(ctx)` | `listenerDoneCh` is closed (select on it returns immediately) |
+| `TestListen_DoneChannelClosedAfterDelete` | `unit` | Done channel is closed after DeleteSocket completes. | Create temp directory; call `CreateSocket()` and `Listen()`. | Call `DeleteSocket()` | `listenerDoneCh` is closed (select on it returns immediately) |
