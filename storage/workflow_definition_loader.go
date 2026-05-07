@@ -20,6 +20,9 @@ type AgentLoader interface {
 
 // workflowYAML is the internal representation for strict YAML parsing of
 // workflow definition files. Fields use camelCase yaml tags.
+// Note: This struct intentionally omits a "name" field. The workflow name is
+// derived exclusively from the filename. Any YAML containing a top-level
+// "name" field will be rejected by the strict decoder (KnownFields mode).
 type workflowYAML struct {
 	Description     string           `yaml:"description"`
 	EntryNode       string           `yaml:"entryNode"`
