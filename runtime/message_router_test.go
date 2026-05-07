@@ -107,17 +107,14 @@ func newMessageRouterFixture(t *testing.T) *messageRouterFixture {
 // =============================================================================
 
 func TestNewMessageRouter_ValidDeps(t *testing.T) {
-	t.Skip("scaffolded: awaiting runtime/message_router.go — NewMessageRouter constructor")
-
 	// Setup
 	f := newMessageRouterFixture(t)
-	_ = f
 
 	// Act
-	// mr := NewMessageRouter(f.ps, f.eventProcessor, f.errorProcessor, f.terminationNotifier, f.logger)
+	mr := NewMessageRouter(f.ps, f.eventProcessor, f.errorProcessor, f.terminationNotifier, f.logger)
 
 	// Assert: Returns non-nil *MessageRouter; no panic
-	// require.NotNil(t, mr)
+	require.NotNil(t, mr)
 }
 
 // =============================================================================
@@ -125,8 +122,6 @@ func TestNewMessageRouter_ValidDeps(t *testing.T) {
 // =============================================================================
 
 func TestMessageRouter_Handle_EventType(t *testing.T) {
-	t.Skip("scaffolded: awaiting runtime/message_router.go — NewMessageRouter, MessageRouter.Handle")
-
 	// Setup
 	f := newMessageRouterFixture(t)
 	f.eventProcessor.processEvResp = entities.SuccessResponse("ok")
@@ -134,19 +129,16 @@ func TestMessageRouter_Handle_EventType(t *testing.T) {
 	msg := mustNewEventRuntimeMessage(t, "cs-123", mustValidEventPayload())
 
 	// Act
-	// mr := NewMessageRouter(f.ps, f.eventProcessor, f.errorProcessor, f.terminationNotifier, f.logger)
-	// resp := mr.Handle(testSessionID, msg)
-	_ = msg
+	mr := NewMessageRouter(f.ps, f.eventProcessor, f.errorProcessor, f.terminationNotifier, f.logger)
+	resp := mr.Handle(testSessionID, msg)
 
 	// Assert
-	// assert.Equal(t, "success", resp.Status())
-	// assert.Equal(t, "ok", resp.Message())
-	// assert.Equal(t, 1, f.eventProcessor.processEvCalled)
+	assert.Equal(t, "success", resp.Status())
+	assert.Equal(t, "ok", resp.Message())
+	assert.Equal(t, 1, f.eventProcessor.processEvCalled)
 }
 
 func TestMessageRouter_Handle_ErrorType(t *testing.T) {
-	t.Skip("scaffolded: awaiting runtime/message_router.go — NewMessageRouter, MessageRouter.Handle")
-
 	// Setup
 	f := newMessageRouterFixture(t)
 	f.errorProcessor.processErrResp = entities.SuccessResponse("error recorded")
@@ -154,19 +146,16 @@ func TestMessageRouter_Handle_ErrorType(t *testing.T) {
 	msg := mustNewErrorRuntimeMessage(t, "cs-123", mustValidErrorPayload())
 
 	// Act
-	// mr := NewMessageRouter(f.ps, f.eventProcessor, f.errorProcessor, f.terminationNotifier, f.logger)
-	// resp := mr.Handle(testSessionID, msg)
-	_ = msg
+	mr := NewMessageRouter(f.ps, f.eventProcessor, f.errorProcessor, f.terminationNotifier, f.logger)
+	resp := mr.Handle(testSessionID, msg)
 
 	// Assert
-	// assert.Equal(t, "success", resp.Status())
-	// assert.Equal(t, "error recorded", resp.Message())
-	// assert.Equal(t, 1, f.errorProcessor.processErrCalled)
+	assert.Equal(t, "success", resp.Status())
+	assert.Equal(t, "error recorded", resp.Message())
+	assert.Equal(t, 1, f.errorProcessor.processErrCalled)
 }
 
 func TestMessageRouter_Handle_EventProcessorReturnsError(t *testing.T) {
-	t.Skip("scaffolded: awaiting runtime/message_router.go — NewMessageRouter, MessageRouter.Handle")
-
 	// Setup
 	f := newMessageRouterFixture(t)
 	f.eventProcessor.processEvResp = entities.ErrorResponse("session not ready: status is 'failed'")
@@ -174,13 +163,12 @@ func TestMessageRouter_Handle_EventProcessorReturnsError(t *testing.T) {
 	msg := mustNewEventRuntimeMessage(t, "cs-123", mustValidEventPayload())
 
 	// Act
-	// mr := NewMessageRouter(f.ps, f.eventProcessor, f.errorProcessor, f.terminationNotifier, f.logger)
-	// resp := mr.Handle(testSessionID, msg)
-	_ = msg
+	mr := NewMessageRouter(f.ps, f.eventProcessor, f.errorProcessor, f.terminationNotifier, f.logger)
+	resp := mr.Handle(testSessionID, msg)
 
 	// Assert
-	// assert.Equal(t, "error", resp.Status())
-	// assert.Equal(t, "session not ready: status is 'failed'", resp.Message())
+	assert.Equal(t, "error", resp.Status())
+	assert.Equal(t, "session not ready: status is 'failed'", resp.Message())
 }
 
 // =============================================================================
@@ -188,29 +176,13 @@ func TestMessageRouter_Handle_EventProcessorReturnsError(t *testing.T) {
 // =============================================================================
 
 func TestMessageRouter_Handle_UnknownType(t *testing.T) {
-	t.Skip("scaffolded: awaiting runtime/message_router.go — NewMessageRouter, MessageRouter.Handle; also requires RuntimeMessage to accept unknown types or a test seam")
-
-	// Setup
-	f := newMessageRouterFixture(t)
-	_ = f
-
-	// Note: entities.NewRuntimeMessage rejects unknown types, so we need either a
-	// test seam or the MessageRouter accepts raw-typed messages via an interface.
-	// This test is blocked on understanding how the MessageRouter receives messages
-	// with unknown types (likely from RuntimeSocketManager bypassing NewRuntimeMessage validation).
-
-	// Act
-	// mr := NewMessageRouter(f.ps, f.eventProcessor, f.errorProcessor, f.terminationNotifier, f.logger)
-	// resp := mr.Handle(testSessionID, unknownMsg)
-
-	// Assert
-	// assert.Equal(t, "error", resp.Status())
-	// assert.Equal(t, "unknown message type 'unknown'", resp.Message())
+	// Note: entities.NewRuntimeMessage rejects unknown types, so this test remains
+	// scaffolded — the MessageRouter's unknown-type branch is a defensive guard that
+	// cannot be reached with the current RuntimeMessage constructor.
+	t.Skip("scaffolded: awaiting test seam for unknown message type — entities.NewRuntimeMessage rejects unknown types at construction")
 }
 
 func TestMessageRouter_Handle_PanicInEventProcessor(t *testing.T) {
-	t.Skip("scaffolded: awaiting runtime/message_router.go — NewMessageRouter, MessageRouter.Handle")
-
 	// Setup
 	f := newMessageRouterFixture(t)
 	f.eventProcessor.processEvPanic = "nil pointer"
@@ -219,26 +191,23 @@ func TestMessageRouter_Handle_PanicInEventProcessor(t *testing.T) {
 	msg := mustNewEventRuntimeMessage(t, "cs-123", mustValidEventPayload())
 
 	// Act
-	// mr := NewMessageRouter(f.ps, f.eventProcessor, f.errorProcessor, f.terminationNotifier, f.logger)
-	// resp := mr.Handle(testSessionID, msg)
-	_ = msg
+	mr := NewMessageRouter(f.ps, f.eventProcessor, f.errorProcessor, f.terminationNotifier, f.logger)
+	resp := mr.Handle(testSessionID, msg)
 
 	// Assert
-	// assert.Equal(t, "error", resp.Status())
-	// assert.Equal(t, "internal server error", resp.Message())
-	// assert.GreaterOrEqual(t, len(f.logger.errorCalls), 1)
-	// assert.Equal(t, 1, f.session.failCalled)
-	// rtErr, ok := f.session.failInputErr.(*entities.RuntimeError)
-	// require.True(t, ok)
-	// assert.Equal(t, "MessageRouter", rtErr.Issuer())
-	// assert.Equal(t, "panic during message processing", rtErr.Message())
-	// assert.Equal(t, testSessionID, rtErr.SessionID())
-	// assert.Equal(t, "NodeA", rtErr.FailingState())
+	assert.Equal(t, "error", resp.Status())
+	assert.Equal(t, "internal server error", resp.Message())
+	assert.GreaterOrEqual(t, len(f.logger.errorCalls), 1)
+	assert.Equal(t, 1, f.session.failCalled)
+	rtErr, ok := f.session.failInputErr.(*entities.RuntimeError)
+	require.True(t, ok)
+	assert.Equal(t, "MessageRouter", rtErr.Issuer())
+	assert.Equal(t, "panic during message processing", rtErr.Message())
+	assert.Equal(t, testSessionID, rtErr.SessionID())
+	assert.Equal(t, "NodeA", rtErr.FailingState())
 }
 
 func TestMessageRouter_Handle_PanicInErrorProcessor(t *testing.T) {
-	t.Skip("scaffolded: awaiting runtime/message_router.go — NewMessageRouter, MessageRouter.Handle")
-
 	// Setup
 	f := newMessageRouterFixture(t)
 	f.errorProcessor.processErrPanic = "index out of range"
@@ -247,23 +216,20 @@ func TestMessageRouter_Handle_PanicInErrorProcessor(t *testing.T) {
 	msg := mustNewErrorRuntimeMessage(t, "cs-123", mustValidErrorPayload())
 
 	// Act
-	// mr := NewMessageRouter(f.ps, f.eventProcessor, f.errorProcessor, f.terminationNotifier, f.logger)
-	// resp := mr.Handle(testSessionID, msg)
-	_ = msg
+	mr := NewMessageRouter(f.ps, f.eventProcessor, f.errorProcessor, f.terminationNotifier, f.logger)
+	resp := mr.Handle(testSessionID, msg)
 
 	// Assert
-	// assert.Equal(t, "error", resp.Status())
-	// assert.Equal(t, "internal server error", resp.Message())
-	// assert.GreaterOrEqual(t, len(f.logger.errorCalls), 1)
-	// assert.Equal(t, 1, f.session.failCalled)
-	// rtErr, ok := f.session.failInputErr.(*entities.RuntimeError)
-	// require.True(t, ok)
-	// assert.Equal(t, "MessageRouter", rtErr.Issuer())
+	assert.Equal(t, "error", resp.Status())
+	assert.Equal(t, "internal server error", resp.Message())
+	assert.GreaterOrEqual(t, len(f.logger.errorCalls), 1)
+	assert.Equal(t, 1, f.session.failCalled)
+	rtErr, ok := f.session.failInputErr.(*entities.RuntimeError)
+	require.True(t, ok)
+	assert.Equal(t, "MessageRouter", rtErr.Issuer())
 }
 
 func TestMessageRouter_Handle_PanicRecovery_FailReturnsError(t *testing.T) {
-	t.Skip("scaffolded: awaiting runtime/message_router.go — NewMessageRouter, MessageRouter.Handle")
-
 	// Setup
 	f := newMessageRouterFixture(t)
 	f.eventProcessor.processEvPanic = "boom"
@@ -273,45 +239,35 @@ func TestMessageRouter_Handle_PanicRecovery_FailReturnsError(t *testing.T) {
 	msg := mustNewEventRuntimeMessage(t, "cs-123", mustValidEventPayload())
 
 	// Act
-	// mr := NewMessageRouter(f.ps, f.eventProcessor, f.errorProcessor, f.terminationNotifier, f.logger)
-	// resp := mr.Handle(testSessionID, msg)
-	_ = msg
+	mr := NewMessageRouter(f.ps, f.eventProcessor, f.errorProcessor, f.terminationNotifier, f.logger)
+	resp := mr.Handle(testSessionID, msg)
 
 	// Assert: Still returns "internal server error" even when Fail fails
-	// assert.Equal(t, "error", resp.Status())
-	// assert.Equal(t, "internal server error", resp.Message())
+	assert.Equal(t, "error", resp.Status())
+	assert.Equal(t, "internal server error", resp.Message())
 	// Logger.Error called (logs Fail error)
-	// assert.GreaterOrEqual(t, len(f.logger.errorCalls), 1)
+	assert.GreaterOrEqual(t, len(f.logger.errorCalls), 1)
 }
 
 func TestMessageRouter_Handle_PanicRecovery_RuntimeErrorConstructionFails(t *testing.T) {
-	t.Skip("scaffolded: awaiting runtime/message_router.go — NewMessageRouter, MessageRouter.Handle")
-
-	// Setup: conditions that cause NewRuntimeError to fail (e.g., empty sessionID and failingState)
+	// Setup: conditions that cause NewRuntimeError to fail (empty failingState)
 	f := newMessageRouterFixture(t)
 	f.eventProcessor.processEvPanic = "boom"
-	f.session.id = ""
 	f.session.getCurrentStateResult = ""
-
-	// Re-create PersistentSession with blank ID
-	// Note: PersistentSession.ID is set from session metadata, so we need a session
-	// that returns empty metadata
-	f.session.getMetadataSnapshotResult.ID = ""
 
 	msg := mustNewEventRuntimeMessage(t, "cs-123", mustValidEventPayload())
 
 	// Act
-	// mr := NewMessageRouter(f.ps, f.eventProcessor, f.errorProcessor, f.terminationNotifier, f.logger)
-	// resp := mr.Handle(testSessionID, msg)
-	_ = msg
+	mr := NewMessageRouter(f.ps, f.eventProcessor, f.errorProcessor, f.terminationNotifier, f.logger)
+	resp := mr.Handle(testSessionID, msg)
 
 	// Assert: Still returns "internal server error"
-	// assert.Equal(t, "error", resp.Status())
-	// assert.Equal(t, "internal server error", resp.Message())
+	assert.Equal(t, "error", resp.Status())
+	assert.Equal(t, "internal server error", resp.Message())
 	// Logger.Error called
-	// assert.GreaterOrEqual(t, len(f.logger.errorCalls), 1)
+	assert.GreaterOrEqual(t, len(f.logger.errorCalls), 1)
 	// Fail() not called (no valid RuntimeError to pass)
-	// assert.Equal(t, 0, f.session.failCalled)
+	assert.Equal(t, 0, f.session.failCalled)
 }
 
 // =============================================================================
@@ -319,8 +275,6 @@ func TestMessageRouter_Handle_PanicRecovery_RuntimeErrorConstructionFails(t *tes
 // =============================================================================
 
 func TestMessageRouter_Handle_DoesNotModifyMessage(t *testing.T) {
-	t.Skip("scaffolded: awaiting runtime/message_router.go — NewMessageRouter, MessageRouter.Handle")
-
 	// Setup
 	f := newMessageRouterFixture(t)
 	f.eventProcessor.processEvResp = entities.SuccessResponse("ok")
@@ -329,18 +283,15 @@ func TestMessageRouter_Handle_DoesNotModifyMessage(t *testing.T) {
 	msg := mustNewEventRuntimeMessage(t, "cs-specific", payload)
 
 	// Act
-	// mr := NewMessageRouter(f.ps, f.eventProcessor, f.errorProcessor, f.terminationNotifier, f.logger)
-	// _ = mr.Handle(testSessionID, msg)
-	_ = msg
+	mr := NewMessageRouter(f.ps, f.eventProcessor, f.errorProcessor, f.terminationNotifier, f.logger)
+	_ = mr.Handle(testSessionID, msg)
 
 	// Assert: EventProcessor receives the exact same RuntimeMessage reference
-	// assert.Equal(t, msg, f.eventProcessor.processEvMsg)
-	// assert.Equal(t, "cs-specific", f.eventProcessor.processEvMsg.ClaudeSessionID())
+	assert.Equal(t, msg, f.eventProcessor.processEvMsg)
+	assert.Equal(t, "cs-specific", f.eventProcessor.processEvMsg.ClaudeSessionID())
 }
 
 func TestMessageRouter_Handle_DoesNotModifyResponse(t *testing.T) {
-	t.Skip("scaffolded: awaiting runtime/message_router.go — NewMessageRouter, MessageRouter.Handle")
-
 	// Setup
 	f := newMessageRouterFixture(t)
 	expectedResp := entities.SuccessResponse("custom-message-42")
@@ -349,17 +300,14 @@ func TestMessageRouter_Handle_DoesNotModifyResponse(t *testing.T) {
 	msg := mustNewErrorRuntimeMessage(t, "cs-123", mustValidErrorPayload())
 
 	// Act
-	// mr := NewMessageRouter(f.ps, f.eventProcessor, f.errorProcessor, f.terminationNotifier, f.logger)
-	// resp := mr.Handle(testSessionID, msg)
-	_ = msg
+	mr := NewMessageRouter(f.ps, f.eventProcessor, f.errorProcessor, f.terminationNotifier, f.logger)
+	resp := mr.Handle(testSessionID, msg)
 
 	// Assert
-	// assert.Equal(t, expectedResp, resp)
+	assert.Equal(t, expectedResp, resp)
 }
 
 func TestMessageRouter_Handle_NoLogOnNormalDispatch(t *testing.T) {
-	t.Skip("scaffolded: awaiting runtime/message_router.go — NewMessageRouter, MessageRouter.Handle")
-
 	// Setup
 	f := newMessageRouterFixture(t)
 	f.eventProcessor.processEvResp = entities.SuccessResponse("ok")
@@ -367,12 +315,11 @@ func TestMessageRouter_Handle_NoLogOnNormalDispatch(t *testing.T) {
 	msg := mustNewEventRuntimeMessage(t, "cs-123", mustValidEventPayload())
 
 	// Act
-	// mr := NewMessageRouter(f.ps, f.eventProcessor, f.errorProcessor, f.terminationNotifier, f.logger)
-	// _ = mr.Handle(testSessionID, msg)
-	_ = msg
+	mr := NewMessageRouter(f.ps, f.eventProcessor, f.errorProcessor, f.terminationNotifier, f.logger)
+	_ = mr.Handle(testSessionID, msg)
 
 	// Assert: Logger.Error not called
-	// assert.Len(t, f.logger.errorCalls, 0)
+	assert.Len(t, f.logger.errorCalls, 0)
 }
 
 // =============================================================================
@@ -380,8 +327,6 @@ func TestMessageRouter_Handle_NoLogOnNormalDispatch(t *testing.T) {
 // =============================================================================
 
 func TestMessageRouter_Handle_ConcurrentMessages(t *testing.T) {
-	t.Skip("scaffolded: awaiting runtime/message_router.go — NewMessageRouter, MessageRouter.Handle")
-
 	// Setup
 	f := newMessageRouterFixture(t)
 	f.eventProcessor.processEvResp = entities.SuccessResponse("ev-ok")
@@ -389,20 +334,20 @@ func TestMessageRouter_Handle_ConcurrentMessages(t *testing.T) {
 
 	evMsg := mustNewEventRuntimeMessage(t, "cs-123", mustValidEventPayload())
 	errMsg := mustNewErrorRuntimeMessage(t, "cs-123", mustValidErrorPayload())
-	_ = evMsg
-	_ = errMsg
+
+	mr := NewMessageRouter(f.ps, f.eventProcessor, f.errorProcessor, f.terminationNotifier, f.logger)
 
 	// Act: Call mr.Handle concurrently from two goroutines
-	// var wg sync.WaitGroup
-	// var resp1, resp2 *entities.RuntimeResponse
-	// wg.Add(2)
-	// go func() { defer wg.Done(); resp1 = mr.Handle(testSessionID, evMsg) }()
-	// go func() { defer wg.Done(); resp2 = mr.Handle(testSessionID, errMsg) }()
-	// wg.Wait()
+	var wg sync.WaitGroup
+	var resp1, resp2 *entities.RuntimeResponse
+	wg.Add(2)
+	go func() { defer wg.Done(); resp1 = mr.Handle(testSessionID, evMsg) }()
+	go func() { defer wg.Done(); resp2 = mr.Handle(testSessionID, errMsg) }()
+	wg.Wait()
 
 	// Assert: Both complete without data race
-	// assert.NotNil(t, resp1)
-	// assert.NotNil(t, resp2)
+	assert.NotNil(t, resp1)
+	assert.NotNil(t, resp2)
 }
 
 // =============================================================================
