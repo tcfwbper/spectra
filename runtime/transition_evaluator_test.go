@@ -54,64 +54,53 @@ func mustNewExitTransition(t *testing.T, from, eventType, to string) *components
 // =============================================================================
 
 func TestEvaluateTransition_RegularTransition(t *testing.T) {
-	t.Skip("scaffolded: production function EvaluateTransition does not exist yet in runtime package")
-
 	// Setup: one regular transition A->Done->B, no exit transitions.
 	wfDef := &mockWorkflowDef{
 		transitions:     []*components.Transition{mustNewTransition(t, "A", "Done", "B")},
 		exitTransitions: []*components.ExitTransition{},
 	}
 
-	_ = wfDef
 	// Act
-	// tr, isExit := EvaluateTransition(wfDef, "A", "Done")
+	tr, isExit := EvaluateTransition(wfDef, "A", "Done")
 
 	// Assert
-	// require.NotNil(t, tr)
-	// assert.Equal(t, "B", tr.ToNode())
-	// assert.False(t, isExit)
+	require.NotNil(t, tr)
+	assert.Equal(t, "B", tr.ToNode())
+	assert.False(t, isExit)
 }
 
 func TestEvaluateTransition_ExitTransition(t *testing.T) {
-	t.Skip("scaffolded: production function EvaluateTransition does not exist yet in runtime package")
-
 	// Setup: transition B->Complete->End is also an exit transition.
 	wfDef := &mockWorkflowDef{
 		transitions:     []*components.Transition{mustNewTransition(t, "B", "Complete", "End")},
 		exitTransitions: []*components.ExitTransition{mustNewExitTransition(t, "B", "Complete", "End")},
 	}
 
-	_ = wfDef
 	// Act
-	// tr, isExit := EvaluateTransition(wfDef, "B", "Complete")
+	tr, isExit := EvaluateTransition(wfDef, "B", "Complete")
 
 	// Assert
-	// require.NotNil(t, tr)
-	// assert.Equal(t, "End", tr.ToNode())
-	// assert.True(t, isExit)
+	require.NotNil(t, tr)
+	assert.Equal(t, "End", tr.ToNode())
+	assert.True(t, isExit)
 }
 
 func TestEvaluateTransition_NoMatch(t *testing.T) {
-	t.Skip("scaffolded: production function EvaluateTransition does not exist yet in runtime package")
-
 	// Setup: one transition A->Done->B
 	wfDef := &mockWorkflowDef{
 		transitions:     []*components.Transition{mustNewTransition(t, "A", "Done", "B")},
 		exitTransitions: []*components.ExitTransition{},
 	}
 
-	_ = wfDef
 	// Act: query with non-matching event type
-	// tr, isExit := EvaluateTransition(wfDef, "A", "Error")
+	tr, isExit := EvaluateTransition(wfDef, "A", "Error")
 
 	// Assert
-	// assert.Nil(t, tr)
-	// assert.False(t, isExit)
+	assert.Nil(t, tr)
+	assert.False(t, isExit)
 }
 
 func TestEvaluateTransition_MultipleTransitions_CorrectMatch(t *testing.T) {
-	t.Skip("scaffolded: production function EvaluateTransition does not exist yet in runtime package")
-
 	// Setup: multiple transitions
 	wfDef := &mockWorkflowDef{
 		transitions: []*components.Transition{
@@ -122,19 +111,16 @@ func TestEvaluateTransition_MultipleTransitions_CorrectMatch(t *testing.T) {
 		exitTransitions: []*components.ExitTransition{},
 	}
 
-	_ = wfDef
 	// Act: query A + Error
-	// tr, isExit := EvaluateTransition(wfDef, "A", "Error")
+	tr, isExit := EvaluateTransition(wfDef, "A", "Error")
 
 	// Assert: selects correct transition
-	// require.NotNil(t, tr)
-	// assert.Equal(t, "C", tr.ToNode())
-	// assert.False(t, isExit)
+	require.NotNil(t, tr)
+	assert.Equal(t, "C", tr.ToNode())
+	assert.False(t, isExit)
 }
 
 func TestEvaluateTransition_MultipleExitTransitions(t *testing.T) {
-	t.Skip("scaffolded: production function EvaluateTransition does not exist yet in runtime package")
-
 	// Setup
 	wfDef := &mockWorkflowDef{
 		transitions: []*components.Transition{
@@ -146,14 +132,13 @@ func TestEvaluateTransition_MultipleExitTransitions(t *testing.T) {
 		},
 	}
 
-	_ = wfDef
 	// Act
-	// tr, isExit := EvaluateTransition(wfDef, "Y", "Finish")
+	tr, isExit := EvaluateTransition(wfDef, "Y", "Finish")
 
 	// Assert
-	// require.NotNil(t, tr)
-	// assert.Equal(t, "End", tr.ToNode())
-	// assert.True(t, isExit)
+	require.NotNil(t, tr)
+	assert.Equal(t, "End", tr.ToNode())
+	assert.True(t, isExit)
 }
 
 // =============================================================================
@@ -161,54 +146,45 @@ func TestEvaluateTransition_MultipleExitTransitions(t *testing.T) {
 // =============================================================================
 
 func TestEvaluateTransition_EmptyCurrentState(t *testing.T) {
-	t.Skip("scaffolded: production function EvaluateTransition does not exist yet in runtime package")
-
 	wfDef := &mockWorkflowDef{
 		transitions:     []*components.Transition{mustNewTransition(t, "A", "Done", "B")},
 		exitTransitions: []*components.ExitTransition{},
 	}
 
-	_ = wfDef
 	// Act: empty currentState
-	// tr, isExit := EvaluateTransition(wfDef, "", "Done")
+	tr, isExit := EvaluateTransition(wfDef, "", "Done")
 
 	// Assert
-	// assert.Nil(t, tr)
-	// assert.False(t, isExit)
+	assert.Nil(t, tr)
+	assert.False(t, isExit)
 }
 
 func TestEvaluateTransition_EmptyEventType(t *testing.T) {
-	t.Skip("scaffolded: production function EvaluateTransition does not exist yet in runtime package")
-
 	wfDef := &mockWorkflowDef{
 		transitions:     []*components.Transition{mustNewTransition(t, "A", "Done", "B")},
 		exitTransitions: []*components.ExitTransition{},
 	}
 
-	_ = wfDef
 	// Act: empty eventType
-	// tr, isExit := EvaluateTransition(wfDef, "A", "")
+	tr, isExit := EvaluateTransition(wfDef, "A", "")
 
 	// Assert
-	// assert.Nil(t, tr)
-	// assert.False(t, isExit)
+	assert.Nil(t, tr)
+	assert.False(t, isExit)
 }
 
 func TestEvaluateTransition_EmptyTransitionsList(t *testing.T) {
-	t.Skip("scaffolded: production function EvaluateTransition does not exist yet in runtime package")
-
 	wfDef := &mockWorkflowDef{
 		transitions:     []*components.Transition{},
 		exitTransitions: []*components.ExitTransition{},
 	}
 
-	_ = wfDef
 	// Act
-	// tr, isExit := EvaluateTransition(wfDef, "A", "Done")
+	tr, isExit := EvaluateTransition(wfDef, "A", "Done")
 
 	// Assert
-	// assert.Nil(t, tr)
-	// assert.False(t, isExit)
+	assert.Nil(t, tr)
+	assert.False(t, isExit)
 }
 
 // =============================================================================
@@ -216,60 +192,51 @@ func TestEvaluateTransition_EmptyTransitionsList(t *testing.T) {
 // =============================================================================
 
 func TestEvaluateTransition_PartialExitMatch_DifferentToNode(t *testing.T) {
-	t.Skip("scaffolded: production function EvaluateTransition does not exist yet in runtime package")
-
 	// Setup: exit transition has same FromNode and EventType but different ToNode.
 	wfDef := &mockWorkflowDef{
 		transitions:     []*components.Transition{mustNewTransition(t, "A", "Done", "B")},
 		exitTransitions: []*components.ExitTransition{mustNewExitTransition(t, "A", "Done", "C")},
 	}
 
-	_ = wfDef
 	// Act
-	// tr, isExit := EvaluateTransition(wfDef, "A", "Done")
+	tr, isExit := EvaluateTransition(wfDef, "A", "Done")
 
 	// Assert: NOT classified as exit (ToNode mismatch)
-	// require.NotNil(t, tr)
-	// assert.Equal(t, "B", tr.ToNode())
-	// assert.False(t, isExit)
+	require.NotNil(t, tr)
+	assert.Equal(t, "B", tr.ToNode())
+	assert.False(t, isExit)
 }
 
 func TestEvaluateTransition_PartialExitMatch_DifferentEventType(t *testing.T) {
-	t.Skip("scaffolded: production function EvaluateTransition does not exist yet in runtime package")
-
 	// Setup: exit transition has same FromNode and ToNode but different EventType.
 	wfDef := &mockWorkflowDef{
 		transitions:     []*components.Transition{mustNewTransition(t, "A", "Done", "B")},
 		exitTransitions: []*components.ExitTransition{mustNewExitTransition(t, "A", "Error", "B")},
 	}
 
-	_ = wfDef
 	// Act
-	// tr, isExit := EvaluateTransition(wfDef, "A", "Done")
+	tr, isExit := EvaluateTransition(wfDef, "A", "Done")
 
 	// Assert: NOT classified as exit (EventType mismatch)
-	// require.NotNil(t, tr)
-	// assert.Equal(t, "B", tr.ToNode())
-	// assert.False(t, isExit)
+	require.NotNil(t, tr)
+	assert.Equal(t, "B", tr.ToNode())
+	assert.False(t, isExit)
 }
 
 func TestEvaluateTransition_PartialExitMatch_DifferentFromNode(t *testing.T) {
-	t.Skip("scaffolded: production function EvaluateTransition does not exist yet in runtime package")
-
 	// Setup: exit transition has same EventType and ToNode but different FromNode.
 	wfDef := &mockWorkflowDef{
 		transitions:     []*components.Transition{mustNewTransition(t, "A", "Done", "B")},
 		exitTransitions: []*components.ExitTransition{mustNewExitTransition(t, "X", "Done", "B")},
 	}
 
-	_ = wfDef
 	// Act
-	// tr, isExit := EvaluateTransition(wfDef, "A", "Done")
+	tr, isExit := EvaluateTransition(wfDef, "A", "Done")
 
 	// Assert: NOT classified as exit (FromNode mismatch)
-	// require.NotNil(t, tr)
-	// assert.Equal(t, "B", tr.ToNode())
-	// assert.False(t, isExit)
+	require.NotNil(t, tr)
+	assert.Equal(t, "B", tr.ToNode())
+	assert.False(t, isExit)
 }
 
 // =============================================================================
@@ -277,25 +244,22 @@ func TestEvaluateTransition_PartialExitMatch_DifferentFromNode(t *testing.T) {
 // =============================================================================
 
 func TestEvaluateTransition_RepeatedCalls_SameResult(t *testing.T) {
-	t.Skip("scaffolded: production function EvaluateTransition does not exist yet in runtime package")
-
 	wfDef := &mockWorkflowDef{
 		transitions:     []*components.Transition{mustNewTransition(t, "A", "Done", "B")},
 		exitTransitions: []*components.ExitTransition{},
 	}
 
-	_ = wfDef
 	// Act: call twice
-	// tr1, isExit1 := EvaluateTransition(wfDef, "A", "Done")
-	// tr2, isExit2 := EvaluateTransition(wfDef, "A", "Done")
+	tr1, isExit1 := EvaluateTransition(wfDef, "A", "Done")
+	tr2, isExit2 := EvaluateTransition(wfDef, "A", "Done")
 
 	// Assert: identical results
-	// require.NotNil(t, tr1)
-	// require.NotNil(t, tr2)
-	// assert.Equal(t, tr1.ToNode(), tr2.ToNode())
-	// assert.Equal(t, tr1.FromNode(), tr2.FromNode())
-	// assert.Equal(t, tr1.EventType(), tr2.EventType())
-	// assert.Equal(t, isExit1, isExit2)
+	require.NotNil(t, tr1)
+	require.NotNil(t, tr2)
+	assert.Equal(t, tr1.ToNode(), tr2.ToNode())
+	assert.Equal(t, tr1.FromNode(), tr2.FromNode())
+	assert.Equal(t, tr1.EventType(), tr2.EventType())
+	assert.Equal(t, isExit1, isExit2)
 }
 
 // =============================================================================
@@ -303,8 +267,6 @@ func TestEvaluateTransition_RepeatedCalls_SameResult(t *testing.T) {
 // =============================================================================
 
 func TestEvaluateTransition_DoesNotModifyWorkflowDefinition(t *testing.T) {
-	t.Skip("scaffolded: production function EvaluateTransition does not exist yet in runtime package")
-
 	// Setup: record original slices
 	transitions := []*components.Transition{mustNewTransition(t, "A", "Done", "B")}
 	exitTransitions := []*components.ExitTransition{}
@@ -317,53 +279,38 @@ func TestEvaluateTransition_DoesNotModifyWorkflowDefinition(t *testing.T) {
 	origTransLen := len(wfDef.Transitions())
 	origExitLen := len(wfDef.ExitTransitions())
 
-	_ = wfDef
-	_ = origTransLen
-	_ = origExitLen
 	// Act
-	// _, _ = EvaluateTransition(wfDef, "A", "Done")
+	_, _ = EvaluateTransition(wfDef, "A", "Done")
 
 	// Assert: no mutations
-	// assert.Equal(t, origTransLen, len(wfDef.Transitions()))
-	// assert.Equal(t, origExitLen, len(wfDef.ExitTransitions()))
+	assert.Equal(t, origTransLen, len(wfDef.Transitions()))
+	assert.Equal(t, origExitLen, len(wfDef.ExitTransitions()))
 }
 
 func TestEvaluateTransition_InvalidCurrentState_NoError(t *testing.T) {
-	t.Skip("scaffolded: production function EvaluateTransition does not exist yet in runtime package")
-
 	wfDef := &mockWorkflowDef{
 		transitions:     []*components.Transition{mustNewTransition(t, "A", "Done", "B")},
 		exitTransitions: []*components.ExitTransition{},
 	}
 
-	_ = wfDef
 	// Act: non-existent node name — should not panic
-	// assert.NotPanics(t, func() {
-	// 	tr, isExit := EvaluateTransition(wfDef, "NonExistentNode", "Done")
-	// 	assert.Nil(t, tr)
-	// 	assert.False(t, isExit)
-	// })
+	assert.NotPanics(t, func() {
+		tr, isExit := EvaluateTransition(wfDef, "NonExistentNode", "Done")
+		assert.Nil(t, tr)
+		assert.False(t, isExit)
+	})
 }
 
 func TestEvaluateTransition_InvalidEventType_NoError(t *testing.T) {
-	t.Skip("scaffolded: production function EvaluateTransition does not exist yet in runtime package")
-
 	wfDef := &mockWorkflowDef{
 		transitions:     []*components.Transition{mustNewTransition(t, "A", "Done", "B")},
 		exitTransitions: []*components.ExitTransition{},
 	}
 
-	_ = wfDef
 	// Act: undefined event type — should not panic
-	// assert.NotPanics(t, func() {
-	// 	tr, isExit := EvaluateTransition(wfDef, "A", "UndefinedEvent")
-	// 	assert.Nil(t, tr)
-	// 	assert.False(t, isExit)
-	// })
+	assert.NotPanics(t, func() {
+		tr, isExit := EvaluateTransition(wfDef, "A", "UndefinedEvent")
+		assert.Nil(t, tr)
+		assert.False(t, isExit)
+	})
 }
-
-// Ensure imports are used (compile guard).
-var (
-	_ = assert.Equal
-	_ = require.NoError
-)
