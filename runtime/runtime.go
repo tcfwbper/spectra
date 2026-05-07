@@ -63,6 +63,29 @@ var newSubTimerFunc = func(d time.Duration) (<-chan struct{}, func()) {
 	return ch, func() { t.Stop() }
 }
 
+// sessionInitializeFunc is a seam for constructing and invoking SessionInitializer.
+// In production it constructs a real SessionInitializer and calls Initialize.
+var sessionInitializeFunc = func(projectRoot string, wfLoader WorkflowLoader, dirMgr SessionDirManager, log logger.Logger, workflowName string, terminationNotifier chan<- struct{}) InitResult {
+	si := NewSessionInitializer(projectRoot, wfLoader, dirMgr, log)
+	return si.Initialize(workflowName, terminationNotifier)
+}
+
+// constructPostSessionDepsFunc is a seam for constructing post-session dependencies.
+// In production it calls the internal constructPostSessionDeps function.
+var constructPostSessionDepsFunc = func(projectRoot string, ps *PersistentSession, wfDef *components.WorkflowDefinition, terminationNotifier chan<- struct{}, log logger.Logger) (*runtimePostSessionDeps, error) {
+	return constructPostSessionDeps(projectRoot, ps, wfDef, terminationNotifier, log)
+}
+
+// --- Interfaces for runtime orchestration ---
+
+// SocketManager defines the interface for socket lifecycle management consumed
+// by the Run function. In production this is implemented by storage.RuntimeSocketManager.
+type SocketManager interface {
+	CreateSocket() error
+	Listen(handler storage.MessageHandler) (<-chan error, <-chan struct{}, error)
+	DeleteSocket()
+}
+
 // --- Adapters ---
 
 // sessionDirManagerAdapter adapts the package-level storage.CreateSessionDirectory
@@ -131,11 +154,8 @@ func Run(workflowName string, log logger.Logger) (int, error) {
 		return 1, fmt.Errorf("failed to initialize runtime dependencies: %w", err)
 	}
 
-	// Step 7: Construct SessionInitializer.
-	sessionInit := NewSessionInitializer(projectRoot, wfLoader, dirMgr, log)
-
-	// Step 8: Initialize session.
-	initResult := sessionInit.Initialize(workflowName, terminationNotifier)
+	// Step 7-8: Construct SessionInitializer and initialize session.
+	initResult := sessionInitializeFunc(projectRoot, wfLoader, dirMgr, log, workflowName, terminationNotifier)
 
 	// Step 9-10: Handle initialization failure.
 	if initResult.Error != nil {
@@ -153,7 +173,7 @@ func Run(workflowName string, log logger.Logger) (int, error) {
 	wfDef := initResult.WorkflowDefinition
 
 	// Step 11-12: Construct post-session dependencies.
-	deps, err := constructPostSessionDeps(projectRoot, ps, wfDef, terminationNotifier, log)
+	deps, err := constructPostSessionDepsFunc(projectRoot, ps, wfDef, terminationNotifier, log)
 	if err != nil {
 		rtErr := buildRuntimeError("Runtime", "failed to initialize post-session dependencies", err, ps)
 		if failErr := ps.Fail(rtErr, terminationNotifier); failErr != nil {
@@ -252,15 +272,20 @@ func Run(workflowName string, log logger.Logger) (int, error) {
 	// Cleanup goroutine result channel.
 	cleanupDone := make(chan struct{})
 
+	// Capture seam references before spawning goroutine to avoid races
+	// with test cleanup that restores package-level vars.
+	localSignalStop := signalStopFunc
+	localNewSubTimer := newSubTimerFunc
+
 	go func() {
 		// Step 32: Stop OS signal notification.
-		signalStopFunc(signalCh)
+		localSignalStop(signalCh)
 
 		// Step 33: Delete socket.
 		socketMgr.DeleteSocket()
 
 		// Step 35-36: Wait for listenerDoneCh with 2-second sub-timeout.
-		subTimerCh, subTimerStop := newSubTimerFunc(2 * time.Second)
+		subTimerCh, subTimerStop := localNewSubTimer(2 * time.Second)
 		defer subTimerStop()
 
 		select {
@@ -313,8 +338,8 @@ func Run(workflowName string, log logger.Logger) (int, error) {
 
 // runtimePostSessionDeps holds all post-session dependencies.
 type runtimePostSessionDeps struct {
-	socketManager  *storage.RuntimeSocketManager
-	transitionNode *TransitionToNode
+	socketManager  SocketManager
+	transitionNode TransitionToNodeExecutor
 	messageRouter  *MessageRouter
 	finalizer      *SessionFinalizer
 }

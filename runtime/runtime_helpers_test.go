@@ -4,10 +4,11 @@ import (
 	"os"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/tcfwbper/spectra/components"
-	"github.com/tcfwbper/spectra/entities"
 	"github.com/tcfwbper/spectra/logger"
+	"github.com/tcfwbper/spectra/storage"
 )
 
 // =============================================================================
@@ -20,40 +21,12 @@ import (
 // =============================================================================
 
 // --- Interfaces representing Runtime's internal dependencies ---
-// These mirror what the production Run function will need to interact with.
-// They are defined here to give structure to the tests until the production
-// seams (package-level vars, functional options, or internal struct) are known.
+// These mirror what the production Run function interacts with.
+// They are used by the test fixture mocks.
 
 // runtimeSpectraFinder abstracts SpectraFinder.Find() for testing.
 type runtimeSpectraFinder interface {
 	Find() (string, error)
-}
-
-// runtimeSessionInitializer abstracts SessionInitializer.Initialize() for testing.
-type runtimeSessionInitializer interface {
-	Initialize(workflowName string, terminationNotifier chan<- struct{}) InitResult
-}
-
-// runtimeSocketManager abstracts RuntimeSocketManager for testing.
-type runtimeSocketManager interface {
-	CreateSocket() error
-	Listen(handler runtimeMessageHandler) (<-chan error, <-chan struct{}, error)
-	DeleteSocket()
-}
-
-// runtimeMessageHandler abstracts the MessageHandler interface from storage package.
-type runtimeMessageHandler interface {
-	Handle(sessionUUID string, msg *entities.RuntimeMessage) *entities.RuntimeResponse
-}
-
-// runtimeTransitionToNode abstracts TransitionToNode.Transition (or Execute) for testing.
-type runtimeTransitionToNode interface {
-	Transition(targetNodeName, message string) error
-}
-
-// runtimeSessionFinalizer abstracts SessionFinalizer.Finalize() for testing.
-type runtimeSessionFinalizer interface {
-	Finalize(session *PersistentSession) int
 }
 
 // runtimeWorkflowDef abstracts WorkflowDefinition for testing.
@@ -97,6 +70,7 @@ func (m *mockRuntimeSessionInitializer) Initialize(workflowName string, terminat
 }
 
 // mockRuntimeSocketManager is a mock for RuntimeSocketManager lifecycle methods.
+// It satisfies the SocketManager interface.
 type mockRuntimeSocketManager struct {
 	mu sync.Mutex
 
@@ -109,7 +83,7 @@ type mockRuntimeSocketManager struct {
 	listenErrCh     chan error
 	listenDoneCh    chan struct{}
 	listenErr       error
-	capturedHandler runtimeMessageHandler
+	capturedHandler storage.MessageHandler
 
 	// DeleteSocket
 	deleteSocketCalled int
@@ -123,7 +97,7 @@ func (m *mockRuntimeSocketManager) CreateSocket() error {
 	return m.createSocketErr
 }
 
-func (m *mockRuntimeSocketManager) Listen(handler runtimeMessageHandler) (<-chan error, <-chan struct{}, error) {
+func (m *mockRuntimeSocketManager) Listen(handler storage.MessageHandler) (<-chan error, <-chan struct{}, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.listenCalled++
@@ -144,7 +118,11 @@ func (m *mockRuntimeSocketManager) DeleteSocket() {
 	}
 }
 
+// Ensure mockRuntimeSocketManager satisfies SocketManager.
+var _ SocketManager = (*mockRuntimeSocketManager)(nil)
+
 // mockRuntimeTransitionToNode is a mock for TransitionToNode dispatch.
+// It satisfies the TransitionToNodeExecutor interface.
 type mockRuntimeTransitionToNode struct {
 	mu               sync.Mutex
 	transitionCalled int
@@ -154,7 +132,7 @@ type mockRuntimeTransitionToNode struct {
 	transitionFunc   func(targetNodeName, message string) error
 }
 
-func (m *mockRuntimeTransitionToNode) Transition(targetNodeName, message string) error {
+func (m *mockRuntimeTransitionToNode) Execute(targetNodeName, message string) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.transitionCalled++
@@ -165,6 +143,9 @@ func (m *mockRuntimeTransitionToNode) Transition(targetNodeName, message string)
 	}
 	return m.transitionErr
 }
+
+// Ensure mockRuntimeTransitionToNode satisfies TransitionToNodeExecutor.
+var _ TransitionToNodeExecutor = (*mockRuntimeTransitionToNode)(nil)
 
 // mockRuntimeSessionFinalizer is a mock for SessionFinalizer.Finalize().
 type mockRuntimeSessionFinalizer struct {
@@ -454,6 +435,103 @@ func (m *runtimeMockPersistentSession) getFailCalls() []failCallRecord {
 	out := make([]failCallRecord, len(m.failCalls))
 	copy(out, m.failCalls)
 	return out
+}
+
+// --- Seam Wiring ---
+
+// wireFixtureToSeams replaces the package-level seam variables with the fixture's
+// mock behaviors and registers a cleanup to restore originals. It enables
+// integration-style testing of the Run function using controlled mocks.
+func wireFixtureToSeams(t *testing.T, f *runtimeTestFixture) {
+	t.Helper()
+
+	// Save originals.
+	origSpectraFinder := spectraFinderFunc
+	origPreSession := preSessionDepsConstructor
+	origSessionInit := sessionInitializeFunc
+	origPostSession := constructPostSessionDepsFunc
+	origSignalNotify := signalNotifyFunc
+	origSignalStop := signalStopFunc
+	origGraceTimer := newGraceTimerFunc
+	origSubTimer := newSubTimerFunc
+
+	// Restore on cleanup.
+	t.Cleanup(func() {
+		spectraFinderFunc = origSpectraFinder
+		preSessionDepsConstructor = origPreSession
+		sessionInitializeFunc = origSessionInit
+		constructPostSessionDepsFunc = origPostSession
+		signalNotifyFunc = origSignalNotify
+		signalStopFunc = origSignalStop
+		newGraceTimerFunc = origGraceTimer
+		newSubTimerFunc = origSubTimer
+	})
+
+	// Wire spectraFinder.
+	spectraFinderFunc = func() (string, error) {
+		return f.SpectraFinder.result, f.SpectraFinder.err
+	}
+
+	// Wire preSessionDepsConstructor (not typically needed since sessionInitializeFunc
+	// bypasses it, but wire it for completeness).
+	preSessionDepsConstructor = func(projectRoot string) (WorkflowLoader, SessionDirManager, error) {
+		return nil, nil, nil
+	}
+
+	// Wire sessionInitializeFunc.
+	sessionInitializeFunc = func(projectRoot string, wfLoader WorkflowLoader, dirMgr SessionDirManager, log logger.Logger, workflowName string, terminationNotifier chan<- struct{}) InitResult {
+		return f.SessionInitializer.Initialize(workflowName, terminationNotifier)
+	}
+
+	// Wire constructPostSessionDepsFunc.
+	constructPostSessionDepsFunc = func(projectRoot string, ps *PersistentSession, wfDef *components.WorkflowDefinition, terminationNotifier chan<- struct{}, log logger.Logger) (*runtimePostSessionDeps, error) {
+		return &runtimePostSessionDeps{
+			socketManager:  f.SocketManager,
+			transitionNode: f.TransitionToNode,
+			messageRouter:  NewMessageRouter(ps, nil, nil, terminationNotifier, log),
+			finalizer:      NewSessionFinalizer(log),
+		}, nil
+	}
+
+	// Wire signalNotifyFunc.
+	// We use a done channel to allow the relay goroutine to exit when test cleanup runs.
+	signalDone := make(chan struct{})
+	t.Cleanup(func() { close(signalDone) })
+	signalNotifyFunc = func(c chan<- os.Signal, sig ...os.Signal) {
+		// Relay from the fake signal source to the provided channel.
+		go func() {
+			for {
+				select {
+				case s, ok := <-f.SignalSource.ch:
+					if !ok {
+						return
+					}
+					select {
+					case c <- s:
+					case <-signalDone:
+						return
+					}
+				case <-signalDone:
+					return
+				}
+			}
+		}()
+	}
+
+	// Wire signalStopFunc.
+	signalStopFunc = func(c chan<- os.Signal) {
+		// No-op in tests.
+	}
+
+	// Wire grace timer.
+	newGraceTimerFunc = func(d time.Duration) (<-chan struct{}, func()) {
+		return f.GraceTimer.Chan(), f.GraceTimer.Stop
+	}
+
+	// Wire sub timer.
+	newSubTimerFunc = func(d time.Duration) (<-chan struct{}, func()) {
+		return f.ListenerTimer.Chan(), f.ListenerTimer.Stop
+	}
 }
 
 // --- Unused import guard (logger is used for interface typing) ---

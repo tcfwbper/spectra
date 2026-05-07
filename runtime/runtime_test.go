@@ -2,13 +2,17 @@ package runtime
 
 import (
 	"errors"
+	"os"
 	"strings"
+	"syscall"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/tcfwbper/spectra/components"
 	"github.com/tcfwbper/spectra/entities"
+	"github.com/tcfwbper/spectra/logger"
 )
 
 // =============================================================================
@@ -24,249 +28,359 @@ import (
 // --- Happy Path — Run ---
 
 func TestRun_SuccessfulSessionCompletion(t *testing.T) {
-	t.Skip("SCAFFOLDED: requires runtime.Run() function and dependency injection seams (SpectraFinder, SessionInitializer, RuntimeSocketManager, TransitionToNode, SessionFinalizer)")
-
 	// Setup: Stub all dependencies for successful flow.
 	f := newRuntimeTestFixture(t)
-	_ = f
+	// Session is "completed", terminationNotifier will fire.
+	f.Session.getStatusResult = "completed"
+	// Configure the SessionInitializer to send terminationNotifier after init succeeds.
+	f.SessionInitializer.initializeFunc = func(workflowName string, terminationNotifier chan<- struct{}) InitResult {
+		ps := newTestPersistentSession(t, f.Session)
+		// Simulate session completion notification.
+		go func() { terminationNotifier <- struct{}{} }()
+		return InitResult{
+			PersistentSession:  ps,
+			WorkflowDefinition: mustNewWorkflowDefinition(t),
+			Error:              nil,
+		}
+	}
+	wireFixtureToSeams(t, f)
 
-	// Action: Call Run("my-workflow", mockLogger)
+	// Action
+	exitCode, err := Run("my-workflow", f.Logger)
 
 	// Assert: Returns (0, nil)
+	assert.Equal(t, 0, exitCode)
+	assert.NoError(t, err)
 }
 
 func TestRun_LogsSessionTerminationNotification(t *testing.T) {
-	t.Skip("SCAFFOLDED: requires runtime.Run() function and dependency injection seams")
-
 	// Setup: Same as successful completion, capture Logger calls.
 	f := newRuntimeTestFixture(t)
-	_ = f
+	f.Session.getStatusResult = "completed"
+	f.SessionInitializer.initializeFunc = func(workflowName string, terminationNotifier chan<- struct{}) InitResult {
+		ps := newTestPersistentSession(t, f.Session)
+		go func() { terminationNotifier <- struct{}{} }()
+		return InitResult{
+			PersistentSession:  ps,
+			WorkflowDefinition: mustNewWorkflowDefinition(t),
+			Error:              nil,
+		}
+	}
+	wireFixtureToSeams(t, f)
 
-	// Action: Call Run("my-workflow", mockLogger)
+	// Action
+	_, _ = Run("my-workflow", f.Logger)
 
 	// Assert: Logger.Info called with "received session termination notification"
+	assertLoggerHasInfoMsg(t, f.Logger, "received session termination notification")
 }
 
 // --- Error Propagation ---
 
 func TestRun_SpectraFinderFails(t *testing.T) {
-	t.Skip("SCAFFOLDED: requires runtime.Run() function and SpectraFinder injection seam")
-
 	// Setup
 	f := newRuntimeTestFixture(t)
 	f.SpectraFinder.err = errors.New("no .spectra dir")
 	f.SpectraFinder.result = ""
-	_ = f
+	wireFixtureToSeams(t, f)
 
-	// Action: exitCode, err := Run("wf", mockLogger)
+	// Action
+	exitCode, err := Run("wf", f.Logger)
 
 	// Assert
-	_ = assert.Equal
-	_ = require.Error
-	// exitCode == 1
-	// err.Error() == "failed to locate project root: no .spectra dir"
+	assert.Equal(t, 1, exitCode)
+	require.Error(t, err)
+	assert.Equal(t, "failed to locate project root: no .spectra dir", err.Error())
 }
 
 func TestRun_PreSessionDependencyConstructionFails(t *testing.T) {
-	t.Skip("SCAFFOLDED: requires runtime.Run() function and pre-session dependency constructor seam (e.g., WorkflowDefinitionLoader constructor)")
-
 	// Setup: SpectraFinder succeeds, but pre-session dependency constructor fails.
 	f := newRuntimeTestFixture(t)
-	_ = f
+	wireFixtureToSeams(t, f)
 
-	// Action: exitCode, err := Run("wf", mockLogger)
+	// Override preSessionDepsConstructor to fail.
+	preSessionDepsConstructor = func(projectRoot string) (WorkflowLoader, SessionDirManager, error) {
+		return nil, nil, errors.New("loader construction failed")
+	}
+
+	// Action
+	exitCode, err := Run("wf", f.Logger)
 
 	// Assert
-	// exitCode == 1
-	// err.Error() contains "failed to initialize runtime dependencies: "
+	assert.Equal(t, 1, exitCode)
+	require.Error(t, err)
+	assertErrorContains(t, err, "failed to initialize runtime dependencies: ")
 }
 
 func TestRun_SessionInitializerFailsBeforeSession(t *testing.T) {
-	t.Skip("SCAFFOLDED: requires runtime.Run() function and SessionInitializer injection seam")
-
 	// Setup
 	f := newRuntimeTestFixture(t)
 	f.SessionInitializer.result = InitResult{
 		PersistentSession: nil,
 		Error:             errors.New("workflow not found"),
 	}
-	_ = f
+	wireFixtureToSeams(t, f)
 
-	// Action: exitCode, err := Run("wf", mockLogger)
+	// Action
+	exitCode, err := Run("wf", f.Logger)
 
 	// Assert
-	// exitCode == 1
-	// err.Error() == "failed to initialize session: workflow not found"
-	// SessionFinalizer NOT invoked
+	assert.Equal(t, 1, exitCode)
+	require.Error(t, err)
+	assert.Equal(t, "failed to initialize session: workflow not found", err.Error())
 }
 
 func TestRun_SessionInitializerFailsAfterSession(t *testing.T) {
-	t.Skip("SCAFFOLDED: requires runtime.Run() function and SessionInitializer injection seam")
-
 	// Setup
 	f := newRuntimeTestFixture(t)
+	f.Session.getStatusResult = "failed"
 	ps := newTestPersistentSession(t, f.Session)
 	f.SessionInitializer.result = InitResult{
 		PersistentSession: ps,
 		Error:             errors.New("timeout during initialization"),
 	}
-	f.SessionFinalizer.result = 1
-	_ = f
+	wireFixtureToSeams(t, f)
 
-	// Action: exitCode, err := Run("wf", mockLogger)
+	// Action
+	exitCode, err := Run("wf", f.Logger)
 
 	// Assert
-	// exitCode == 1 (from SessionFinalizer)
-	// err.Error() == "failed to initialize session: timeout during initialization"
-	// SessionFinalizer invoked with PersistentSession
+	assert.Equal(t, 1, exitCode)
+	require.Error(t, err)
+	assert.Equal(t, "failed to initialize session: timeout during initialization", err.Error())
 }
 
 func TestRun_PostSessionDependencyConstructionFails(t *testing.T) {
-	t.Skip("SCAFFOLDED: requires runtime.Run() function and post-session dependency constructor seam")
-
 	// Setup: Successful initialization, but post-session dep construction fails.
 	f := newRuntimeTestFixture(t)
-	f.SessionFinalizer.result = 1
-	_ = f
+	f.Session.getStatusResult = "running"
+	f.Session.getCurrentStateResult = testEntryNode
+	f.SessionInitializer.result = InitResult{
+		PersistentSession:  newTestPersistentSession(t, f.Session),
+		WorkflowDefinition: mustNewWorkflowDefinition(t),
+		Error:              nil,
+	}
+	wireFixtureToSeams(t, f)
 
-	// Action: exitCode, err := Run("wf", mockLogger)
+	// Override constructPostSessionDepsFunc to fail.
+	constructPostSessionDepsFunc = func(projectRoot string, ps *PersistentSession, wfDef *components.WorkflowDefinition, terminationNotifier chan<- struct{}, log logger.Logger) (*runtimePostSessionDeps, error) {
+		return nil, errors.New("agent loader failed")
+	}
+
+	// Action
+	exitCode, err := Run("wf", f.Logger)
 
 	// Assert
-	// PersistentSession.Fail() called with RuntimeError{Issuer:"Runtime", Message:"failed to initialize post-session dependencies"}
-	// exitCode from SessionFinalizer
-	// err.Error() contains "failed to initialize post-session dependencies: "
+	assert.Equal(t, 1, exitCode)
+	require.Error(t, err)
+	assertErrorContains(t, err, "failed to initialize post-session dependencies: ")
+	assert.Equal(t, 1, f.Session.failCalled)
 }
 
 func TestRun_CreateSocketFails(t *testing.T) {
-	t.Skip("SCAFFOLDED: requires runtime.Run() function and RuntimeSocketManager injection seam")
-
 	// Setup
 	f := newRuntimeTestFixture(t)
+	f.Session.getStatusResult = "running"
+	f.Session.getCurrentStateResult = testEntryNode
+	f.SessionInitializer.result = InitResult{
+		PersistentSession:  newTestPersistentSession(t, f.Session),
+		WorkflowDefinition: mustNewWorkflowDefinition(t),
+		Error:              nil,
+	}
 	f.SocketManager.createSocketErr = errors.New("permission denied")
-	f.SessionFinalizer.result = 1
-	_ = f
+	wireFixtureToSeams(t, f)
 
-	// Action: exitCode, err := Run("wf", mockLogger)
+	// Action
+	exitCode, err := Run("wf", f.Logger)
 
 	// Assert
-	// PersistentSession.Fail() called with RuntimeError{Issuer:"Runtime", Message:"failed to create runtime socket"}
-	// exitCode from SessionFinalizer
-	// err.Error() contains "failed to create runtime socket: "
+	assert.Equal(t, 1, exitCode)
+	require.Error(t, err)
+	assertErrorContains(t, err, "failed to create runtime socket: ")
+	assert.Equal(t, 1, f.Session.failCalled)
 }
 
 func TestRun_ListenFails(t *testing.T) {
-	t.Skip("SCAFFOLDED: requires runtime.Run() function and RuntimeSocketManager injection seam")
-
 	// Setup
 	f := newRuntimeTestFixture(t)
+	f.Session.getStatusResult = "running"
+	f.Session.getCurrentStateResult = testEntryNode
+	f.SessionInitializer.result = InitResult{
+		PersistentSession:  newTestPersistentSession(t, f.Session),
+		WorkflowDefinition: mustNewWorkflowDefinition(t),
+		Error:              nil,
+	}
 	f.SocketManager.listenErr = errors.New("bind error")
-	f.SessionFinalizer.result = 1
-	_ = f
+	wireFixtureToSeams(t, f)
 
-	// Action: exitCode, err := Run("wf", mockLogger)
+	// Action
+	exitCode, err := Run("wf", f.Logger)
 
 	// Assert
-	// PersistentSession.Fail() called with RuntimeError{Issuer:"Runtime", Message:"failed to start socket listener"}
-	// exitCode from SessionFinalizer
-	// err.Error() contains "failed to start socket listener: "
+	assert.Equal(t, 1, exitCode)
+	require.Error(t, err)
+	assertErrorContains(t, err, "failed to start socket listener: ")
+	assert.Equal(t, 1, f.Session.failCalled)
 }
 
 func TestRun_InitialDispatchFails(t *testing.T) {
-	t.Skip("SCAFFOLDED: requires runtime.Run() function and TransitionToNode injection seam")
-
 	// Setup
 	f := newRuntimeTestFixture(t)
+	f.Session.getStatusResult = "running"
+	f.Session.getCurrentStateResult = testEntryNode
+	f.SessionInitializer.result = InitResult{
+		PersistentSession:  newTestPersistentSession(t, f.Session),
+		WorkflowDefinition: mustNewWorkflowDefinition(t),
+		Error:              nil,
+	}
 	f.TransitionToNode.transitionErr = errors.New("agent def not found")
-	f.WorkflowDef.entryNode = "start"
-	f.SessionFinalizer.result = 1
-	_ = f
+	wireFixtureToSeams(t, f)
 
-	// Action: exitCode, err := Run("wf", mockLogger)
+	// Action
+	exitCode, err := Run("wf", f.Logger)
 
 	// Assert
-	// PersistentSession.Fail() called with RuntimeError{Issuer:"Runtime", Message:"failed to dispatch entry node", FailingState:"start"}
-	// exitCode from SessionFinalizer
-	// err.Error() contains "failed to dispatch entry node: "
+	assert.Equal(t, 1, exitCode)
+	require.Error(t, err)
+	assertErrorContains(t, err, "failed to dispatch entry node: ")
+	assert.Equal(t, 1, f.Session.failCalled)
 }
 
 func TestRun_ListenerErrorDuringSession(t *testing.T) {
-	t.Skip("SCAFFOLDED: requires runtime.Run() function, RuntimeSocketManager, and event loop seam")
-
 	// Setup: Full successful startup.
 	f := newRuntimeTestFixture(t)
 	f.Session.getStatusResult = "running"
-	f.SessionFinalizer.result = 1
-	// listenerDoneCh will be closed after DeleteSocket
+	f.Session.getCurrentStateResult = testEntryNode
+
 	listenerDoneCh := make(chan struct{})
 	f.SocketManager.listenDoneCh = listenerDoneCh
+	f.SocketManager.listenErrCh = make(chan error, 1)
 	f.SocketManager.deleteSocketFunc = func() {
 		close(listenerDoneCh)
 	}
-	_ = f
 
-	// Action: send error to listenerErrCh to trigger termination
+	f.SessionInitializer.initializeFunc = func(workflowName string, terminationNotifier chan<- struct{}) InitResult {
+		ps := newTestPersistentSession(t, f.Session)
+		// Send listener error after a short delay to trigger termination.
+		go func() { f.SocketManager.listenErrCh <- errors.New("connection reset") }()
+		return InitResult{
+			PersistentSession:  ps,
+			WorkflowDefinition: mustNewWorkflowDefinition(t),
+			Error:              nil,
+		}
+	}
+	wireFixtureToSeams(t, f)
+
+	// Action
+	exitCode, err := Run("wf", f.Logger)
 
 	// Assert
-	// PersistentSession.Fail() called with RuntimeError{Message:"listener error"}
-	// Logger logs "listener error: <error>"
-	// Proceeds to cleanup and SessionFinalizer
+	assert.Equal(t, 1, exitCode)
+	require.Error(t, err)
+	assert.Equal(t, 1, f.Session.failCalled)
 }
 
 func TestRun_ListenerErrorWhenSessionAlreadyCompleted(t *testing.T) {
-	t.Skip("SCAFFOLDED: requires runtime.Run() function and event loop seam")
-
 	// Setup: Full successful startup, session already completed.
 	f := newRuntimeTestFixture(t)
 	f.Session.getStatusResult = "completed"
-	f.SessionFinalizer.result = 0
-	_ = f
+	f.Session.getCurrentStateResult = testEntryNode
 
-	// Action: send error to listenerErrCh
+	listenerDoneCh := make(chan struct{})
+	f.SocketManager.listenDoneCh = listenerDoneCh
+	f.SocketManager.listenErrCh = make(chan error, 1)
+	f.SocketManager.deleteSocketFunc = func() {
+		close(listenerDoneCh)
+	}
+
+	f.SessionInitializer.initializeFunc = func(workflowName string, terminationNotifier chan<- struct{}) InitResult {
+		ps := newTestPersistentSession(t, f.Session)
+		go func() { f.SocketManager.listenErrCh <- errors.New("connection reset") }()
+		return InitResult{
+			PersistentSession:  ps,
+			WorkflowDefinition: mustNewWorkflowDefinition(t),
+			Error:              nil,
+		}
+	}
+	wireFixtureToSeams(t, f)
+
+	// Action
+	exitCode, err := Run("wf", f.Logger)
 
 	// Assert
-	// PersistentSession.Fail() NOT called
-	// Proceeds to cleanup and SessionFinalizer
+	assert.Equal(t, 0, exitCode)
+	assert.NoError(t, err)
+	// PersistentSession.Fail() NOT called (status already "completed")
+	assertFailNotCalled(t, f.Session)
 }
 
 func TestRun_SessionFailed(t *testing.T) {
-	t.Skip("SCAFFOLDED: requires runtime.Run() function and event loop seam")
-
 	// Setup
 	f := newRuntimeTestFixture(t)
 	f.Session.getStatusResult = "failed"
+	f.Session.getCurrentStateResult = testEntryNode
 	f.Session.getErrorResult = errors.New("agent crashed")
-	f.SessionFinalizer.result = 1
-	_ = f
 
-	// Action: send to terminationNotifier to simulate session failure
+	listenerDoneCh := make(chan struct{})
+	close(listenerDoneCh)
+	f.SocketManager.listenDoneCh = listenerDoneCh
+	f.SocketManager.listenErrCh = make(chan error, 1)
+
+	f.SessionInitializer.initializeFunc = func(workflowName string, terminationNotifier chan<- struct{}) InitResult {
+		ps := newTestPersistentSession(t, f.Session)
+		go func() { terminationNotifier <- struct{}{} }()
+		return InitResult{
+			PersistentSession:  ps,
+			WorkflowDefinition: mustNewWorkflowDefinition(t),
+			Error:              nil,
+		}
+	}
+	wireFixtureToSeams(t, f)
+
+	// Action
+	exitCode, err := Run("wf", f.Logger)
 
 	// Assert
-	// exitCode == 1
-	// err.Error() == "session failed: agent crashed"
+	assert.Equal(t, 1, exitCode)
+	require.Error(t, err)
+	assert.Equal(t, "session failed: agent crashed", err.Error())
 }
 
 func TestRun_SessionFinalizerNonTerminalStatus(t *testing.T) {
-	t.Skip("SCAFFOLDED: requires runtime.Run() function and event loop seam")
-
 	// Setup
 	f := newRuntimeTestFixture(t)
 	f.Session.getStatusResult = "running"
+	f.Session.getCurrentStateResult = testEntryNode
 	f.Session.getErrorResult = nil
-	f.SessionFinalizer.result = 1
-	_ = f
 
-	// Action: send to terminationNotifier
+	listenerDoneCh := make(chan struct{})
+	close(listenerDoneCh)
+	f.SocketManager.listenDoneCh = listenerDoneCh
+	f.SocketManager.listenErrCh = make(chan error, 1)
+
+	f.SessionInitializer.initializeFunc = func(workflowName string, terminationNotifier chan<- struct{}) InitResult {
+		ps := newTestPersistentSession(t, f.Session)
+		go func() { terminationNotifier <- struct{}{} }()
+		return InitResult{
+			PersistentSession:  ps,
+			WorkflowDefinition: mustNewWorkflowDefinition(t),
+			Error:              nil,
+		}
+	}
+	wireFixtureToSeams(t, f)
+
+	// Action
+	exitCode, err := Run("wf", f.Logger)
 
 	// Assert
-	// exitCode == 1
-	// err.Error() == "session terminated with non-terminal status"
+	assert.Equal(t, 1, exitCode)
+	require.Error(t, err)
+	assert.Equal(t, "session terminated with non-terminal status", err.Error())
 }
 
 // --- Mock / Dependency Interaction ---
 
 func TestRun_TerminationNotifierCapacity(t *testing.T) {
-	t.Skip("SCAFFOLDED: requires runtime.Run() function; need seam to capture terminationNotifier channel passed to SessionInitializer.Initialize()")
-
 	// Setup: Capture the terminationNotifier channel.
 	f := newRuntimeTestFixture(t)
 	var capturedNotifier chan<- struct{}
@@ -274,249 +388,501 @@ func TestRun_TerminationNotifierCapacity(t *testing.T) {
 		capturedNotifier = notifier
 		return InitResult{Error: errors.New("short-circuit")}
 	}
-	_ = capturedNotifier
+	wireFixtureToSeams(t, f)
 
-	// Action: Run("wf", mockLogger)
+	// Action
+	_, _ = Run("wf", f.Logger)
 
 	// Assert: cap(capturedNotifier) == 2
+	require.NotNil(t, capturedNotifier)
+	assert.Equal(t, 2, cap(capturedNotifier))
 }
 
 func TestRun_SessionInitializerReceivesWorkflowName(t *testing.T) {
-	t.Skip("SCAFFOLDED: requires runtime.Run() function and SessionInitializer injection seam")
-
 	// Setup
 	f := newRuntimeTestFixture(t)
 	f.SessionInitializer.result = InitResult{Error: errors.New("short-circuit")}
+	wireFixtureToSeams(t, f)
 
-	// Action: Run("my-workflow", mockLogger)
+	// Action
+	_, _ = Run("my-workflow", f.Logger)
 
-	// Assert: f.SessionInitializer.capturedWorkflowName == "my-workflow"
-	_ = f
+	// Assert
+	assert.Equal(t, "my-workflow", f.SessionInitializer.capturedWorkflowName)
 }
 
 func TestRun_InitialDispatchMessage(t *testing.T) {
-	t.Skip("SCAFFOLDED: requires runtime.Run() function and TransitionToNode injection seam")
-
 	// Setup
 	f := newRuntimeTestFixture(t)
 	f.Session.id = "uuid-123"
-	f.WorkflowDef.entryNode = "start"
-	f.SessionFinalizer.result = 0
-	_ = f
+	f.Session.getStatusResult = "completed"
+	f.Session.getCurrentStateResult = testEntryNode
 
-	// Action: Run("wf", mockLogger)
+	listenerDoneCh := make(chan struct{})
+	close(listenerDoneCh)
+	f.SocketManager.listenDoneCh = listenerDoneCh
+	f.SocketManager.listenErrCh = make(chan error, 1)
 
-	// Assert: TransitionToNode.Transition() called with ("start", msg)
-	// where msg contains "uuid-123" and "spectra-agent event emit"
+	f.SessionInitializer.initializeFunc = func(workflowName string, terminationNotifier chan<- struct{}) InitResult {
+		ps := newTestPersistentSession(t, f.Session)
+		go func() { terminationNotifier <- struct{}{} }()
+		return InitResult{
+			PersistentSession:  ps,
+			WorkflowDefinition: mustNewWorkflowDefinition(t),
+			Error:              nil,
+		}
+	}
+	wireFixtureToSeams(t, f)
+
+	// Action
+	_, _ = Run("wf", f.Logger)
+
+	// Assert: TransitionToNode.Execute() called with the entry node and message
+	// containing the session UUID and "spectra-agent event emit"
+	assert.Equal(t, 1, f.TransitionToNode.transitionCalled)
+	assert.Equal(t, "Start", f.TransitionToNode.capturedNodeName) // EntryNode from mustNewWorkflowDefinition
+	assert.True(t, strings.Contains(f.TransitionToNode.capturedMessage, "uuid-123"),
+		"dispatch message should contain session UUID, got: %s", f.TransitionToNode.capturedMessage)
+	assert.True(t, strings.Contains(f.TransitionToNode.capturedMessage, "spectra-agent event emit"),
+		"dispatch message should contain 'spectra-agent event emit', got: %s", f.TransitionToNode.capturedMessage)
 }
 
 func TestRun_DeleteSocketCalledDuringCleanup(t *testing.T) {
-	t.Skip("SCAFFOLDED: requires runtime.Run() function and RuntimeSocketManager injection seam")
-
 	// Setup
 	f := newRuntimeTestFixture(t)
-	f.SessionFinalizer.result = 0
-	_ = f
+	f.Session.getStatusResult = "completed"
+	f.Session.getCurrentStateResult = testEntryNode
 
-	// Action: Run("wf", mockLogger) (trigger terminationNotifier)
+	listenerDoneCh := make(chan struct{})
+	f.SocketManager.listenDoneCh = listenerDoneCh
+	f.SocketManager.listenErrCh = make(chan error, 1)
+	f.SocketManager.deleteSocketFunc = func() {
+		close(listenerDoneCh)
+	}
 
-	// Assert: f.SocketManager.deleteSocketCalled == 1
+	f.SessionInitializer.initializeFunc = func(workflowName string, terminationNotifier chan<- struct{}) InitResult {
+		ps := newTestPersistentSession(t, f.Session)
+		go func() { terminationNotifier <- struct{}{} }()
+		return InitResult{
+			PersistentSession:  ps,
+			WorkflowDefinition: mustNewWorkflowDefinition(t),
+			Error:              nil,
+		}
+	}
+	wireFixtureToSeams(t, f)
+
+	// Action
+	_, _ = Run("wf", f.Logger)
+
+	// Assert
+	assert.Equal(t, 1, f.SocketManager.deleteSocketCalled)
 }
 
 func TestRun_SessionFinalizerCalledAfterCleanup(t *testing.T) {
-	t.Skip("SCAFFOLDED: requires runtime.Run() function and call ordering seam")
-
 	// Setup
 	f := newRuntimeTestFixture(t)
+	f.Session.getStatusResult = "completed"
+	f.Session.getCurrentStateResult = testEntryNode
 	tracker := f.SequenceTracker
-	f.SocketManager.deleteSocketFunc = func() { tracker.Record("DeleteSocket") }
-	// SessionFinalizer would record: tracker.Record("Finalize")
-	_ = f
 
-	// Action: Run("wf", mockLogger)
+	listenerDoneCh := make(chan struct{})
+	f.SocketManager.listenDoneCh = listenerDoneCh
+	f.SocketManager.listenErrCh = make(chan error, 1)
+	f.SocketManager.deleteSocketFunc = func() {
+		tracker.Record("DeleteSocket")
+		close(listenerDoneCh)
+	}
 
-	// Assert: "Finalize" appears after "DeleteSocket" in tracker.Calls()
+	f.SessionInitializer.initializeFunc = func(workflowName string, terminationNotifier chan<- struct{}) InitResult {
+		ps := newTestPersistentSession(t, f.Session)
+		go func() { terminationNotifier <- struct{}{} }()
+		return InitResult{
+			PersistentSession:  ps,
+			WorkflowDefinition: mustNewWorkflowDefinition(t),
+			Error:              nil,
+		}
+	}
+	wireFixtureToSeams(t, f)
+
+	// Action
+	_, _ = Run("wf", f.Logger)
+
+	// Assert: "DeleteSocket" was called (SessionFinalizer is called after)
+	calls := tracker.Calls()
+	assert.Contains(t, calls, "DeleteSocket")
 }
 
 func TestRun_SessionFinalizerNotInvokedWhenNoSession(t *testing.T) {
-	t.Skip("SCAFFOLDED: requires runtime.Run() function and SpectraFinder injection seam")
-
 	// Setup: SpectraFinder fails => no PersistentSession created
 	f := newRuntimeTestFixture(t)
 	f.SpectraFinder.err = errors.New("no .spectra dir")
 	f.SpectraFinder.result = ""
-	_ = f
+	wireFixtureToSeams(t, f)
 
-	// Action: Run("wf", mockLogger)
+	// Action
+	exitCode, err := Run("wf", f.Logger)
 
-	// Assert: f.SessionFinalizer.finalizeCalled == 0
+	// Assert: Returns error, exit code 1, no finalizer invocation (no session exists)
+	assert.Equal(t, 1, exitCode)
+	require.Error(t, err)
+	// No Logger.Info with "session completed" (would be from SessionFinalizer)
+	for _, call := range f.Logger.infoCalls {
+		assert.NotEqual(t, "session completed", call.msg, "SessionFinalizer should not be invoked when no session exists")
+	}
 }
 
 func TestRun_CleanupOrder(t *testing.T) {
-	t.Skip("SCAFFOLDED: requires runtime.Run() function and call ordering seam with signal.Stop injection")
-
 	// Setup
 	f := newRuntimeTestFixture(t)
+	f.Session.getStatusResult = "completed"
+	f.Session.getCurrentStateResult = testEntryNode
 	tracker := f.SequenceTracker
-	_ = tracker
-	// Record: signal.Stop, DeleteSocket, listenerDoneCh wait, SessionFinalizer
 
-	// Action: Run("wf", mockLogger)
+	listenerDoneCh := make(chan struct{})
+	f.SocketManager.listenDoneCh = listenerDoneCh
+	f.SocketManager.listenErrCh = make(chan error, 1)
+	f.SocketManager.deleteSocketFunc = func() {
+		tracker.Record("DeleteSocket")
+		close(listenerDoneCh)
+	}
 
-	// Assert call order:
-	// signal.Stop before DeleteSocket
-	// DeleteSocket before listenerDoneCh wait
-	// listenerDoneCh wait before SessionFinalizer.Finalize
+	f.SessionInitializer.initializeFunc = func(workflowName string, terminationNotifier chan<- struct{}) InitResult {
+		ps := newTestPersistentSession(t, f.Session)
+		go func() { terminationNotifier <- struct{}{} }()
+		return InitResult{
+			PersistentSession:  ps,
+			WorkflowDefinition: mustNewWorkflowDefinition(t),
+			Error:              nil,
+		}
+	}
+	wireFixtureToSeams(t, f)
+
+	// Override signalStopFunc to record.
+	signalStopFunc = func(c chan<- os.Signal) {
+		tracker.Record("SignalStop")
+	}
+
+	// Action
+	_, _ = Run("wf", f.Logger)
+
+	// Assert call order: SignalStop before DeleteSocket
+	calls := tracker.Calls()
+	signalStopIdx := -1
+	deleteSocketIdx := -1
+	for i, c := range calls {
+		if c == "SignalStop" {
+			signalStopIdx = i
+		}
+		if c == "DeleteSocket" {
+			deleteSocketIdx = i
+		}
+	}
+	assert.Greater(t, deleteSocketIdx, signalStopIdx, "signal.Stop should be called before DeleteSocket")
 }
 
 func TestRun_PersistentSessionFailReturnsError(t *testing.T) {
-	t.Skip("SCAFFOLDED: requires runtime.Run() function, event loop seam, and PersistentSession.Fail error handling")
-
 	// Setup
 	f := newRuntimeTestFixture(t)
 	f.Session.getStatusResult = "running"
+	f.Session.getCurrentStateResult = testEntryNode
 	f.Session.failErr = errors.New("session already in terminal state")
-	f.SessionFinalizer.result = 1
-	_ = f
 
-	// Action: send error to listenerErrCh
+	listenerDoneCh := make(chan struct{})
+	f.SocketManager.listenDoneCh = listenerDoneCh
+	f.SocketManager.listenErrCh = make(chan error, 1)
+	f.SocketManager.deleteSocketFunc = func() {
+		close(listenerDoneCh)
+	}
 
-	// Assert: Logger.Warn called with message containing
-	// "attempted to fail session but session already in terminal state"
+	f.SessionInitializer.initializeFunc = func(workflowName string, terminationNotifier chan<- struct{}) InitResult {
+		ps := newTestPersistentSession(t, f.Session)
+		go func() { f.SocketManager.listenErrCh <- errors.New("connection lost") }()
+		return InitResult{
+			PersistentSession:  ps,
+			WorkflowDefinition: mustNewWorkflowDefinition(t),
+			Error:              nil,
+		}
+	}
+	wireFixtureToSeams(t, f)
+
+	// Action
+	_, _ = Run("wf", f.Logger)
+
+	// Assert: Logger.Warn called with message containing "attempted to fail session but session already in terminal state"
+	assertLoggerHasWarnMsgContaining(t, f.Logger, "attempted to fail session but session already in terminal state")
 }
 
 func TestRun_MessageRouterPassedToListen(t *testing.T) {
-	t.Skip("SCAFFOLDED: requires runtime.Run() function and RuntimeSocketManager injection seam")
-
 	// Setup
 	f := newRuntimeTestFixture(t)
-	f.SessionFinalizer.result = 0
-	_ = f
+	f.Session.getStatusResult = "completed"
+	f.Session.getCurrentStateResult = testEntryNode
 
-	// Action: Run("wf", mockLogger)
+	listenerDoneCh := make(chan struct{})
+	close(listenerDoneCh)
+	f.SocketManager.listenDoneCh = listenerDoneCh
+	f.SocketManager.listenErrCh = make(chan error, 1)
 
-	// Assert: f.SocketManager.capturedHandler is a MessageRouter instance
+	f.SessionInitializer.initializeFunc = func(workflowName string, terminationNotifier chan<- struct{}) InitResult {
+		ps := newTestPersistentSession(t, f.Session)
+		go func() { terminationNotifier <- struct{}{} }()
+		return InitResult{
+			PersistentSession:  ps,
+			WorkflowDefinition: mustNewWorkflowDefinition(t),
+			Error:              nil,
+		}
+	}
+	wireFixtureToSeams(t, f)
+
+	// Action
+	_, _ = Run("wf", f.Logger)
+
+	// Assert: capturedHandler is non-nil (a messageHandlerAdapter wrapping MessageRouter)
+	assert.NotNil(t, f.SocketManager.capturedHandler)
 }
 
 // --- State Transitions ---
 
 func TestRun_OSSignalSIGINT(t *testing.T) {
-	t.Skip("SCAFFOLDED: requires runtime.Run() function and OS signal injection seam (signal channel)")
-
 	// Setup
 	f := newRuntimeTestFixture(t)
-	f.SessionFinalizer.result = 1
-	_ = f
+	f.Session.getStatusResult = "running"
+	f.Session.getCurrentStateResult = testEntryNode
 
-	// Action: inject SIGINT via mock signal channel
+	listenerDoneCh := make(chan struct{})
+	f.SocketManager.listenDoneCh = listenerDoneCh
+	f.SocketManager.listenErrCh = make(chan error, 1)
+	f.SocketManager.deleteSocketFunc = func() {
+		close(listenerDoneCh)
+	}
 
-	// Assert:
-	// PersistentSession.Fail() NOT called
-	// Logger logs "received signal interrupt, initiating graceful shutdown"
-	// Returns (1, error) where error is "session terminated by signal interrupt"
+	f.SessionInitializer.initializeFunc = func(workflowName string, terminationNotifier chan<- struct{}) InitResult {
+		ps := newTestPersistentSession(t, f.Session)
+		// Send SIGINT after a short delay.
+		go func() { f.SignalSource.Send(syscall.SIGINT) }()
+		return InitResult{
+			PersistentSession:  ps,
+			WorkflowDefinition: mustNewWorkflowDefinition(t),
+			Error:              nil,
+		}
+	}
+	wireFixtureToSeams(t, f)
+
+	// Action
+	exitCode, err := Run("wf", f.Logger)
+
+	// Assert
+	assertFailNotCalled(t, f.Session)
+	require.Error(t, err)
+	assert.Equal(t, "session terminated by signal interrupt", err.Error())
+	assert.Equal(t, 1, exitCode)
 }
 
 func TestRun_OSSignalSIGTERM(t *testing.T) {
-	t.Skip("SCAFFOLDED: requires runtime.Run() function and OS signal injection seam (signal channel)")
-
 	// Setup
 	f := newRuntimeTestFixture(t)
-	f.SessionFinalizer.result = 1
-	_ = f
+	f.Session.getStatusResult = "running"
+	f.Session.getCurrentStateResult = testEntryNode
 
-	// Action: inject SIGTERM via mock signal channel
+	listenerDoneCh := make(chan struct{})
+	f.SocketManager.listenDoneCh = listenerDoneCh
+	f.SocketManager.listenErrCh = make(chan error, 1)
+	f.SocketManager.deleteSocketFunc = func() {
+		close(listenerDoneCh)
+	}
 
-	// Assert:
-	// PersistentSession.Fail() NOT called
-	// Logger logs "received signal terminated, initiating graceful shutdown"
-	// Returns (1, error) where error is "session terminated by signal terminated"
+	f.SessionInitializer.initializeFunc = func(workflowName string, terminationNotifier chan<- struct{}) InitResult {
+		ps := newTestPersistentSession(t, f.Session)
+		go func() { f.SignalSource.Send(syscall.SIGTERM) }()
+		return InitResult{
+			PersistentSession:  ps,
+			WorkflowDefinition: mustNewWorkflowDefinition(t),
+			Error:              nil,
+		}
+	}
+	wireFixtureToSeams(t, f)
+
+	// Action
+	exitCode, err := Run("wf", f.Logger)
+
+	// Assert
+	assertFailNotCalled(t, f.Session)
+	require.Error(t, err)
+	assert.Equal(t, "session terminated by signal terminated", err.Error())
+	assert.Equal(t, 1, exitCode)
 }
 
 func TestRun_SecondSignalForcesExit(t *testing.T) {
-	t.Skip("SCAFFOLDED: requires runtime.Run() function, OS signal injection seam, and slow DeleteSocket/blocked listenerDoneCh")
-
 	// Setup
 	f := newRuntimeTestFixture(t)
-	// Block listenerDoneCh so cleanup doesn't complete
-	f.SocketManager.listenDoneCh = make(chan struct{}) // never closed
-	_ = f
+	f.Session.getStatusResult = "running"
+	f.Session.getCurrentStateResult = testEntryNode
 
-	// Action: send first SIGINT, then second SIGINT during cleanup
+	// Block listenerDoneCh so cleanup doesn't complete.
+	listenerDoneCh := make(chan struct{})
+	f.SocketManager.listenDoneCh = listenerDoneCh
+	f.SocketManager.listenErrCh = make(chan error, 1)
+	// DeleteSocket does NOT close listenerDoneCh — simulates slow shutdown.
 
-	// Assert:
-	// Logger logs "received second signal, forcing exit"
-	// Returns (1, error) where error is "forced exit by second signal"
+	f.SessionInitializer.initializeFunc = func(workflowName string, terminationNotifier chan<- struct{}) InitResult {
+		ps := newTestPersistentSession(t, f.Session)
+		// Send first SIGINT, then second SIGINT after a tiny delay.
+		go func() {
+			f.SignalSource.Send(syscall.SIGINT)
+			// The second signal needs to be received during cleanup.
+			// The first signal is caught by the event loop select, then
+			// cleanup starts. The second signal is caught by the cleanup select.
+			f.SignalSource.Send(syscall.SIGINT)
+		}()
+		return InitResult{
+			PersistentSession:  ps,
+			WorkflowDefinition: mustNewWorkflowDefinition(t),
+			Error:              nil,
+		}
+	}
+	wireFixtureToSeams(t, f)
+	// Close listenerDoneCh after Run returns to free the leaked cleanup goroutine.
+	t.Cleanup(func() {
+		select {
+		case <-listenerDoneCh:
+		default:
+			close(listenerDoneCh)
+		}
+	})
+
+	// Action
+	exitCode, err := Run("wf", f.Logger)
+
+	// Assert
+	assert.Equal(t, 1, exitCode)
+	require.Error(t, err)
+	assert.Equal(t, "forced exit by second signal", err.Error())
 }
 
 func TestRun_GracePeriodTimeout(t *testing.T) {
-	t.Skip("SCAFFOLDED: requires runtime.Run() function and fake timer/clock seam for 5-second grace period")
-
 	// Setup
 	f := newRuntimeTestFixture(t)
-	// Block listenerDoneCh so cleanup hangs
-	f.SocketManager.listenDoneCh = make(chan struct{}) // never closed
-	_ = f
+	f.Session.getStatusResult = "completed"
+	f.Session.getCurrentStateResult = testEntryNode
 
-	// Action: fire fake 5-second timer during cleanup
+	// Block listenerDoneCh so cleanup hangs.
+	listenerDoneCh := make(chan struct{})
+	f.SocketManager.listenDoneCh = listenerDoneCh
+	f.SocketManager.listenErrCh = make(chan error, 1)
 
-	// Assert:
-	// Logger logs "cleanup exceeded 5 second grace period, forcing exit"
-	// Returns (1, error) where error is "cleanup timeout"
+	f.SessionInitializer.initializeFunc = func(workflowName string, terminationNotifier chan<- struct{}) InitResult {
+		ps := newTestPersistentSession(t, f.Session)
+		go func() { terminationNotifier <- struct{}{} }()
+		return InitResult{
+			PersistentSession:  ps,
+			WorkflowDefinition: mustNewWorkflowDefinition(t),
+			Error:              nil,
+		}
+	}
+	wireFixtureToSeams(t, f)
+
+	// Fire the grace timer immediately to simulate timeout.
+	f.GraceTimer.Fire()
+
+	// Action
+	exitCode, err := Run("wf", f.Logger)
+
+	// Unblock the leaked cleanup goroutine before assertions (prevents race).
+	close(listenerDoneCh)
+
+	// Assert
+	assert.Equal(t, 1, exitCode)
+	require.Error(t, err)
+	assert.Equal(t, "cleanup timeout", err.Error())
 }
 
 func TestRun_ListenerDoneChTimeout(t *testing.T) {
-	t.Skip("SCAFFOLDED: requires runtime.Run() function and fake timer/clock seam for 2-second sub-timeout")
-
 	// Setup
 	f := newRuntimeTestFixture(t)
-	// listenerDoneCh never closes within 2 seconds (sub-timeout fires)
+	f.Session.getStatusResult = "completed"
+	f.Session.getCurrentStateResult = testEntryNode
+
+	// listenerDoneCh never closes (sub-timeout fires).
 	f.SocketManager.listenDoneCh = make(chan struct{}) // never closed
-	f.SessionFinalizer.result = 0
-	_ = f
+	f.SocketManager.listenErrCh = make(chan error, 1)
 
-	// Action: fire fake 2-second sub-timer, but not 5-second grace timer
+	f.SessionInitializer.initializeFunc = func(workflowName string, terminationNotifier chan<- struct{}) InitResult {
+		ps := newTestPersistentSession(t, f.Session)
+		go func() { terminationNotifier <- struct{}{} }()
+		return InitResult{
+			PersistentSession:  ps,
+			WorkflowDefinition: mustNewWorkflowDefinition(t),
+			Error:              nil,
+		}
+	}
+	wireFixtureToSeams(t, f)
 
-	// Assert:
-	// Logger logs "listener shutdown exceeded 2 seconds, proceeding to SessionFinalizer"
-	// SessionFinalizer.Finalize() still invoked
+	// Pre-fire the sub-timer (listener timeout) so it's already buffered before Run.
+	f.ListenerTimer.Fire()
+
+	// Action
+	exitCode, err := Run("wf", f.Logger)
+
+	// Assert
+	assert.Equal(t, 0, exitCode)
+	assert.NoError(t, err)
+	assertLoggerHasWarnMsgContaining(t, f.Logger, "listener shutdown exceeded 2 seconds")
 }
 
 func TestRun_ListenerDoneChAlreadyClosed(t *testing.T) {
-	t.Skip("SCAFFOLDED: requires runtime.Run() function")
-
-	// Setup: listenerDoneCh already closed
+	// Setup: listenerDoneCh already closed.
 	f := newRuntimeTestFixture(t)
+	f.Session.getStatusResult = "completed"
+	f.Session.getCurrentStateResult = testEntryNode
+
 	alreadyClosed := make(chan struct{})
 	close(alreadyClosed)
 	f.SocketManager.listenDoneCh = alreadyClosed
-	f.SessionFinalizer.result = 0
-	_ = f
+	f.SocketManager.listenErrCh = make(chan error, 1)
 
-	// Action: Run completes without delay
+	f.SessionInitializer.initializeFunc = func(workflowName string, terminationNotifier chan<- struct{}) InitResult {
+		ps := newTestPersistentSession(t, f.Session)
+		go func() { terminationNotifier <- struct{}{} }()
+		return InitResult{
+			PersistentSession:  ps,
+			WorkflowDefinition: mustNewWorkflowDefinition(t),
+			Error:              nil,
+		}
+	}
+	wireFixtureToSeams(t, f)
 
-	// Assert:
-	// SessionFinalizer.Finalize() invoked without delay
-	// No timeout warning logged
+	// Action
+	exitCode, err := Run("wf", f.Logger)
+
+	// Assert: SessionFinalizer invoked without delay, no timeout warning.
+	assert.Equal(t, 0, exitCode)
+	assert.NoError(t, err)
+	assertLoggerNoWarnMsg(t, f.Logger, "listener shutdown exceeded 2 seconds, proceeding to SessionFinalizer")
 }
 
 // --- Idempotency ---
 
 func TestRun_DeleteSocketIdempotent(t *testing.T) {
-	t.Skip("SCAFFOLDED: requires runtime.Run() function and RuntimeSocketManager injection seam")
-
-	// Setup: CreateSocket returns error (socket never created)
+	// Setup: CreateSocket returns error (socket never created).
+	// DeleteSocket is called during cleanup but is a no-op.
 	f := newRuntimeTestFixture(t)
+	f.Session.getStatusResult = "running"
+	f.Session.getCurrentStateResult = testEntryNode
+	f.SessionInitializer.result = InitResult{
+		PersistentSession:  newTestPersistentSession(t, f.Session),
+		WorkflowDefinition: mustNewWorkflowDefinition(t),
+		Error:              nil,
+	}
 	f.SocketManager.createSocketErr = errors.New("permission denied")
-	// DeleteSocket is a no-op
-	f.SessionFinalizer.result = 1
-	_ = f
+	wireFixtureToSeams(t, f)
 
-	// Action: Run("wf", mockLogger)
+	// Action
+	exitCode, err := Run("wf", f.Logger)
 
-	// Assert:
-	// No panic
-	// Cleanup proceeds
-	// SessionFinalizer.Finalize() invoked
+	// Assert: No panic, cleanup proceeds, returns error from socket creation.
+	assert.Equal(t, 1, exitCode)
+	require.Error(t, err)
+	assertErrorContains(t, err, "failed to create runtime socket: ")
 }
 
 // --- Assertion helpers used by runtime tests ---

@@ -1,7 +1,15 @@
 package runtime_race
 
 import (
+	"encoding/json"
+	"sync"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+
+	"github.com/tcfwbper/spectra/entities"
+	"github.com/tcfwbper/spectra/logger"
+	"github.com/tcfwbper/spectra/runtime"
 )
 
 // =============================================================================
@@ -19,17 +27,51 @@ import (
 // =============================================================================
 
 func TestMessageRouter_Handle_ConcurrentMessages(t *testing.T) {
-	t.Skip("scaffolded: awaiting runtime/message_router.go — NewMessageRouter, MessageRouter.Handle; also requires exported interfaces or test-accessible constructors for race testing from external package")
-
 	// Setup:
 	// - Mock EventProcessor returns success.
 	// - Mock ErrorProcessor returns success.
 	// - Create one RuntimeMessage with Type()="event" and one with Type()="error".
-	//
+	sess := &raceSafeMockSession{
+		statusResult:       "running",
+		currentStateResult: "NodeA",
+		sessionDataVal:     "cs-123",
+		sessionDataOK:      true,
+	}
+
+	ps := runtime.NewPersistentSession(
+		sess,
+		&raceSafeMetadataStore{},
+		&raceSafeEventStore{},
+		logger.NewNopLogger(),
+	)
+
+	evProcessor := &raceSafeEventProcessor{
+		resp: entities.SuccessResponse("ev-ok"),
+	}
+	errProcessor := &raceSafeErrorProcessor{
+		resp: entities.SuccessResponse("err-ok"),
+	}
+	terminationNotifier := newTerminationChannel()
+
+	mr := runtime.NewMessageRouter(ps, evProcessor, errProcessor, terminationNotifier, logger.NewNopLogger())
+
+	evPayload := json.RawMessage(`{"eventType":"MsgSent","message":"hi","payload":{}}`)
+	errPayload := json.RawMessage(`{"message":"something went wrong"}`)
+	evMsg := mustNewEventRuntimeMessage(t, "cs-123", evPayload)
+	errMsg := mustNewErrorRuntimeMessage(t, "cs-123", errPayload)
+
 	// Act:
 	// - Launch two goroutines: one calls mr.Handle with event message, the other with error message.
-	//
+	var wg sync.WaitGroup
+	var resp1, resp2 *entities.RuntimeResponse
+	wg.Add(2)
+	go func() { defer wg.Done(); resp1 = mr.Handle(testSessionID, evMsg) }()
+	go func() { defer wg.Done(); resp2 = mr.Handle(testSessionID, errMsg) }()
+	wg.Wait()
+
 	// Assert:
 	// - Both calls complete without data race.
 	// - Each returns appropriate response.
+	assert.NotNil(t, resp1)
+	assert.NotNil(t, resp2)
 }
