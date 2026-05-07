@@ -128,7 +128,10 @@ func (m *mockSession) GetErrorSafe() error {
 }
 
 func (m *mockSession) GetMetadataSnapshotSafe() session.SessionMetadata {
-	return m.getMetadataSnapshotResult
+	result := m.getMetadataSnapshotResult
+	result.ID = m.id
+	result.WorkflowName = m.workflowName
+	return result
 }
 
 func (m *mockSession) GetSessionDataSafe(key string) (any, bool) {
