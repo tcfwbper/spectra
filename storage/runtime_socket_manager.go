@@ -2,7 +2,6 @@ package storage
 
 import (
 	"bufio"
-	"context"
 	"encoding/json"
 	"fmt"
 	"net"
@@ -84,7 +83,7 @@ func (m *RuntimeSocketManager) CreateSocket() error {
 
 // Listen starts accepting connections on the created socket. It returns channels
 // for error reporting and completion signaling.
-func (m *RuntimeSocketManager) Listen(ctx context.Context, handler MessageHandler) (<-chan error, <-chan struct{}, error) {
+func (m *RuntimeSocketManager) Listen(handler MessageHandler) (<-chan error, <-chan struct{}, error) {
 	m.mu.Lock()
 	if !m.created {
 		m.mu.Unlock()
@@ -114,14 +113,14 @@ func (m *RuntimeSocketManager) Listen(ctx context.Context, handler MessageHandle
 	listenerErrCh := make(chan error, 1)
 	listenerDoneCh := make(chan struct{})
 
-	go m.acceptLoop(ctx, ln, handler, listenerErrCh, listenerDoneCh)
+	go m.acceptLoop(ln, handler, listenerErrCh, listenerDoneCh)
 
 	return listenerErrCh, listenerDoneCh, nil
 }
 
 // DeleteSocket stops the listener, closes all active connections, and removes
 // the socket file. It is idempotent.
-func (m *RuntimeSocketManager) DeleteSocket(ctx context.Context) {
+func (m *RuntimeSocketManager) DeleteSocket() {
 	m.mu.Lock()
 	ln := m.listener
 	m.listener = nil
@@ -152,45 +151,29 @@ func (m *RuntimeSocketManager) DeleteSocket(ctx context.Context) {
 	}
 }
 
-func (m *RuntimeSocketManager) acceptLoop(ctx context.Context, ln net.Listener, handler MessageHandler, errCh chan<- error, doneCh chan struct{}) {
+func (m *RuntimeSocketManager) acceptLoop(ln net.Listener, handler MessageHandler, errCh chan<- error, doneCh chan struct{}) {
 	defer close(doneCh)
-
-	// Monitor context cancellation to close the listener
-	go func() {
-		<-ctx.Done()
-		m.mu.Lock()
-		if m.listener == ln {
-			m.listener = nil
-			m.closed = true
-		}
-		m.mu.Unlock()
-		ln.Close()
-	}()
 
 	// Monitor socket file existence. If removed externally, close the listener.
 	go func() {
 		ticker := newTicker(socketFileCheckInterval)
 		defer ticker.Stop()
 		for {
-			select {
-			case <-ctx.Done():
+			<-ticker.C
+			m.mu.Lock()
+			closed := m.closed
+			m.mu.Unlock()
+			if closed {
 				return
-			case <-ticker.C:
+			}
+			if _, err := os.Stat(m.socketPath); err != nil && os.IsNotExist(err) {
 				m.mu.Lock()
-				closed := m.closed
+				if m.listener == ln {
+					m.listener = nil
+				}
 				m.mu.Unlock()
-				if closed {
-					return
-				}
-				if _, err := os.Stat(m.socketPath); err != nil && os.IsNotExist(err) {
-					m.mu.Lock()
-					if m.listener == ln {
-						m.listener = nil
-					}
-					m.mu.Unlock()
-					ln.Close()
-					return
-				}
+				ln.Close()
+				return
 			}
 		}
 	}()
@@ -203,12 +186,6 @@ func (m *RuntimeSocketManager) acceptLoop(ctx context.Context, ln net.Listener, 
 			m.mu.Unlock()
 			if closed {
 				return
-			}
-			// Check if context was cancelled
-			select {
-			case <-ctx.Done():
-				return
-			default:
 			}
 			// Check if socket file was removed
 			if _, statErr := os.Stat(m.socketPath); statErr != nil && os.IsNotExist(statErr) {

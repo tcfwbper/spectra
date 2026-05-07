@@ -2,7 +2,6 @@ package storage
 
 import (
 	"bufio"
-	"context"
 	"encoding/json"
 	"fmt"
 	"net"
@@ -112,25 +111,21 @@ func makeSocketTestDir(t *testing.T) (projectRoot string, socketPath string) {
 }
 
 // --- API Bridge Helpers ---
-// The test spec defines Listen(handler) and DeleteSocket() without context.Context.
-// Production currently requires context.Context. These helpers bridge the gap so
-// test call sites match the spec API surface. Update when production API changes.
 
 // listenSocket calls mgr.Listen matching the spec signature Listen(handler).
-// An internal cancellable context is used and cancelled during test cleanup
-// to prevent goroutine leaks.
-// Pending: production API update to remove context.Context from Listen signature.
+// Test cleanup calls DeleteSocket to prevent goroutine leaks.
 func listenSocket(t *testing.T, mgr *RuntimeSocketManager, handler MessageHandler) (<-chan error, <-chan struct{}, error) {
 	t.Helper()
-	ctx, cancel := context.WithCancel(context.Background())
-	t.Cleanup(cancel)
-	return mgr.Listen(ctx, handler)
+	errCh, doneCh, err := mgr.Listen(handler)
+	if err == nil {
+		t.Cleanup(func() { mgr.DeleteSocket() })
+	}
+	return errCh, doneCh, err
 }
 
 // deleteSocket calls mgr.DeleteSocket matching the spec signature DeleteSocket().
-// Pending: production API update to remove context.Context from DeleteSocket signature.
 func deleteSocket(mgr *RuntimeSocketManager) {
-	mgr.DeleteSocket(context.Background())
+	mgr.DeleteSocket()
 }
 
 // dialSocket connects a client to the given Unix domain socket path.
