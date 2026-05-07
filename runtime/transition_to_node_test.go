@@ -194,8 +194,6 @@ func newRecordingSession(callback func(string)) *recordingMockSession {
 // =============================================================================
 
 func TestNewTransitionToNode_ValidDeps(t *testing.T) {
-	t.Skip("scaffolded: awaiting runtime/transition_to_node.go — NewTransitionToNode(ps, wfDef, loader, invoker)")
-
 	sess := newDefaultMockSession()
 	ps := newTransitionTestPersistentSession(sess)
 	wfDef := &mockTransitionWorkflowDef{
@@ -204,13 +202,8 @@ func TestNewTransitionToNode_ValidDeps(t *testing.T) {
 	loader := &mockTransitionAgentDefLoader{}
 	invoker := &mockTransitionAgentInvoker{}
 
-	_ = ps
-	_ = wfDef
-	_ = loader
-	_ = invoker
-	// Expected:
-	// ttn := NewTransitionToNode(ps, wfDef, loader, invoker)
-	// require.NotNil(t, ttn)
+	ttn := NewTransitionToNode(ps, wfDef, loader, invoker)
+	require.NotNil(t, ttn)
 }
 
 // =============================================================================
@@ -218,8 +211,6 @@ func TestNewTransitionToNode_ValidDeps(t *testing.T) {
 // =============================================================================
 
 func TestTransitionToNode_Execute_HumanNode(t *testing.T) {
-	t.Skip("scaffolded: awaiting runtime/transition_to_node.go — NewTransitionToNode, TransitionToNode.Execute, WithOutput")
-
 	sess := newDefaultMockSession()
 	ps := newTransitionTestPersistentSession(sess)
 	wfDef := &mockTransitionWorkflowDef{
@@ -229,23 +220,15 @@ func TestTransitionToNode_Execute_HumanNode(t *testing.T) {
 	invoker := &mockTransitionAgentInvoker{}
 
 	var buf bytes.Buffer
-	_ = ps
-	_ = wfDef
-	_ = loader
-	_ = invoker
-	_ = &buf
-	// Expected:
-	// ttn := NewTransitionToNode(ps, wfDef, loader, invoker, WithOutput(&buf))
-	// err := ttn.Execute("HumanReview", "please review this")
-	// require.NoError(t, err)
-	// assert.Equal(t, "[HumanReview] please review this\n", buf.String())
-	// assert.Equal(t, 1, sess.updateCurrentStateCalled)
-	// assert.Equal(t, "HumanReview", sess.updateCurrentStateInput)
+	ttn := NewTransitionToNode(ps, wfDef, loader, invoker, WithOutput(&buf))
+	err := ttn.Execute("HumanReview", "please review this")
+	require.NoError(t, err)
+	assert.Equal(t, "[HumanReview] please review this\n", buf.String())
+	assert.Equal(t, 1, sess.updateCurrentStateCalled)
+	assert.Equal(t, "HumanReview", sess.updateCurrentStateInput)
 }
 
 func TestTransitionToNode_Execute_HumanNodeEmptyMessage(t *testing.T) {
-	t.Skip("scaffolded: awaiting runtime/transition_to_node.go — NewTransitionToNode, TransitionToNode.Execute, WithOutput")
-
 	sess := newDefaultMockSession()
 	ps := newTransitionTestPersistentSession(sess)
 	wfDef := &mockTransitionWorkflowDef{
@@ -255,23 +238,15 @@ func TestTransitionToNode_Execute_HumanNodeEmptyMessage(t *testing.T) {
 	invoker := &mockTransitionAgentInvoker{}
 
 	var buf bytes.Buffer
-	_ = ps
-	_ = wfDef
-	_ = loader
-	_ = invoker
-	_ = &buf
-	// Expected:
-	// ttn := NewTransitionToNode(ps, wfDef, loader, invoker, WithOutput(&buf))
-	// err := ttn.Execute("HumanReview", "")
-	// require.NoError(t, err)
-	// assert.Equal(t, "[HumanReview] (no message)\n", buf.String())
-	// assert.Equal(t, 1, sess.updateCurrentStateCalled)
-	// assert.Equal(t, "HumanReview", sess.updateCurrentStateInput)
+	ttn := NewTransitionToNode(ps, wfDef, loader, invoker, WithOutput(&buf))
+	err := ttn.Execute("HumanReview", "")
+	require.NoError(t, err)
+	assert.Equal(t, "[HumanReview] (no message)\n", buf.String())
+	assert.Equal(t, 1, sess.updateCurrentStateCalled)
+	assert.Equal(t, "HumanReview", sess.updateCurrentStateInput)
 }
 
 func TestTransitionToNode_Execute_HumanNodeSpecialChars(t *testing.T) {
-	t.Skip("scaffolded: awaiting runtime/transition_to_node.go — NewTransitionToNode, TransitionToNode.Execute, WithOutput")
-
 	sess := newDefaultMockSession()
 	ps := newTransitionTestPersistentSession(sess)
 	wfDef := &mockTransitionWorkflowDef{
@@ -282,25 +257,16 @@ func TestTransitionToNode_Execute_HumanNodeSpecialChars(t *testing.T) {
 
 	var buf bytes.Buffer
 	message := "line1\n\"quoted\" $var"
-	_ = ps
-	_ = wfDef
-	_ = loader
-	_ = invoker
-	_ = &buf
-	_ = message
-	// Expected:
-	// ttn := NewTransitionToNode(ps, wfDef, loader, invoker, WithOutput(&buf))
-	// err := ttn.Execute("HumanReview", message)
-	// require.NoError(t, err)
-	// expected := "[HumanReview] line1\n\"quoted\" $var\n"
-	// assert.Equal(t, expected, buf.String())
-	// assert.Equal(t, 1, sess.updateCurrentStateCalled)
-	// assert.Equal(t, "HumanReview", sess.updateCurrentStateInput)
+	ttn := NewTransitionToNode(ps, wfDef, loader, invoker, WithOutput(&buf))
+	err := ttn.Execute("HumanReview", message)
+	require.NoError(t, err)
+	expected := "[HumanReview] line1\n\"quoted\" $var\n"
+	assert.Equal(t, expected, buf.String())
+	assert.Equal(t, 1, sess.updateCurrentStateCalled)
+	assert.Equal(t, "HumanReview", sess.updateCurrentStateInput)
 }
 
 func TestTransitionToNode_Execute_AgentNode(t *testing.T) {
-	t.Skip("scaffolded: awaiting runtime/transition_to_node.go — NewTransitionToNode, TransitionToNode.Execute")
-
 	sess := newDefaultMockSession()
 	ps := newTransitionTestPersistentSession(sess)
 	wfDef := &mockTransitionWorkflowDef{
@@ -310,22 +276,17 @@ func TestTransitionToNode_Execute_AgentNode(t *testing.T) {
 	loader := &mockTransitionAgentDefLoader{loadResult: agentDef}
 	invoker := &mockTransitionAgentInvoker{}
 
-	_ = ps
-	_ = wfDef
-	_ = loader
-	_ = invoker
-	// Expected:
-	// ttn := NewTransitionToNode(ps, wfDef, loader, invoker)
-	// err := ttn.Execute("Coder", "implement feature")
-	// require.NoError(t, err)
-	// assert.Equal(t, 1, loader.loadCalled)
-	// assert.Equal(t, "Developer", loader.loadInput)
-	// assert.Equal(t, 1, invoker.invokeAgentCalled)
-	// assert.Equal(t, "Coder", invoker.invokeAgentNodeName)
-	// assert.Equal(t, "implement feature", invoker.invokeAgentMessage)
-	// assert.Equal(t, agentDef, invoker.invokeAgentDef)
-	// assert.Equal(t, 1, sess.updateCurrentStateCalled)
-	// assert.Equal(t, "Coder", sess.updateCurrentStateInput)
+	ttn := NewTransitionToNode(ps, wfDef, loader, invoker)
+	err := ttn.Execute("Coder", "implement feature")
+	require.NoError(t, err)
+	assert.Equal(t, 1, loader.loadCalled)
+	assert.Equal(t, "Developer", loader.loadInput)
+	assert.Equal(t, 1, invoker.invokeAgentCalled)
+	assert.Equal(t, "Coder", invoker.invokeAgentNodeName)
+	assert.Equal(t, "implement feature", invoker.invokeAgentMessage)
+	assert.Equal(t, agentDef, invoker.invokeAgentDef)
+	assert.Equal(t, 1, sess.updateCurrentStateCalled)
+	assert.Equal(t, "Coder", sess.updateCurrentStateInput)
 }
 
 // =============================================================================
@@ -333,8 +294,6 @@ func TestTransitionToNode_Execute_AgentNode(t *testing.T) {
 // =============================================================================
 
 func TestTransitionToNode_Execute_NodeNotFound(t *testing.T) {
-	t.Skip("scaffolded: awaiting runtime/transition_to_node.go — NewTransitionToNode, TransitionToNode.Execute")
-
 	sess := newDefaultMockSession()
 	ps := newTransitionTestPersistentSession(sess)
 	wfDef := &mockTransitionWorkflowDef{
@@ -343,21 +302,14 @@ func TestTransitionToNode_Execute_NodeNotFound(t *testing.T) {
 	loader := &mockTransitionAgentDefLoader{}
 	invoker := &mockTransitionAgentInvoker{}
 
-	_ = ps
-	_ = wfDef
-	_ = loader
-	_ = invoker
-	// Expected:
-	// ttn := NewTransitionToNode(ps, wfDef, loader, invoker)
-	// err := ttn.Execute("NonExistent", "msg")
-	// require.Error(t, err)
-	// assert.Equal(t, "target node 'NonExistent' not found in workflow", err.Error())
-	// assert.Equal(t, 0, sess.updateCurrentStateCalled)
+	ttn := NewTransitionToNode(ps, wfDef, loader, invoker)
+	err := ttn.Execute("NonExistent", "msg")
+	require.Error(t, err)
+	assert.Equal(t, "target node 'NonExistent' not found in workflow", err.Error())
+	assert.Equal(t, 0, sess.updateCurrentStateCalled)
 }
 
 func TestTransitionToNode_Execute_AgentDefLoadFails(t *testing.T) {
-	t.Skip("scaffolded: awaiting runtime/transition_to_node.go — NewTransitionToNode, TransitionToNode.Execute")
-
 	sess := newDefaultMockSession()
 	ps := newTransitionTestPersistentSession(sess)
 	wfDef := &mockTransitionWorkflowDef{
@@ -368,22 +320,15 @@ func TestTransitionToNode_Execute_AgentDefLoadFails(t *testing.T) {
 	}
 	invoker := &mockTransitionAgentInvoker{}
 
-	_ = ps
-	_ = wfDef
-	_ = loader
-	_ = invoker
-	// Expected:
-	// ttn := NewTransitionToNode(ps, wfDef, loader, invoker)
-	// err := ttn.Execute("Coder", "msg")
-	// require.Error(t, err)
-	// assert.Equal(t, "failed to load agent definition for role 'MissingRole': file not found", err.Error())
-	// assert.Equal(t, 0, invoker.invokeAgentCalled)
-	// assert.Equal(t, 0, sess.updateCurrentStateCalled)
+	ttn := NewTransitionToNode(ps, wfDef, loader, invoker)
+	err := ttn.Execute("Coder", "msg")
+	require.Error(t, err)
+	assert.Equal(t, "failed to load agent definition for role 'MissingRole': file not found", err.Error())
+	assert.Equal(t, 0, invoker.invokeAgentCalled)
+	assert.Equal(t, 0, sess.updateCurrentStateCalled)
 }
 
 func TestTransitionToNode_Execute_AgentInvokeFails(t *testing.T) {
-	t.Skip("scaffolded: awaiting runtime/transition_to_node.go — NewTransitionToNode, TransitionToNode.Execute")
-
 	sess := newDefaultMockSession()
 	ps := newTransitionTestPersistentSession(sess)
 	wfDef := &mockTransitionWorkflowDef{
@@ -395,21 +340,14 @@ func TestTransitionToNode_Execute_AgentInvokeFails(t *testing.T) {
 		invokeAgentErr: errors.New("claude not in PATH"),
 	}
 
-	_ = ps
-	_ = wfDef
-	_ = loader
-	_ = invoker
-	// Expected:
-	// ttn := NewTransitionToNode(ps, wfDef, loader, invoker)
-	// err := ttn.Execute("Coder", "msg")
-	// require.Error(t, err)
-	// assert.Equal(t, "failed to invoke agent for node 'Coder': claude not in PATH", err.Error())
-	// assert.Equal(t, 0, sess.updateCurrentStateCalled)
+	ttn := NewTransitionToNode(ps, wfDef, loader, invoker)
+	err := ttn.Execute("Coder", "msg")
+	require.Error(t, err)
+	assert.Equal(t, "failed to invoke agent for node 'Coder': claude not in PATH", err.Error())
+	assert.Equal(t, 0, sess.updateCurrentStateCalled)
 }
 
 func TestTransitionToNode_Execute_UpdateStateFails(t *testing.T) {
-	t.Skip("scaffolded: awaiting runtime/transition_to_node.go — NewTransitionToNode, TransitionToNode.Execute, WithOutput")
-
 	sess := newDefaultMockSession()
 	sess.updateCurrentStateErr = errors.New("validation failed")
 	ps := newTransitionTestPersistentSession(sess)
@@ -420,22 +358,14 @@ func TestTransitionToNode_Execute_UpdateStateFails(t *testing.T) {
 	invoker := &mockTransitionAgentInvoker{}
 
 	var buf bytes.Buffer
-	_ = ps
-	_ = wfDef
-	_ = loader
-	_ = invoker
-	_ = &buf
-	// Expected:
-	// ttn := NewTransitionToNode(ps, wfDef, loader, invoker, WithOutput(&buf))
-	// err := ttn.Execute("HumanReview", "msg")
-	// require.Error(t, err)
-	// assert.Equal(t, "failed to update current state: validation failed", err.Error())
-	// assert.Equal(t, "[HumanReview] msg\n", buf.String())
+	ttn := NewTransitionToNode(ps, wfDef, loader, invoker, WithOutput(&buf))
+	err := ttn.Execute("HumanReview", "msg")
+	require.Error(t, err)
+	assert.Equal(t, "failed to update current state: validation failed", err.Error())
+	assert.Equal(t, "[HumanReview] msg\n", buf.String())
 }
 
 func TestTransitionToNode_Execute_StdoutWriteFails(t *testing.T) {
-	t.Skip("scaffolded: awaiting runtime/transition_to_node.go — NewTransitionToNode, TransitionToNode.Execute, WithOutput")
-
 	sess := newDefaultMockSession()
 	ps := newTransitionTestPersistentSession(sess)
 	wfDef := &mockTransitionWorkflowDef{
@@ -445,16 +375,10 @@ func TestTransitionToNode_Execute_StdoutWriteFails(t *testing.T) {
 	invoker := &mockTransitionAgentInvoker{}
 
 	fw := &failingWriter{err: errors.New("broken pipe")}
-	_ = ps
-	_ = wfDef
-	_ = loader
-	_ = invoker
-	_ = fw
-	// Expected:
-	// ttn := NewTransitionToNode(ps, wfDef, loader, invoker, WithOutput(fw))
-	// err := ttn.Execute("HumanReview", "msg")
-	// require.Error(t, err)
-	// assert.Equal(t, 0, sess.updateCurrentStateCalled)
+	ttn := NewTransitionToNode(ps, wfDef, loader, invoker, WithOutput(fw))
+	err := ttn.Execute("HumanReview", "msg")
+	require.Error(t, err)
+	assert.Equal(t, 0, sess.updateCurrentStateCalled)
 }
 
 // =============================================================================
@@ -462,8 +386,6 @@ func TestTransitionToNode_Execute_StdoutWriteFails(t *testing.T) {
 // =============================================================================
 
 func TestTransitionToNode_Execute_ActionBeforeStateUpdate(t *testing.T) {
-	t.Skip("scaffolded: awaiting runtime/transition_to_node.go — NewTransitionToNode, TransitionToNode.Execute")
-
 	var callOrder []string
 	var mu sync.Mutex
 
@@ -487,25 +409,17 @@ func TestTransitionToNode_Execute_ActionBeforeStateUpdate(t *testing.T) {
 		},
 	}
 
-	_ = ps
-	_ = wfDef
-	_ = loader
-	_ = invoker
-	_ = callOrder
-	// Expected:
-	// ttn := NewTransitionToNode(ps, wfDef, loader, invoker)
-	// err := ttn.Execute("Coder", "msg")
-	// require.NoError(t, err)
-	// mu.Lock()
-	// defer mu.Unlock()
-	// require.Len(t, callOrder, 2)
-	// assert.Equal(t, "InvokeAgent", callOrder[0])
-	// assert.Equal(t, "UpdateCurrentStateSafe", callOrder[1])
+	ttn := NewTransitionToNode(ps, wfDef, loader, invoker)
+	err := ttn.Execute("Coder", "msg")
+	require.NoError(t, err)
+	mu.Lock()
+	defer mu.Unlock()
+	require.Len(t, callOrder, 2)
+	assert.Equal(t, "InvokeAgent", callOrder[0])
+	assert.Equal(t, "UpdateCurrentStateSafe", callOrder[1])
 }
 
 func TestTransitionToNode_Execute_NoLifecycleMethodsCalled(t *testing.T) {
-	t.Skip("scaffolded: awaiting runtime/transition_to_node.go — NewTransitionToNode, TransitionToNode.Execute, WithOutput")
-
 	rec := newRecordingSession(nil)
 	ps := newTransitionTestPersistentSession(rec)
 
@@ -516,25 +430,17 @@ func TestTransitionToNode_Execute_NoLifecycleMethodsCalled(t *testing.T) {
 	invoker := &mockTransitionAgentInvoker{}
 
 	var buf bytes.Buffer
-	_ = ps
-	_ = wfDef
-	_ = loader
-	_ = invoker
-	_ = &buf
-	// Expected:
-	// ttn := NewTransitionToNode(ps, wfDef, loader, invoker, WithOutput(&buf))
-	// err := ttn.Execute("HumanReview", "msg")
-	// require.NoError(t, err)
-	// for _, method := range rec.callLog {
-	//     assert.NotEqual(t, "Run", method)
-	//     assert.NotEqual(t, "Done", method)
-	//     assert.NotEqual(t, "Fail", method)
-	// }
+	ttn := NewTransitionToNode(ps, wfDef, loader, invoker, WithOutput(&buf))
+	err := ttn.Execute("HumanReview", "msg")
+	require.NoError(t, err)
+	for _, method := range rec.callLog {
+		assert.NotEqual(t, "Run", method)
+		assert.NotEqual(t, "Done", method)
+		assert.NotEqual(t, "Fail", method)
+	}
 }
 
 func TestTransitionToNode_Execute_AgentNodeNoStateUpdateOnInvokeError(t *testing.T) {
-	t.Skip("scaffolded: awaiting runtime/transition_to_node.go — NewTransitionToNode, TransitionToNode.Execute")
-
 	rec := newRecordingSession(nil)
 	ps := newTransitionTestPersistentSession(rec)
 
@@ -547,38 +453,19 @@ func TestTransitionToNode_Execute_AgentNodeNoStateUpdateOnInvokeError(t *testing
 		invokeAgentErr: errors.New("agent failed"),
 	}
 
-	_ = ps
-	_ = wfDef
-	_ = loader
-	_ = invoker
-	// Expected:
-	// ttn := NewTransitionToNode(ps, wfDef, loader, invoker)
-	// err := ttn.Execute("Coder", "msg")
-	// require.Error(t, err)
-	// for _, method := range rec.callLog {
-	//     assert.NotEqual(t, "UpdateCurrentStateSafe", method)
-	// }
+	ttn := NewTransitionToNode(ps, wfDef, loader, invoker)
+	err := ttn.Execute("Coder", "msg")
+	require.Error(t, err)
+	for _, method := range rec.callLog {
+		assert.NotEqual(t, "UpdateCurrentStateSafe", method)
+	}
 }
 
 // =============================================================================
-// Suppressing unused import warnings — compile guards
+// Compile guards — interface satisfaction checks
 // =============================================================================
 
 var (
 	_ io.Writer = (*failingWriter)(nil)
 	_ io.Writer = (*syncBuffer)(nil)
-	_ error     = (*assertGuard)(nil)
 )
-
-// assertGuard ensures testify and session imports are used.
-type assertGuard struct{}
-
-func (a *assertGuard) Error() string { return "" }
-
-func init() {
-	// Compile-time references to imported packages that are otherwise unused
-	// due to all assertions being commented out in scaffolded tests.
-	_ = require.NotNil
-	_ = assert.Equal
-	_ = session.SessionMetadata{}
-}
