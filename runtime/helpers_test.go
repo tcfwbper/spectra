@@ -138,6 +138,18 @@ func (m *mockSession) GetSessionDataSafe(key string) (any, bool) {
 	return m.getSessionDataResultVal, m.getSessionDataResultOK
 }
 
+// --- Mock Node ---
+
+// mockNode implements a Node interface with configurable Type() and Name()
+// for ValidateClaudeSessionID testing.
+type mockNode struct {
+	nodeType string
+	nodeName string
+}
+
+func (m *mockNode) Type() string { return m.nodeType }
+func (m *mockNode) Name() string { return m.nodeName }
+
 // --- Mock SessionMetadataStore ---
 
 // mockSessionMetadataStore records Write calls for assertion.
