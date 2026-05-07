@@ -72,11 +72,11 @@ The Logger interface is defined in the `logger` package (see [Logger](../logger/
 ### Listen
 
 10. Returns an error synchronously if `CreateSocket()` has not been called: `"runtime socket not created: call CreateSocket() first"`.
-11. Accepts a `MessageHandler` argument and a `context.Context` for lifecycle control.
+11. Accepts a `MessageHandler` argument.
 12. Binds to the created socket and starts listening for incoming connections.
 13. If the initial bind/listen fails, returns a synchronous error: `"failed to listen on runtime socket: <underlying error>"`.
 14. On successful bind/listen, spawns a background goroutine for the accept loop and returns `(listenerErrCh, listenerDoneCh, nil)`.
-15. The accept loop runs until the context is cancelled or `DeleteSocket()` is called.
+15. The accept loop runs until `DeleteSocket()` is called.
 16. Each accepted connection is handled in a separate goroutine.
 17. Per-connection handling: reads one message, validates at protocol level, dispatches to MessageHandler, serializes response, sends response, closes connection.
 
@@ -123,14 +123,11 @@ No additional inputs.
 
 | Field | Type | Constraints | Required |
 |-------|------|-------------|----------|
-| ctx | context.Context | Non-nil context for lifecycle control | Yes |
 | handler | MessageHandler | Non-nil MessageHandler interface implementation | Yes |
 
 ### For DeleteSocket
 
-| Field | Type | Constraints | Required |
-|-------|------|-------------|----------|
-| ctx | context.Context | Non-nil context (used for potential blocking on close) | Yes |
+No additional inputs.
 
 ## Outputs
 
@@ -287,8 +284,8 @@ No error return — deletion failures are logged as warnings, not returned.
 - Condition: Client sends multiple messages over one connection.
   Expected: Only the first message is read and processed. Connection closed after first response. Subsequent messages ignored.
 
-- Condition: Context is cancelled while listener is running.
-  Expected: Accept loop exits. listenerDoneCh is closed. Existing connections may continue until they complete or DeleteSocket is called.
+- Condition: DeleteSocket is called while the accept loop is waiting for a new connection.
+  Expected: Accept loop exits. Active connections are closed. Socket file is deleted. listenerDoneCh is closed.
 
 - Condition: Multiple goroutines call `CreateSocket()` concurrently.
   Expected: Filesystem-level atomicity determines winner. One succeeds, others get "file already exists" errors.
