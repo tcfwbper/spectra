@@ -377,6 +377,45 @@ exitTransitions:
 	assert.Contains(t, err.Error(), "failed to parse workflow definition 'Snake':")
 }
 
+func TestWorkflowDefinitionLoader_Load_YamlContainsNameField(t *testing.T) {
+
+	projectRoot := makeTempDirWithWorkflows(t)
+	// Valid workflow structure plus a top-level `name` field which should be rejected
+	// since Name is derived exclusively from filename.
+	yaml := `name: "Legacy"
+description: "Legacy workflow with name field"
+entryNode: "HumanInput"
+nodes:
+  - name: "HumanInput"
+    type: "human"
+    description: "User provides input"
+  - name: "AgentWork"
+    type: "agent"
+    agentRole: "Worker"
+    description: "Agent performs work"
+transitions:
+  - fromNode: "HumanInput"
+    eventType: "Submit"
+    toNode: "AgentWork"
+  - fromNode: "AgentWork"
+    eventType: "Done"
+    toNode: "HumanInput"
+exitTransitions:
+  - fromNode: "AgentWork"
+    eventType: "Done"
+    toNode: "HumanInput"
+`
+	writeWorkflowYAML(t, projectRoot, "Legacy", yaml)
+
+	mock := newMockAgentLoader().withSuccess()
+	loader := NewWorkflowDefinitionLoader(projectRoot, mock)
+	def, err := loader.Load("Legacy")
+
+	assert.Nil(t, def)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "failed to parse workflow definition 'Legacy':")
+}
+
 func TestWorkflowDefinitionLoader_Load_NodeConstructorFails_WithName(t *testing.T) {
 
 	projectRoot := makeTempDirWithWorkflows(t)
