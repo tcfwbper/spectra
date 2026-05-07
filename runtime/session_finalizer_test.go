@@ -134,8 +134,6 @@ func marshalDetailJSON(t *testing.T, detail map[string]string) string {
 // =============================================================================
 
 func TestNewSessionFinalizer_ValidLogger(t *testing.T) {
-	t.Skip("scaffolded: production surface NewSessionFinalizer does not exist yet")
-
 	f := newSessionFinalizerFixture(t)
 
 	// Act
@@ -150,8 +148,6 @@ func TestNewSessionFinalizer_ValidLogger(t *testing.T) {
 // =============================================================================
 
 func TestNewSessionFinalizer_NilLogger(t *testing.T) {
-	t.Skip("scaffolded: production surface NewSessionFinalizer does not exist yet")
-
 	// Act & Assert: panics with message indicating nil logger
 	assert.PanicsWithValue(t, "NewSessionFinalizer: logger must not be nil", func() {
 		NewSessionFinalizer(nil)
@@ -163,8 +159,6 @@ func TestNewSessionFinalizer_NilLogger(t *testing.T) {
 // =============================================================================
 
 func TestSessionFinalizer_Finalize_Completed(t *testing.T) {
-	t.Skip("scaffolded: production surface NewSessionFinalizer/Finalize does not exist yet")
-
 	f := newSessionFinalizerFixture(t)
 	ps := newFinalizerPSBuilder().
 		withStatus("completed").
@@ -184,8 +178,6 @@ func TestSessionFinalizer_Finalize_Completed(t *testing.T) {
 }
 
 func TestSessionFinalizer_Finalize_FailedWithAgentError(t *testing.T) {
-	t.Skip("scaffolded: production surface NewSessionFinalizer/Finalize does not exist yet")
-
 	f := newSessionFinalizerFixture(t)
 	detail := json.RawMessage(`{"key":"val"}`)
 	agentErr := mustNewAgentError(t, "parser", "agent broke", "node_3", detail)
@@ -210,8 +202,6 @@ func TestSessionFinalizer_Finalize_FailedWithAgentError(t *testing.T) {
 }
 
 func TestSessionFinalizer_Finalize_FailedWithRuntimeError(t *testing.T) {
-	t.Skip("scaffolded: production surface NewSessionFinalizer/Finalize does not exist yet")
-
 	f := newSessionFinalizerFixture(t)
 	detail := json.RawMessage(`{"elapsed":"30s"}`)
 	rtErr := mustNewRuntimeError(t, "SessionInitializer", "timeout", "entry", detail)
@@ -236,8 +226,6 @@ func TestSessionFinalizer_Finalize_FailedWithRuntimeError(t *testing.T) {
 }
 
 func TestSessionFinalizer_Finalize_FailedWithAgentError_EmptyDetail(t *testing.T) {
-	t.Skip("scaffolded: production surface NewSessionFinalizer/Finalize does not exist yet")
-
 	f := newSessionFinalizerFixture(t)
 	// AgentError with empty detail (empty JSON object)
 	agentErr := mustNewAgentError(t, "runner", "err", "s1", json.RawMessage(`{}`))
@@ -258,8 +246,6 @@ func TestSessionFinalizer_Finalize_FailedWithAgentError_EmptyDetail(t *testing.T
 }
 
 func TestSessionFinalizer_Finalize_FailedWithAgentError_NilDetail(t *testing.T) {
-	t.Skip("scaffolded: production surface NewSessionFinalizer/Finalize does not exist yet")
-
 	f := newSessionFinalizerFixture(t)
 	// AgentError with nil detail
 	agentErr := mustNewAgentError(t, "runner", "err", "s1", nil)
@@ -284,8 +270,6 @@ func TestSessionFinalizer_Finalize_FailedWithAgentError_NilDetail(t *testing.T) 
 // =============================================================================
 
 func TestSessionFinalizer_Finalize_NilSession(t *testing.T) {
-	t.Skip("scaffolded: production surface NewSessionFinalizer/Finalize does not exist yet")
-
 	f := newSessionFinalizerFixture(t)
 
 	// Act
@@ -298,8 +282,6 @@ func TestSessionFinalizer_Finalize_NilSession(t *testing.T) {
 }
 
 func TestSessionFinalizer_Finalize_FailedWithNilError(t *testing.T) {
-	t.Skip("scaffolded: production surface NewSessionFinalizer/Finalize does not exist yet")
-
 	f := newSessionFinalizerFixture(t)
 	ps := newFinalizerPSBuilder().
 		withStatus("failed").
@@ -323,8 +305,6 @@ func TestSessionFinalizer_Finalize_FailedWithNilError(t *testing.T) {
 // =============================================================================
 
 func TestSessionFinalizer_Finalize_FailedWithUnexpectedErrorType(t *testing.T) {
-	t.Skip("scaffolded: production surface NewSessionFinalizer/Finalize does not exist yet")
-
 	f := newSessionFinalizerFixture(t)
 	ps := newFinalizerPSBuilder().
 		withStatus("failed").
@@ -371,8 +351,6 @@ func TestSessionFinalizer_Finalize_FailedWithDetailSerializationError(t *testing
 // =============================================================================
 
 func TestSessionFinalizer_Finalize_NonTerminalInitializing(t *testing.T) {
-	t.Skip("scaffolded: production surface NewSessionFinalizer/Finalize does not exist yet")
-
 	f := newSessionFinalizerFixture(t)
 	ps := newFinalizerPSBuilder().
 		withStatus("initializing").
@@ -392,8 +370,6 @@ func TestSessionFinalizer_Finalize_NonTerminalInitializing(t *testing.T) {
 }
 
 func TestSessionFinalizer_Finalize_NonTerminalRunning(t *testing.T) {
-	t.Skip("scaffolded: production surface NewSessionFinalizer/Finalize does not exist yet")
-
 	f := newSessionFinalizerFixture(t)
 	ps := newFinalizerPSBuilder().
 		withStatus("running").
@@ -413,8 +389,6 @@ func TestSessionFinalizer_Finalize_NonTerminalRunning(t *testing.T) {
 }
 
 func TestSessionFinalizer_Finalize_NonTerminalWithError(t *testing.T) {
-	t.Skip("scaffolded: production surface NewSessionFinalizer/Finalize does not exist yet")
-
 	f := newSessionFinalizerFixture(t)
 	agentErr := mustNewAgentError(t, "worker", "interrupted", "node_5", nil)
 
@@ -440,8 +414,6 @@ func TestSessionFinalizer_Finalize_NonTerminalWithError(t *testing.T) {
 // =============================================================================
 
 func TestSessionFinalizer_Finalize_CalledTwice(t *testing.T) {
-	t.Skip("scaffolded: production surface NewSessionFinalizer/Finalize does not exist yet")
-
 	f := newSessionFinalizerFixture(t)
 	ps := newFinalizerPSBuilder().
 		withStatus("completed").
@@ -468,8 +440,6 @@ func TestSessionFinalizer_Finalize_CalledTwice(t *testing.T) {
 // =============================================================================
 
 func TestSessionFinalizer_Finalize_NopLogger(t *testing.T) {
-	t.Skip("scaffolded: production surface NewSessionFinalizer/Finalize does not exist yet")
-
 	// Use a no-op logger that silently drops all messages.
 	nopLogger := &nopLoggerMock{}
 	rtErr := mustNewRuntimeError(t, "SomeIssuer", "timeout", "node_1", nil)
@@ -488,8 +458,6 @@ func TestSessionFinalizer_Finalize_NopLogger(t *testing.T) {
 }
 
 func TestSessionFinalizer_Finalize_RuntimeError_EmptyDetail(t *testing.T) {
-	t.Skip("scaffolded: production surface NewSessionFinalizer/Finalize does not exist yet")
-
 	f := newSessionFinalizerFixture(t)
 	rtErr := mustNewRuntimeError(t, "SomeIssuer", "timeout", "node_1", json.RawMessage(`{}`))
 

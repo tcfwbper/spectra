@@ -170,8 +170,6 @@ func isValidUUID(s string) bool {
 // =============================================================================
 
 func TestNewSessionInitializer_ValidDeps(t *testing.T) {
-	t.Skip("scaffolded: production surface NewSessionInitializer does not exist yet")
-
 	f := newSessionInitializerFixture(t)
 
 	// Act
@@ -186,8 +184,6 @@ func TestNewSessionInitializer_ValidDeps(t *testing.T) {
 // =============================================================================
 
 func TestSessionInitializer_Initialize_TerminationNotifierCapacityOne(t *testing.T) {
-	t.Skip("scaffolded: production surface NewSessionInitializer/Initialize does not exist yet")
-
 	f := newSessionInitializerFixture(t).withWorkflowLoaderSuccess(t).withDirManagerSuccess()
 
 	// Act
@@ -200,8 +196,6 @@ func TestSessionInitializer_Initialize_TerminationNotifierCapacityOne(t *testing
 }
 
 func TestSessionInitializer_Initialize_TerminationNotifierNil(t *testing.T) {
-	t.Skip("scaffolded: production surface NewSessionInitializer/Initialize does not exist yet")
-
 	f := newSessionInitializerFixture(t).withWorkflowLoaderSuccess(t).withDirManagerSuccess()
 
 	// Act
@@ -214,8 +208,6 @@ func TestSessionInitializer_Initialize_TerminationNotifierNil(t *testing.T) {
 }
 
 func TestSessionInitializer_Initialize_TerminationNotifierUnbuffered(t *testing.T) {
-	t.Skip("scaffolded: production surface NewSessionInitializer/Initialize does not exist yet")
-
 	f := newSessionInitializerFixture(t).withWorkflowLoaderSuccess(t).withDirManagerSuccess()
 
 	// Act
@@ -232,8 +224,6 @@ func TestSessionInitializer_Initialize_TerminationNotifierUnbuffered(t *testing.
 // =============================================================================
 
 func TestSessionInitializer_Initialize_Success(t *testing.T) {
-	t.Skip("scaffolded: production surface NewSessionInitializer/Initialize does not exist yet")
-
 	f := newSessionInitializerFixture(t).withWorkflowLoaderSuccess(t).withDirManagerSuccess()
 
 	// Act
@@ -254,8 +244,6 @@ func TestSessionInitializer_Initialize_Success(t *testing.T) {
 // =============================================================================
 
 func TestSessionInitializer_Initialize_LogsSessionID(t *testing.T) {
-	t.Skip("scaffolded: production surface NewSessionInitializer/Initialize does not exist yet; needs call-order tracking seam")
-
 	f := newSessionInitializerFixture(t).withWorkflowLoaderSuccess(t).withDirManagerSuccess()
 
 	// Act
@@ -287,8 +275,6 @@ func TestSessionInitializer_Initialize_LogsSessionID(t *testing.T) {
 }
 
 func TestSessionInitializer_Initialize_CallsLoadWithWorkflowName(t *testing.T) {
-	t.Skip("scaffolded: production surface NewSessionInitializer/Initialize does not exist yet")
-
 	f := newSessionInitializerFixture(t).withWorkflowLoaderSuccess(t).withDirManagerSuccess()
 
 	// Act
@@ -301,8 +287,6 @@ func TestSessionInitializer_Initialize_CallsLoadWithWorkflowName(t *testing.T) {
 }
 
 func TestSessionInitializer_Initialize_CallsCreateSessionDirectory(t *testing.T) {
-	t.Skip("scaffolded: production surface NewSessionInitializer/Initialize does not exist yet")
-
 	f := newSessionInitializerFixture(t).withWorkflowLoaderSuccess(t).withDirManagerSuccess()
 
 	// Act
@@ -320,8 +304,6 @@ func TestSessionInitializer_Initialize_CallsCreateSessionDirectory(t *testing.T)
 // =============================================================================
 
 func TestSessionInitializer_Initialize_WorkflowLoadFails(t *testing.T) {
-	t.Skip("scaffolded: production surface NewSessionInitializer/Initialize does not exist yet")
-
 	f := newSessionInitializerFixture(t)
 	f.loader.loadErr = errors.New("file not found")
 	f.loader.loadResult = nil
@@ -338,8 +320,6 @@ func TestSessionInitializer_Initialize_WorkflowLoadFails(t *testing.T) {
 }
 
 func TestSessionInitializer_Initialize_DirectoryCreationFails(t *testing.T) {
-	t.Skip("scaffolded: production surface NewSessionInitializer/Initialize does not exist yet")
-
 	f := newSessionInitializerFixture(t).withWorkflowLoaderSuccess(t)
 	f.dirMgr.createSessionDirErr = errors.New("permission denied")
 
@@ -463,8 +443,6 @@ func TestSessionInitializer_Initialize_RunFailsRuntimeErrorDetails(t *testing.T)
 // =============================================================================
 
 func TestSessionInitializer_Initialize_TerminationNotifierCapacityTwo(t *testing.T) {
-	t.Skip("scaffolded: production surface NewSessionInitializer/Initialize does not exist yet")
-
 	f := newSessionInitializerFixture(t).withWorkflowLoaderSuccess(t).withDirManagerSuccess()
 
 	// Act
@@ -476,8 +454,6 @@ func TestSessionInitializer_Initialize_TerminationNotifierCapacityTwo(t *testing
 }
 
 func TestSessionInitializer_Initialize_TerminationNotifierCapacityLarge(t *testing.T) {
-	t.Skip("scaffolded: production surface NewSessionInitializer/Initialize does not exist yet")
-
 	f := newSessionInitializerFixture(t).withWorkflowLoaderSuccess(t).withDirManagerSuccess()
 
 	// Act
