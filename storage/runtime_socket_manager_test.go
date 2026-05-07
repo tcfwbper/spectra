@@ -111,6 +111,28 @@ func makeSocketTestDir(t *testing.T) (projectRoot string, socketPath string) {
 	return dir, socketPath
 }
 
+// --- API Bridge Helpers ---
+// The test spec defines Listen(handler) and DeleteSocket() without context.Context.
+// Production currently requires context.Context. These helpers bridge the gap so
+// test call sites match the spec API surface. Update when production API changes.
+
+// listenSocket calls mgr.Listen matching the spec signature Listen(handler).
+// An internal cancellable context is used and cancelled during test cleanup
+// to prevent goroutine leaks.
+// Pending: production API update to remove context.Context from Listen signature.
+func listenSocket(t *testing.T, mgr *RuntimeSocketManager, handler MessageHandler) (<-chan error, <-chan struct{}, error) {
+	t.Helper()
+	ctx, cancel := context.WithCancel(context.Background())
+	t.Cleanup(cancel)
+	return mgr.Listen(ctx, handler)
+}
+
+// deleteSocket calls mgr.DeleteSocket matching the spec signature DeleteSocket().
+// Pending: production API update to remove context.Context from DeleteSocket signature.
+func deleteSocket(mgr *RuntimeSocketManager) {
+	mgr.DeleteSocket(context.Background())
+}
+
 // dialSocket connects a client to the given Unix domain socket path.
 func dialSocket(t *testing.T, socketPath string) net.Conn {
 	t.Helper()
@@ -217,11 +239,9 @@ func TestListen_ReturnsChannels(t *testing.T) {
 	mgr := NewRuntimeSocketManager(projectRoot, testSessionUUID, ml)
 	require.NoError(t, mgr.CreateSocket())
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 	handler := newMockMessageHandler(*entities.SuccessResponse("ok"))
 
-	listenerErrCh, listenerDoneCh, err := mgr.Listen(ctx, handler)
+	listenerErrCh, listenerDoneCh, err := listenSocket(t, mgr, handler)
 
 	require.NoError(t, err)
 	assert.NotNil(t, listenerErrCh)
@@ -235,10 +255,8 @@ func TestListen_AcceptsConnection(t *testing.T) {
 	mgr := NewRuntimeSocketManager(projectRoot, testSessionUUID, ml)
 	require.NoError(t, mgr.CreateSocket())
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 	handler := newMockMessageHandler(*entities.SuccessResponse("ok"))
-	_, _, err := mgr.Listen(ctx, handler)
+	_, _, err := listenSocket(t, mgr, handler)
 	require.NoError(t, err)
 
 	conn, dialErr := net.Dial("unix", socketPath)
@@ -253,10 +271,8 @@ func TestListen_DispatchesToHandler(t *testing.T) {
 	mgr := NewRuntimeSocketManager(projectRoot, testSessionUUID, ml)
 	require.NoError(t, mgr.CreateSocket())
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 	handler := newMockMessageHandler(*entities.SuccessResponse("ok"))
-	_, _, err := mgr.Listen(ctx, handler)
+	_, _, err := listenSocket(t, mgr, handler)
 	require.NoError(t, err)
 
 	conn := dialSocket(t, socketPath)
@@ -276,10 +292,8 @@ func TestListen_SendsResponseToClient(t *testing.T) {
 	mgr := NewRuntimeSocketManager(projectRoot, testSessionUUID, ml)
 	require.NoError(t, mgr.CreateSocket())
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 	handler := newMockMessageHandler(*entities.SuccessResponse("ok"))
-	_, _, err := mgr.Listen(ctx, handler)
+	_, _, err := listenSocket(t, mgr, handler)
 	require.NoError(t, err)
 
 	conn := dialSocket(t, socketPath)
@@ -298,10 +312,8 @@ func TestListen_ClosesConnectionAfterResponse(t *testing.T) {
 	mgr := NewRuntimeSocketManager(projectRoot, testSessionUUID, ml)
 	require.NoError(t, mgr.CreateSocket())
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 	handler := newMockMessageHandler(*entities.SuccessResponse("ok"))
-	_, _, err := mgr.Listen(ctx, handler)
+	_, _, err := listenSocket(t, mgr, handler)
 	require.NoError(t, err)
 
 	conn, dialErr := net.Dial("unix", socketPath)
@@ -371,9 +383,8 @@ func TestListen_BeforeCreateSocket(t *testing.T) {
 	ml := newMockLogger()
 	mgr := NewRuntimeSocketManager(projectRoot, testSessionUUID, ml)
 
-	ctx := context.Background()
 	handler := newMockMessageHandler(*entities.SuccessResponse("ok"))
-	listenerErrCh, listenerDoneCh, err := mgr.Listen(ctx, handler)
+	listenerErrCh, listenerDoneCh, err := listenSocket(t, mgr, handler)
 
 	require.Error(t, err)
 	assert.Equal(t, "runtime socket not created: call CreateSocket() first", err.Error())
@@ -391,9 +402,8 @@ func TestListen_BindFailure(t *testing.T) {
 	// Delete the socket file externally before calling Listen
 	require.NoError(t, os.Remove(socketPath))
 
-	ctx := context.Background()
 	handler := newMockMessageHandler(*entities.SuccessResponse("ok"))
-	_, _, err := mgr.Listen(ctx, handler)
+	_, _, err := listenSocket(t, mgr, handler)
 
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to listen on runtime socket:")
@@ -408,13 +418,11 @@ func TestDeleteSocket_RemovesFile(t *testing.T) {
 	mgr := NewRuntimeSocketManager(projectRoot, testSessionUUID, ml)
 	require.NoError(t, mgr.CreateSocket())
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 	handler := newMockMessageHandler(*entities.SuccessResponse("ok"))
-	_, _, err := mgr.Listen(ctx, handler)
+	_, _, err := listenSocket(t, mgr, handler)
 	require.NoError(t, err)
 
-	mgr.DeleteSocket(ctx)
+	deleteSocket(mgr)
 
 	_, statErr := os.Stat(socketPath)
 	assert.True(t, os.IsNotExist(statErr), "socket file should be removed")
@@ -427,13 +435,11 @@ func TestDeleteSocket_ClosesListener(t *testing.T) {
 	mgr := NewRuntimeSocketManager(projectRoot, testSessionUUID, ml)
 	require.NoError(t, mgr.CreateSocket())
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 	handler := newMockMessageHandler(*entities.SuccessResponse("ok"))
-	_, listenerDoneCh, err := mgr.Listen(ctx, handler)
+	_, listenerDoneCh, err := listenSocket(t, mgr, handler)
 	require.NoError(t, err)
 
-	mgr.DeleteSocket(ctx)
+	deleteSocket(mgr)
 
 	select {
 	case <-listenerDoneCh:
@@ -452,17 +458,15 @@ func TestDeleteSocket_Idempotent(t *testing.T) {
 	mgr := NewRuntimeSocketManager(projectRoot, testSessionUUID, ml)
 	require.NoError(t, mgr.CreateSocket())
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 	handler := newMockMessageHandler(*entities.SuccessResponse("ok"))
-	_, _, err := mgr.Listen(ctx, handler)
+	_, _, err := listenSocket(t, mgr, handler)
 	require.NoError(t, err)
 
-	mgr.DeleteSocket(ctx)
+	deleteSocket(mgr)
 
 	// Second call should not panic or error
 	assert.NotPanics(t, func() {
-		mgr.DeleteSocket(ctx)
+		deleteSocket(mgr)
 	})
 }
 
@@ -473,17 +477,15 @@ func TestDeleteSocket_FileAlreadyGone(t *testing.T) {
 	mgr := NewRuntimeSocketManager(projectRoot, testSessionUUID, ml)
 	require.NoError(t, mgr.CreateSocket())
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 	handler := newMockMessageHandler(*entities.SuccessResponse("ok"))
-	_, _, err := mgr.Listen(ctx, handler)
+	_, _, err := listenSocket(t, mgr, handler)
 	require.NoError(t, err)
 
 	// Manually remove socket file before calling DeleteSocket
 	os.Remove(socketPath)
 
 	assert.NotPanics(t, func() {
-		mgr.DeleteSocket(ctx)
+		deleteSocket(mgr)
 	})
 	assert.Equal(t, 0, ml.warnCallCount(), "no warning should be logged")
 }
@@ -497,10 +499,8 @@ func TestPerConnection_MalformedJSON(t *testing.T) {
 	mgr := NewRuntimeSocketManager(projectRoot, testSessionUUID, ml)
 	require.NoError(t, mgr.CreateSocket())
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 	handler := newMockMessageHandler(*entities.SuccessResponse("ok"))
-	_, _, err := mgr.Listen(ctx, handler)
+	_, _, err := listenSocket(t, mgr, handler)
 	require.NoError(t, err)
 
 	conn := dialSocket(t, socketPath)
@@ -520,10 +520,8 @@ func TestPerConnection_MissingTypeField(t *testing.T) {
 	mgr := NewRuntimeSocketManager(projectRoot, testSessionUUID, ml)
 	require.NoError(t, mgr.CreateSocket())
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 	handler := newMockMessageHandler(*entities.SuccessResponse("ok"))
-	_, _, err := mgr.Listen(ctx, handler)
+	_, _, err := listenSocket(t, mgr, handler)
 	require.NoError(t, err)
 
 	conn := dialSocket(t, socketPath)
@@ -542,10 +540,8 @@ func TestPerConnection_InvalidTypeValue(t *testing.T) {
 	mgr := NewRuntimeSocketManager(projectRoot, testSessionUUID, ml)
 	require.NoError(t, mgr.CreateSocket())
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 	handler := newMockMessageHandler(*entities.SuccessResponse("ok"))
-	_, _, err := mgr.Listen(ctx, handler)
+	_, _, err := listenSocket(t, mgr, handler)
 	require.NoError(t, err)
 
 	conn := dialSocket(t, socketPath)
@@ -564,10 +560,8 @@ func TestPerConnection_MissingPayload(t *testing.T) {
 	mgr := NewRuntimeSocketManager(projectRoot, testSessionUUID, ml)
 	require.NoError(t, mgr.CreateSocket())
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 	handler := newMockMessageHandler(*entities.SuccessResponse("ok"))
-	_, _, err := mgr.Listen(ctx, handler)
+	_, _, err := listenSocket(t, mgr, handler)
 	require.NoError(t, err)
 
 	conn := dialSocket(t, socketPath)
@@ -586,10 +580,8 @@ func TestPerConnection_PayloadNotObject(t *testing.T) {
 	mgr := NewRuntimeSocketManager(projectRoot, testSessionUUID, ml)
 	require.NoError(t, mgr.CreateSocket())
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 	handler := newMockMessageHandler(*entities.SuccessResponse("ok"))
-	_, _, err := mgr.Listen(ctx, handler)
+	_, _, err := listenSocket(t, mgr, handler)
 	require.NoError(t, err)
 
 	conn := dialSocket(t, socketPath)
@@ -608,10 +600,8 @@ func TestPerConnection_PayloadArray(t *testing.T) {
 	mgr := NewRuntimeSocketManager(projectRoot, testSessionUUID, ml)
 	require.NoError(t, mgr.CreateSocket())
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 	handler := newMockMessageHandler(*entities.SuccessResponse("ok"))
-	_, _, err := mgr.Listen(ctx, handler)
+	_, _, err := listenSocket(t, mgr, handler)
 	require.NoError(t, err)
 
 	conn := dialSocket(t, socketPath)
@@ -630,10 +620,8 @@ func TestPerConnection_ClientClosesWithoutSending(t *testing.T) {
 	mgr := NewRuntimeSocketManager(projectRoot, testSessionUUID, ml)
 	require.NoError(t, mgr.CreateSocket())
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 	handler := newMockMessageHandler(*entities.SuccessResponse("ok"))
-	_, _, err := mgr.Listen(ctx, handler)
+	_, _, err := listenSocket(t, mgr, handler)
 	require.NoError(t, err)
 
 	// Connect and immediately close
@@ -655,10 +643,8 @@ func TestPerConnection_ExceedsMaxSize(t *testing.T) {
 	mgr := NewRuntimeSocketManager(projectRoot, testSessionUUID, ml)
 	require.NoError(t, mgr.CreateSocket())
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 	handler := newMockMessageHandler(*entities.SuccessResponse("ok"))
-	_, _, err := mgr.Listen(ctx, handler)
+	_, _, err := listenSocket(t, mgr, handler)
 	require.NoError(t, err)
 
 	// Build a message larger than 10 MB
@@ -689,10 +675,8 @@ func TestPerConnection_AtMaxSize(t *testing.T) {
 	mgr := NewRuntimeSocketManager(projectRoot, testSessionUUID, ml)
 	require.NoError(t, mgr.CreateSocket())
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 	handler := newMockMessageHandler(*entities.SuccessResponse("ok"))
-	_, _, err := mgr.Listen(ctx, handler)
+	_, _, err := listenSocket(t, mgr, handler)
 	require.NoError(t, err)
 
 	// Build a valid JSON message that is exactly at the limit (10 MB including newline).
@@ -723,10 +707,8 @@ func TestPerConnection_EmptyClaudeSessionID(t *testing.T) {
 	mgr := NewRuntimeSocketManager(projectRoot, testSessionUUID, ml)
 	require.NoError(t, mgr.CreateSocket())
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 	handler := newMockMessageHandler(*entities.SuccessResponse("ok"))
-	_, _, err := mgr.Listen(ctx, handler)
+	_, _, err := listenSocket(t, mgr, handler)
 	require.NoError(t, err)
 
 	conn := dialSocket(t, socketPath)
@@ -745,10 +727,8 @@ func TestPerConnection_WithClaudeSessionID(t *testing.T) {
 	mgr := NewRuntimeSocketManager(projectRoot, testSessionUUID, ml)
 	require.NoError(t, mgr.CreateSocket())
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 	handler := newMockMessageHandler(*entities.SuccessResponse("ok"))
-	_, _, err := mgr.Listen(ctx, handler)
+	_, _, err := listenSocket(t, mgr, handler)
 	require.NoError(t, err)
 
 	conn := dialSocket(t, socketPath)
@@ -767,10 +747,8 @@ func TestPerConnection_EmptyMessageInResponse(t *testing.T) {
 	mgr := NewRuntimeSocketManager(projectRoot, testSessionUUID, ml)
 	require.NoError(t, mgr.CreateSocket())
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 	handler := newMockMessageHandler(*entities.SuccessResponse(""))
-	_, _, err := mgr.Listen(ctx, handler)
+	_, _, err := listenSocket(t, mgr, handler)
 	require.NoError(t, err)
 
 	conn := dialSocket(t, socketPath)
@@ -802,10 +780,8 @@ func TestPerConnection_InvokesNewRuntimeMessage(t *testing.T) {
 	mgr := NewRuntimeSocketManager(projectRoot, testSessionUUID, ml)
 	require.NoError(t, mgr.CreateSocket())
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 	handler := newMockMessageHandler(*entities.SuccessResponse("ok"))
-	_, _, err := mgr.Listen(ctx, handler)
+	_, _, err := listenSocket(t, mgr, handler)
 	require.NoError(t, err)
 
 	conn := dialSocket(t, socketPath)
@@ -829,10 +805,8 @@ func TestDeleteSocket_LogsOnFileDeletionFailure(t *testing.T) {
 	mgr := NewRuntimeSocketManager(projectRoot, testSessionUUID, ml)
 	require.NoError(t, mgr.CreateSocket())
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 	handler := newMockMessageHandler(*entities.SuccessResponse("ok"))
-	_, _, err := mgr.Listen(ctx, handler)
+	_, _, err := listenSocket(t, mgr, handler)
 	require.NoError(t, err)
 
 	// Make parent dir read-only so socket file cannot be deleted
@@ -840,7 +814,7 @@ func TestDeleteSocket_LogsOnFileDeletionFailure(t *testing.T) {
 	require.NoError(t, os.Chmod(sessionDir, 0555))
 	t.Cleanup(func() { os.Chmod(sessionDir, 0755) })
 
-	mgr.DeleteSocket(ctx)
+	deleteSocket(mgr)
 
 	assert.Greater(t, ml.warnCallCount(), 0)
 	assert.Contains(t, ml.warnMsgs[0], "failed to delete runtime socket:")
@@ -853,13 +827,10 @@ func TestPerConnection_LogsOnSendFailure(t *testing.T) {
 	mgr := NewRuntimeSocketManager(projectRoot, testSessionUUID, ml)
 	require.NoError(t, mgr.CreateSocket())
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
 	blockCh := make(chan struct{})
 	handler := newMockMessageHandler(*entities.SuccessResponse("ok"))
 	handler.blockCh = blockCh
-	_, _, err := mgr.Listen(ctx, handler)
+	_, _, err := listenSocket(t, mgr, handler)
 	require.NoError(t, err)
 
 	conn, dialErr := net.Dial("unix", socketPath)
@@ -885,10 +856,8 @@ func TestListen_MultipleSimultaneousConnections(t *testing.T) {
 	mgr := NewRuntimeSocketManager(projectRoot, testSessionUUID, ml)
 	require.NoError(t, mgr.CreateSocket())
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 	handler := newMockMessageHandler(*entities.SuccessResponse("ok"))
-	_, _, err := mgr.Listen(ctx, handler)
+	_, _, err := listenSocket(t, mgr, handler)
 	require.NoError(t, err)
 
 	const numClients = 3
@@ -921,10 +890,8 @@ func TestPerConnection_IsolationOnError(t *testing.T) {
 	mgr := NewRuntimeSocketManager(projectRoot, testSessionUUID, ml)
 	require.NoError(t, mgr.CreateSocket())
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 	handler := newMockMessageHandler(*entities.SuccessResponse("ok"))
-	_, _, err := mgr.Listen(ctx, handler)
+	_, _, err := listenSocket(t, mgr, handler)
 	require.NoError(t, err)
 
 	// Client A sends malformed JSON
@@ -949,16 +916,13 @@ func TestPerConnection_HandlerPanicCrashesGoroutine(t *testing.T) {
 	mgr := NewRuntimeSocketManager(projectRoot, testSessionUUID, ml)
 	require.NoError(t, mgr.CreateSocket())
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
 	// Handler that panics on first call only (uses panicOnce for race-free behavior)
 	panicHandler := &mockMessageHandler{
 		response:  *entities.SuccessResponse("ok"),
 		panicMsg:  "handler panic",
 		panicOnce: true,
 	}
-	_, _, err := mgr.Listen(ctx, panicHandler)
+	_, _, err := listenSocket(t, mgr, panicHandler)
 	require.NoError(t, err)
 
 	// Client A triggers the panic
@@ -990,13 +954,10 @@ func TestDeleteSocket_ClosesActiveConnections(t *testing.T) {
 	mgr := NewRuntimeSocketManager(projectRoot, testSessionUUID, ml)
 	require.NoError(t, mgr.CreateSocket())
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
 	blockCh := make(chan struct{})
 	handler := newMockMessageHandler(*entities.SuccessResponse("ok"))
 	handler.blockCh = blockCh
-	_, listenerDoneCh, err := mgr.Listen(ctx, handler)
+	_, listenerDoneCh, err := listenSocket(t, mgr, handler)
 	require.NoError(t, err)
 
 	// Connect client and send a message (handler blocks)
@@ -1017,7 +978,7 @@ func TestDeleteSocket_ClosesActiveConnections(t *testing.T) {
 	}, 5*time.Second, 10*time.Millisecond)
 
 	// Delete socket while handler is blocked
-	mgr.DeleteSocket(ctx)
+	deleteSocket(mgr)
 	close(blockCh) // unblock handler so goroutine can exit
 
 	// Client connection should be closed
@@ -1036,30 +997,32 @@ func TestDeleteSocket_ClosesActiveConnections(t *testing.T) {
 	}
 }
 
-func TestListen_ContextCancellation(t *testing.T) {
+func TestDeleteSocket_WhileAcceptLoopWaiting(t *testing.T) {
 
 	projectRoot, socketPath := makeSocketTestDir(t)
 	ml := newMockLogger()
 	mgr := NewRuntimeSocketManager(projectRoot, testSessionUUID, ml)
 	require.NoError(t, mgr.CreateSocket())
 
-	ctx, cancel := context.WithCancel(context.Background())
 	handler := newMockMessageHandler(*entities.SuccessResponse("ok"))
-	_, listenerDoneCh, err := mgr.Listen(ctx, handler)
+	_, listenerDoneCh, err := listenSocket(t, mgr, handler)
 	require.NoError(t, err)
 
-	cancel()
+	// No clients connected — accept loop is idle/waiting.
+	// Call DeleteSocket to stop the accept loop.
+	deleteSocket(mgr)
 
+	// Accept loop should exit and listenerDoneCh should be closed
 	select {
 	case <-listenerDoneCh:
 		// OK - accept loop exited
 	case <-time.After(5 * time.Second):
-		t.Fatal("listenerDoneCh was not closed after context cancellation")
+		t.Fatal("listenerDoneCh was not closed after DeleteSocket while accept loop waiting")
 	}
 
-	// New connections should be refused
-	_, dialErr := net.Dial("unix", socketPath)
-	assert.Error(t, dialErr, "new connections should be refused after context cancellation")
+	// Socket file should be deleted
+	_, statErr := os.Stat(socketPath)
+	assert.True(t, os.IsNotExist(statErr), "socket file should be deleted")
 }
 
 // --- State Transitions ---
@@ -1071,10 +1034,8 @@ func TestPerConnection_SingleRequestResponse(t *testing.T) {
 	mgr := NewRuntimeSocketManager(projectRoot, testSessionUUID, ml)
 	require.NoError(t, mgr.CreateSocket())
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 	handler := newMockMessageHandler(*entities.SuccessResponse("ok"))
-	_, _, err := mgr.Listen(ctx, handler)
+	_, _, err := listenSocket(t, mgr, handler)
 	require.NoError(t, err)
 
 	conn, dialErr := net.Dial("unix", socketPath)
@@ -1106,10 +1067,8 @@ func TestListen_ListenerErrChannel(t *testing.T) {
 	mgr := NewRuntimeSocketManager(projectRoot, testSessionUUID, ml)
 	require.NoError(t, mgr.CreateSocket())
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 	handler := newMockMessageHandler(*entities.SuccessResponse("ok"))
-	listenerErrCh, _, err := mgr.Listen(ctx, handler)
+	listenerErrCh, _, err := listenSocket(t, mgr, handler)
 	require.NoError(t, err)
 
 	// Simulate accept failure by closing the underlying listener externally.
@@ -1136,13 +1095,11 @@ func TestListen_DoneChannelClosedAfterDelete(t *testing.T) {
 	mgr := NewRuntimeSocketManager(projectRoot, testSessionUUID, ml)
 	require.NoError(t, mgr.CreateSocket())
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 	handler := newMockMessageHandler(*entities.SuccessResponse("ok"))
-	_, listenerDoneCh, err := mgr.Listen(ctx, handler)
+	_, listenerDoneCh, err := listenSocket(t, mgr, handler)
 	require.NoError(t, err)
 
-	mgr.DeleteSocket(ctx)
+	deleteSocket(mgr)
 
 	select {
 	case <-listenerDoneCh:
