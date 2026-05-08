@@ -15,13 +15,10 @@ func TestInit_AllPhasesSucceed(t *testing.T) {
 	stdout := &bytes.Buffer{}
 	stderr := &bytes.Buffer{}
 
-	_ = deps
-	_ = stdout
-	_ = stderr
-
-	t.Skip("scaffolded: production symbol NewInitCommand (init.go) does not exist yet")
+	exitCode := runInit(deps, stdout, stderr)
 
 	// Expected: stdout contains success message; exit code 0
+	assert.Equal(t, 0, exitCode)
 	assert.Contains(t, stdout.String(), "Spectra project initialized successfully")
 	assert.Empty(t, stderr.String())
 }
@@ -32,13 +29,10 @@ func TestInit_Phase2_WarningsPrinted(t *testing.T) {
 	stdout := &bytes.Buffer{}
 	stderr := &bytes.Buffer{}
 
-	_ = deps
-	_ = stdout
-	_ = stderr
-
-	t.Skip("scaffolded: production symbol NewInitCommand (init.go) does not exist yet")
+	exitCode := runInit(deps, stdout, stderr)
 
 	// Expected: stdout contains warning and success message
+	assert.Equal(t, 0, exitCode)
 	assert.Contains(t, stdout.String(), "workflow X already exists, skipping")
 	assert.Contains(t, stdout.String(), "Spectra project initialized successfully")
 	assert.Empty(t, stderr.String())
@@ -51,11 +45,7 @@ func TestInit_PhasesExecuteInOrder(t *testing.T) {
 	stdout := &bytes.Buffer{}
 	stderr := &bytes.Buffer{}
 
-	_ = deps
-	_ = stdout
-	_ = stderr
-
-	t.Skip("scaffolded: production symbol NewInitCommand (init.go) does not exist yet")
+	runInit(deps, stdout, stderr)
 
 	// Expected: Phases execute in order
 	expected := []string{"gitignore", "directories", "workflows", "agents", "specfiles"}
@@ -70,13 +60,10 @@ func TestInit_GetwdFails(t *testing.T) {
 	stdout := &bytes.Buffer{}
 	stderr := &bytes.Buffer{}
 
-	_ = deps
-	_ = stdout
-	_ = stderr
-
-	t.Skip("scaffolded: production symbol NewInitCommand (init.go) does not exist yet")
+	exitCode := runInit(deps, stdout, stderr)
 
 	// Expected: stderr contains error; exit code 1
+	assert.Equal(t, 1, exitCode)
 	assert.Contains(t, stderr.String(), "Error: failed to determine working directory:")
 }
 
@@ -86,13 +73,10 @@ func TestInit_Phase0_GitignoreFails(t *testing.T) {
 	stdout := &bytes.Buffer{}
 	stderr := &bytes.Buffer{}
 
-	_ = deps
-	_ = stdout
-	_ = stderr
-
-	t.Skip("scaffolded: production symbol NewInitCommand (init.go) does not exist yet")
+	exitCode := runInit(deps, stdout, stderr)
 
 	// Expected: stderr contains error; exit code 1; DirectoryCreator.CreateAll() not called
+	assert.Equal(t, 1, exitCode)
 	assert.NotEmpty(t, stderr.String())
 	assert.False(t, deps.directoryCreator.called, "DirectoryCreator.CreateAll() should not have been called")
 }
@@ -103,13 +87,10 @@ func TestInit_Phase1_DirectoryCreatorFails(t *testing.T) {
 	stdout := &bytes.Buffer{}
 	stderr := &bytes.Buffer{}
 
-	_ = deps
-	_ = stdout
-	_ = stderr
-
-	t.Skip("scaffolded: production symbol NewInitCommand (init.go) does not exist yet")
+	exitCode := runInit(deps, stdout, stderr)
 
 	// Expected: stderr contains error; exit code 1; BuiltinResourceCopier methods not called
+	assert.Equal(t, 1, exitCode)
 	assert.NotEmpty(t, stderr.String())
 	assert.False(t, deps.copier.copyWorkflowsCalled, "CopyWorkflows should not have been called")
 	assert.False(t, deps.copier.copyAgentsCalled, "CopyAgents should not have been called")
@@ -122,13 +103,10 @@ func TestInit_Phase2a_CopyWorkflowsFails(t *testing.T) {
 	stdout := &bytes.Buffer{}
 	stderr := &bytes.Buffer{}
 
-	_ = deps
-	_ = stdout
-	_ = stderr
-
-	t.Skip("scaffolded: production symbol NewInitCommand (init.go) does not exist yet")
+	exitCode := runInit(deps, stdout, stderr)
 
 	// Expected: stderr contains error; CopyAgents and CopySpecFiles not called
+	assert.Equal(t, 1, exitCode)
 	assert.NotEmpty(t, stderr.String())
 	assert.False(t, deps.copier.copyAgentsCalled, "CopyAgents should not have been called")
 	assert.False(t, deps.copier.copySpecFilesCalled, "CopySpecFiles should not have been called")
@@ -140,13 +118,10 @@ func TestInit_Phase2b_CopyAgentsFails(t *testing.T) {
 	stdout := &bytes.Buffer{}
 	stderr := &bytes.Buffer{}
 
-	_ = deps
-	_ = stdout
-	_ = stderr
-
-	t.Skip("scaffolded: production symbol NewInitCommand (init.go) does not exist yet")
+	exitCode := runInit(deps, stdout, stderr)
 
 	// Expected: stderr contains error; CopySpecFiles not called
+	assert.Equal(t, 1, exitCode)
 	assert.NotEmpty(t, stderr.String())
 	assert.False(t, deps.copier.copySpecFilesCalled, "CopySpecFiles should not have been called")
 }
@@ -157,13 +132,10 @@ func TestInit_Phase2c_CopySpecFilesFails(t *testing.T) {
 	stdout := &bytes.Buffer{}
 	stderr := &bytes.Buffer{}
 
-	_ = deps
-	_ = stdout
-	_ = stderr
-
-	t.Skip("scaffolded: production symbol NewInitCommand (init.go) does not exist yet")
+	exitCode := runInit(deps, stdout, stderr)
 
 	// Expected: stderr contains error; exit code 1
+	assert.Equal(t, 1, exitCode)
 	assert.NotEmpty(t, stderr.String())
 }
 
@@ -175,11 +147,7 @@ func TestInit_PassesProjectRootToAllPhases(t *testing.T) {
 	stdout := &bytes.Buffer{}
 	stderr := &bytes.Buffer{}
 
-	_ = deps
-	_ = stdout
-	_ = stderr
-
-	t.Skip("scaffolded: production symbol NewInitCommand (init.go) does not exist yet")
+	runInit(deps, stdout, stderr)
 
 	// Expected: All phases receive /fake/project as projectRoot
 	assert.Equal(t, "/fake/project", deps.gitignoreEnsurer.receivedProjectRoot)
@@ -193,11 +161,7 @@ func TestInit_FailFast_Phase0_SkipsSubsequent(t *testing.T) {
 	stdout := &bytes.Buffer{}
 	stderr := &bytes.Buffer{}
 
-	_ = deps
-	_ = stdout
-	_ = stderr
-
-	t.Skip("scaffolded: production symbol NewInitCommand (init.go) does not exist yet")
+	runInit(deps, stdout, stderr)
 
 	// Expected: No subsequent phases called
 	assert.False(t, deps.directoryCreator.called)
@@ -216,13 +180,10 @@ func TestInit_ReInitialization_WarningsOnly(t *testing.T) {
 	stdout := &bytes.Buffer{}
 	stderr := &bytes.Buffer{}
 
-	_ = deps
-	_ = stdout
-	_ = stderr
-
-	t.Skip("scaffolded: production symbol NewInitCommand (init.go) does not exist yet")
+	exitCode := runInit(deps, stdout, stderr)
 
 	// Expected: stdout contains all warnings and success message
+	assert.Equal(t, 0, exitCode)
 	output := stdout.String()
 	assert.Contains(t, output, "workflow A exists")
 	assert.Contains(t, output, "agent B exists")

@@ -25,15 +25,10 @@ func TestClear_SingleUUID_Exists(t *testing.T) {
 	stdout := &bytes.Buffer{}
 	stderr := &bytes.Buffer{}
 
-	_ = finder
-	_ = layout
-	_ = stdin
-	_ = stdout
-	_ = stderr
-
-	t.Skip("scaffolded: production symbol NewClearCommand (clear.go) does not exist yet")
+	exitCode := runClear(finder, layout, stdin, stdout, stderr, []string{uuid})
 
 	// Expected: Session directory removed; stdout contains "Session '<UUID>' cleared"
+	assert.Equal(t, 0, exitCode)
 	assertPathNotExists(t, sessionDir)
 	assert.Contains(t, stdout.String(), "Session '"+uuid+"' cleared")
 }
@@ -53,15 +48,10 @@ func TestClear_MultipleUUIDs_AllExist(t *testing.T) {
 	stdout := &bytes.Buffer{}
 	stderr := &bytes.Buffer{}
 
-	_ = finder
-	_ = layout
-	_ = stdin
-	_ = stdout
-	_ = stderr
-
-	t.Skip("scaffolded: production symbol NewClearCommand (clear.go) does not exist yet")
+	exitCode := runClear(finder, layout, stdin, stdout, stderr, []string{uuid1, uuid2})
 
 	// Expected: Both directories removed; stdout contains both messages
+	assert.Equal(t, 0, exitCode)
 	assertPathNotExists(t, sessionDir1)
 	assertPathNotExists(t, sessionDir2)
 	assert.Contains(t, stdout.String(), "Session '"+uuid1+"' cleared")
@@ -77,13 +67,7 @@ func TestClear_ConfirmationPrompt_ListsUUIDs(t *testing.T) {
 	stdout := &bytes.Buffer{}
 	stderr := &bytes.Buffer{}
 
-	_ = finder
-	_ = layout
-	_ = stdin
-	_ = stdout
-	_ = stderr
-
-	t.Skip("scaffolded: production symbol NewClearCommand (clear.go) does not exist yet")
+	runClear(finder, layout, stdin, stdout, stderr, []string{"abc-123", "def-456"})
 
 	// Expected: Prompt output contains UUID listing
 	output := stdout.String()
@@ -106,15 +90,10 @@ func TestClear_NoArgs_DeletesAll(t *testing.T) {
 	stdout := &bytes.Buffer{}
 	stderr := &bytes.Buffer{}
 
-	_ = finder
-	_ = layout
-	_ = stdin
-	_ = stdout
-	_ = stderr
-
-	t.Skip("scaffolded: production symbol NewClearCommand (clear.go) does not exist yet")
+	exitCode := runClear(finder, layout, stdin, stdout, stderr, nil)
 
 	// Expected: Both directories removed; stdout contains messages
+	assert.Equal(t, 0, exitCode)
 	assertPathNotExists(t, filepath.Join(sessionsDir, "sess1"))
 	assertPathNotExists(t, filepath.Join(sessionsDir, "sess2"))
 	assert.Contains(t, stdout.String(), "Session 'sess1' cleared")
@@ -134,15 +113,10 @@ func TestClear_NoArgs_SkipsFiles(t *testing.T) {
 	stdout := &bytes.Buffer{}
 	stderr := &bytes.Buffer{}
 
-	_ = finder
-	_ = layout
-	_ = stdin
-	_ = stdout
-	_ = stderr
-
-	t.Skip("scaffolded: production symbol NewClearCommand (clear.go) does not exist yet")
+	exitCode := runClear(finder, layout, stdin, stdout, stderr, nil)
 
 	// Expected: sess1/ removed; somefile.txt still exists
+	assert.Equal(t, 0, exitCode)
 	assertPathNotExists(t, filepath.Join(sessionsDir, "sess1"))
 	assertFileExists(t, filepath.Join(sessionsDir, "somefile.txt"))
 	assert.Contains(t, stdout.String(), "Session 'sess1' cleared")
@@ -159,13 +133,7 @@ func TestClear_NoArgs_PromptText(t *testing.T) {
 	stdout := &bytes.Buffer{}
 	stderr := &bytes.Buffer{}
 
-	_ = finder
-	_ = layout
-	_ = stdin
-	_ = stdout
-	_ = stderr
-
-	t.Skip("scaffolded: production symbol NewClearCommand (clear.go) does not exist yet")
+	runClear(finder, layout, stdin, stdout, stderr, nil)
 
 	// Expected: Prompt contains specific text
 	assert.Contains(t, stdout.String(), "Are you sure you want to delete all sessions? [y/N]: ")
@@ -185,15 +153,10 @@ func TestClear_SpecificUUIDs_UserDeclinesN(t *testing.T) {
 	stdout := &bytes.Buffer{}
 	stderr := &bytes.Buffer{}
 
-	_ = finder
-	_ = layout
-	_ = stdin
-	_ = stdout
-	_ = stderr
-
-	t.Skip("scaffolded: production symbol NewClearCommand (clear.go) does not exist yet")
+	exitCode := runClear(finder, layout, stdin, stdout, stderr, []string{uuid})
 
 	// Expected: Session directory still exists; stdout contains "Operation cancelled"
+	assert.Equal(t, 0, exitCode)
 	assertDirExists(t, sessionDir)
 	assert.Contains(t, stdout.String(), "Operation cancelled")
 }
@@ -209,15 +172,10 @@ func TestClear_AllSessions_UserDeclinesN(t *testing.T) {
 	stdout := &bytes.Buffer{}
 	stderr := &bytes.Buffer{}
 
-	_ = finder
-	_ = layout
-	_ = stdin
-	_ = stdout
-	_ = stderr
-
-	t.Skip("scaffolded: production symbol NewClearCommand (clear.go) does not exist yet")
+	exitCode := runClear(finder, layout, stdin, stdout, stderr, nil)
 
 	// Expected: Session directory still exists; stdout contains "Operation cancelled"
+	assert.Equal(t, 0, exitCode)
 	assertDirExists(t, filepath.Join(sessionsDir, "sess1"))
 	assert.Contains(t, stdout.String(), "Operation cancelled")
 }
@@ -234,15 +192,10 @@ func TestClear_UserEntersYes_TreatedAsRejection(t *testing.T) {
 	stdout := &bytes.Buffer{}
 	stderr := &bytes.Buffer{}
 
-	_ = finder
-	_ = layout
-	_ = stdin
-	_ = stdout
-	_ = stderr
-
-	t.Skip("scaffolded: production symbol NewClearCommand (clear.go) does not exist yet")
+	exitCode := runClear(finder, layout, stdin, stdout, stderr, []string{uuid})
 
 	// Expected: "yes" treated as rejection, directory still exists
+	assert.Equal(t, 0, exitCode)
 	assertDirExists(t, sessionDir)
 	assert.Contains(t, stdout.String(), "Operation cancelled")
 }
@@ -251,16 +204,14 @@ func TestClear_UserEntersYes_TreatedAsRejection(t *testing.T) {
 
 func TestClear_SpectraFinderFails(t *testing.T) {
 	finder := &fakeSpectraFinderForClear{err: errFakeFinderFailure}
+	layout := &fakeClearStorageLayout{}
 	stdout := &bytes.Buffer{}
 	stderr := &bytes.Buffer{}
 
-	_ = finder
-	_ = stdout
-	_ = stderr
-
-	t.Skip("scaffolded: production symbol NewClearCommand (clear.go) does not exist yet")
+	exitCode := runClear(finder, layout, strings.NewReader(""), stdout, stderr, []string{"any-uuid"})
 
 	// Expected: stderr contains error message; exit code 1
+	assert.Equal(t, 1, exitCode)
 	assert.Contains(t, stderr.String(), "Error: .spectra directory not found. Are you in a Spectra project?")
 }
 
@@ -273,14 +224,10 @@ func TestClear_NoArgs_SessionsDirNotExist(t *testing.T) {
 	stdout := &bytes.Buffer{}
 	stderr := &bytes.Buffer{}
 
-	_ = finder
-	_ = layout
-	_ = stdout
-	_ = stderr
-
-	t.Skip("scaffolded: production symbol NewClearCommand (clear.go) does not exist yet")
+	exitCode := runClear(finder, layout, strings.NewReader(""), stdout, stderr, nil)
 
 	// Expected: stdout contains warning; exit code 0
+	assert.Equal(t, 0, exitCode)
 	assert.Contains(t, stdout.String(), "Warning: sessions directory not found, nothing to clear")
 	assert.Empty(t, stderr.String())
 }
@@ -299,14 +246,10 @@ func TestClear_NoArgs_ReadDirFails(t *testing.T) {
 	stdout := &bytes.Buffer{}
 	stderr := &bytes.Buffer{}
 
-	_ = finder
-	_ = layout
-	_ = stdout
-	_ = stderr
-
-	t.Skip("scaffolded: production symbol NewClearCommand (clear.go) does not exist yet")
+	exitCode := runClear(finder, layout, strings.NewReader(""), stdout, stderr, nil)
 
 	// Expected: stderr contains error; exit code 1
+	assert.Equal(t, 1, exitCode)
 	assert.Contains(t, stderr.String(), "Error: failed to read sessions directory:")
 }
 
@@ -336,15 +279,10 @@ func TestClear_SpecificUUID_DeletionFails(t *testing.T) {
 	stdout := &bytes.Buffer{}
 	stderr := &bytes.Buffer{}
 
-	_ = finder
-	_ = layout
-	_ = stdin
-	_ = stdout
-	_ = stderr
-
-	t.Skip("scaffolded: production symbol NewClearCommand (clear.go) does not exist yet")
+	exitCode := runClear(finder, layout, stdin, stdout, stderr, []string{uuid1, uuid2})
 
 	// Expected: error for uuid1, success for uuid2
+	assert.Equal(t, 0, exitCode)
 	assert.Contains(t, stderr.String(), "Error: failed to clear session '"+uuid1+"':")
 	assert.Contains(t, stdout.String(), "Session '"+uuid2+"' cleared")
 }
@@ -371,15 +309,10 @@ func TestClear_NoArgs_PartialDeletionFailure(t *testing.T) {
 	stdout := &bytes.Buffer{}
 	stderr := &bytes.Buffer{}
 
-	_ = finder
-	_ = layout
-	_ = stdin
-	_ = stdout
-	_ = stderr
-
-	t.Skip("scaffolded: production symbol NewClearCommand (clear.go) does not exist yet")
+	exitCode := runClear(finder, layout, stdin, stdout, stderr, nil)
 
 	// Expected: error for sess1, success for sess2, no summary
+	assert.Equal(t, 0, exitCode)
 	assert.Contains(t, stderr.String(), "Error: failed to clear session 'sess1':")
 	assert.Contains(t, stdout.String(), "Session 'sess2' cleared")
 	assert.NotContains(t, stdout.String(), "All sessions cleared successfully")
@@ -397,14 +330,10 @@ func TestClear_NoArgs_EmptySessionsDir(t *testing.T) {
 	stdout := &bytes.Buffer{}
 	stderr := &bytes.Buffer{}
 
-	_ = finder
-	_ = layout
-	_ = stdout
-	_ = stderr
-
-	t.Skip("scaffolded: production symbol NewClearCommand (clear.go) does not exist yet")
+	exitCode := runClear(finder, layout, strings.NewReader(""), stdout, stderr, nil)
 
 	// Expected: stdout contains "No sessions to clear"; no confirmation prompt
+	assert.Equal(t, 0, exitCode)
 	assert.Contains(t, stdout.String(), "No sessions to clear")
 	assert.NotContains(t, stdout.String(), "[y/N]")
 }
@@ -420,14 +349,10 @@ func TestClear_NoArgs_OnlyFilesInSessionsDir(t *testing.T) {
 	stdout := &bytes.Buffer{}
 	stderr := &bytes.Buffer{}
 
-	_ = finder
-	_ = layout
-	_ = stdout
-	_ = stderr
-
-	t.Skip("scaffolded: production symbol NewClearCommand (clear.go) does not exist yet")
+	exitCode := runClear(finder, layout, strings.NewReader(""), stdout, stderr, nil)
 
 	// Expected: stdout contains "No sessions to clear"
+	assert.Equal(t, 0, exitCode)
 	assert.Contains(t, stdout.String(), "No sessions to clear")
 }
 
@@ -441,15 +366,10 @@ func TestClear_SpecificUUID_NotFound(t *testing.T) {
 	stdout := &bytes.Buffer{}
 	stderr := &bytes.Buffer{}
 
-	_ = finder
-	_ = layout
-	_ = stdin
-	_ = stdout
-	_ = stderr
-
-	t.Skip("scaffolded: production symbol NewClearCommand (clear.go) does not exist yet")
+	exitCode := runClear(finder, layout, stdin, stdout, stderr, []string{"nonexistent-uuid"})
 
 	// Expected: stdout contains warning about missing UUID
+	assert.Equal(t, 0, exitCode)
 	assert.Contains(t, stdout.String(), "Warning: session 'nonexistent-uuid' not found, skipping")
 }
 
@@ -465,15 +385,10 @@ func TestClear_EOF_Stdin(t *testing.T) {
 	stdout := &bytes.Buffer{}
 	stderr := &bytes.Buffer{}
 
-	_ = finder
-	_ = layout
-	_ = stdin
-	_ = stdout
-	_ = stderr
-
-	t.Skip("scaffolded: production symbol NewClearCommand (clear.go) does not exist yet")
+	exitCode := runClear(finder, layout, stdin, stdout, stderr, []string{uuid})
 
 	// Expected: Session directory still exists; stdout contains "Operation cancelled"
+	assert.Equal(t, 0, exitCode)
 	assertDirExists(t, sessionDir)
 	assert.Contains(t, stdout.String(), "Operation cancelled")
 }
@@ -490,16 +405,11 @@ func TestClear_EmptyStringUUID(t *testing.T) {
 	stdout := &bytes.Buffer{}
 	stderr := &bytes.Buffer{}
 
-	_ = finder
-	_ = layout
-	_ = stdin
-	_ = stdout
-	_ = stderr
-
-	t.Skip("scaffolded: production symbol NewClearCommand (clear.go) does not exist yet")
+	exitCode := runClear(finder, layout, stdin, stdout, stderr, []string{""})
 
 	// Expected: Warning printed (stat likely fails); exit code 0
 	// Empty string UUID is passed to StorageLayout without validation
+	assert.Equal(t, 0, exitCode)
 }
 
 func TestClear_MixedExistentAndNonExistent(t *testing.T) {
@@ -513,15 +423,10 @@ func TestClear_MixedExistentAndNonExistent(t *testing.T) {
 	stdout := &bytes.Buffer{}
 	stderr := &bytes.Buffer{}
 
-	_ = finder
-	_ = layout
-	_ = stdin
-	_ = stdout
-	_ = stderr
-
-	t.Skip("scaffolded: production symbol NewClearCommand (clear.go) does not exist yet")
+	exitCode := runClear(finder, layout, stdin, stdout, stderr, []string{"exists-uuid", "missing-uuid"})
 
 	// Expected: existing deleted, missing warned
+	assert.Equal(t, 0, exitCode)
 	assertPathNotExists(t, existsDir)
 	assert.Contains(t, stdout.String(), "Session 'exists-uuid' cleared")
 	assert.Contains(t, stdout.String(), "Warning: session 'missing-uuid' not found, skipping")
@@ -531,16 +436,15 @@ func TestClear_MixedExistentAndNonExistent(t *testing.T) {
 
 func TestClear_CallsSpectraFinder(t *testing.T) {
 	projectRoot := t.TempDir()
+	sessionsDir := filepath.Join(projectRoot, ".spectra", "sessions")
+	ensureDir(t, sessionsDir)
 
 	finder := &fakeSpectraFinderForClear{projectRoot: projectRoot}
+	layout := &fakeClearStorageLayout{projectRoot: projectRoot}
 	stdout := &bytes.Buffer{}
 	stderr := &bytes.Buffer{}
 
-	_ = finder
-	_ = stdout
-	_ = stderr
-
-	t.Skip("scaffolded: production symbol NewClearCommand (clear.go) does not exist yet")
+	runClear(finder, layout, strings.NewReader(""), stdout, stderr, nil)
 
 	// Expected: SpectraFinder.Find() called exactly once
 	assert.Equal(t, 1, finder.findCallCount)
@@ -557,13 +461,7 @@ func TestClear_CallsStorageLayoutGetSessionDir(t *testing.T) {
 	stdout := &bytes.Buffer{}
 	stderr := &bytes.Buffer{}
 
-	_ = finder
-	_ = layout
-	_ = stdin
-	_ = stdout
-	_ = stderr
-
-	t.Skip("scaffolded: production symbol NewClearCommand (clear.go) does not exist yet")
+	runClear(finder, layout, stdin, stdout, stderr, []string{"uuid1", "uuid2"})
 
 	// Expected: GetSessionDir called for each UUID
 	require.Len(t, layout.getSessionDirCalls, 2)
@@ -582,13 +480,7 @@ func TestClear_CallsStorageLayoutGetSessionsDir(t *testing.T) {
 	stdout := &bytes.Buffer{}
 	stderr := &bytes.Buffer{}
 
-	_ = finder
-	_ = layout
-	_ = stdin
-	_ = stdout
-	_ = stderr
-
-	t.Skip("scaffolded: production symbol NewClearCommand (clear.go) does not exist yet")
+	runClear(finder, layout, stdin, stdout, stderr, nil)
 
 	// Expected: GetSessionsDir called exactly once
 	assert.Equal(t, 1, layout.getSessionsDirCallCount)
@@ -606,13 +498,7 @@ func TestClear_CallsConfirmPrompt(t *testing.T) {
 	stdout := &bytes.Buffer{}
 	stderr := &bytes.Buffer{}
 
-	_ = finder
-	_ = layout
-	_ = stdin
-	_ = stdout
-	_ = stderr
-
-	t.Skip("scaffolded: production symbol NewClearCommand (clear.go) does not exist yet")
+	runClear(finder, layout, stdin, stdout, stderr, []string{uuid})
 
 	// Expected: ConfirmPrompt called once; no directories deleted
 	assertDirExists(t, sessionDir)
