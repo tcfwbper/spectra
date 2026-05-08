@@ -9,6 +9,9 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/tcfwbper/spectra/internal/cmdutil"
+	"github.com/tcfwbper/spectra/logger"
+	runtimex "github.com/tcfwbper/spectra/runtime"
+	"github.com/tcfwbper/spectra/storage"
 )
 
 // version is the current version of the spectra CLI.
@@ -134,11 +137,18 @@ func newInitCobraCommand() *cobra.Command {
 		Use:   "init",
 		Short: "Initialize a new Spectra project",
 		RunE: func(cmd *cobra.Command, args []string) error {
+			layout := &productionStorageLayout{}
+			copier := NewBuiltinResourceCopier(
+				builtinWorkflowsFS,
+				builtinAgentsFS,
+				builtinSpecFilesFS,
+				layout,
+			)
 			opts := InitCommandOptions{
 				GetwdFunc:        os.Getwd,
-				GitignoreEnsurer: nil, // wired at runtime via real implementations
-				DirectoryCreator: nil,
-				Copier:           nil,
+				GitignoreEnsurer: NewGitignoreEnsurer(),
+				DirectoryCreator: NewDirectoryCreator(),
+				Copier:           copier,
 				Stdout:           cmd.OutOrStdout(),
 				Stderr:           cmd.ErrOrStderr(),
 			}
@@ -159,17 +169,21 @@ func newRunCobraCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "run",
 		Short: "Run a Spectra workflow",
-		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			// This is handled by RunRunCommand via the wiring in the test
-			// In production, we construct real dependencies here
+			workflowProvided := cmd.Flags().Changed("workflow")
+
 			opts := RunCommandOptions{
-				Runtime:  nil, // wired at runtime
-				Workflow: workflow,
-				Stdout:   cmd.OutOrStdout(),
-				Stderr:   cmd.ErrOrStderr(),
+				Runtime:          &productionRuntime{},
+				Workflow:         workflow,
+				WorkflowProvided: workflowProvided,
+				Args:             args,
+				Stdout:           cmd.OutOrStdout(),
+				Stderr:           cmd.ErrOrStderr(),
 			}
-			_ = opts
+			code := RunRunCommand(opts)
+			if code != 0 {
+				setExitCode(cmd, code)
+			}
 			return nil
 		},
 	}
@@ -184,8 +198,8 @@ func newClearCobraCommand() *cobra.Command {
 		Short: "Clear session data",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			opts := ClearCommandOptions{
-				Finder: nil, // wired at runtime via real implementations
-				Layout: nil,
+				Finder: &productionClearSpectraFinder{},
+				Layout: &productionClearStorageLayout{},
 				Stdin:  os.Stdin,
 				Stdout: cmd.OutOrStdout(),
 				Stderr: cmd.ErrOrStderr(),
@@ -233,6 +247,42 @@ func newStubSubcommand(name string, exitCode int) *cobra.Command {
 			return nil
 		},
 	}
+}
+
+// productionRuntime is the production adapter that delegates to the runtime package.
+type productionRuntime struct{}
+
+func (p *productionRuntime) Run(workflowName string, log logger.Logger) (int, error) {
+	return runtimex.Run(workflowName, log)
+}
+
+// productionStorageLayout is the production adapter for StorageLayoutInterface used by BuiltinResourceCopier.
+type productionStorageLayout struct{}
+
+func (p *productionStorageLayout) GetWorkflowPath(projectRoot, name string) string {
+	return storage.GetWorkflowPath(projectRoot, name)
+}
+
+func (p *productionStorageLayout) GetAgentPath(projectRoot, name string) string {
+	return storage.GetAgentPath(projectRoot, name)
+}
+
+// productionClearSpectraFinder is the production adapter for ClearSpectraFinder.
+type productionClearSpectraFinder struct{}
+
+func (p *productionClearSpectraFinder) Find() (string, error) {
+	return storage.FindSpectraRoot("")
+}
+
+// productionClearStorageLayout is the production adapter for ClearStorageLayout.
+type productionClearStorageLayout struct{}
+
+func (p *productionClearStorageLayout) GetSessionDir(projectRoot, uuid string) string {
+	return storage.GetSessionDir(projectRoot, uuid)
+}
+
+func (p *productionClearStorageLayout) GetSessionsDir(projectRoot string) string {
+	return storage.GetSessionsDir(projectRoot)
 }
 
 // signalInterruptSubstring is the string to detect SIGINT-based termination.

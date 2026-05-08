@@ -9,6 +9,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/tcfwbper/spectra/internal/cmdutil"
 	"github.com/tcfwbper/spectra/storage"
 )
 
@@ -29,6 +30,13 @@ func (d *defaultSpectraFinder) FindProjectRoot(startDir string) (string, error) 
 	return storage.FindSpectraRoot(startDir)
 }
 
+// defaultSendAndHandler is the production implementation that delegates to cmdutil.PublicSendAndHandle.
+type defaultSendAndHandler struct{}
+
+func (d *defaultSendAndHandler) SendAndHandle(sessionID, projectRoot string, message any, successText string) (int, string, string) {
+	return cmdutil.PublicSendAndHandle(sessionID, projectRoot, message, successText)
+}
+
 // Options configures the root command with injectable dependencies.
 type Options struct {
 	Finder SpectraFinder
@@ -41,6 +49,7 @@ type Options struct {
 func Execute() int {
 	return ExecuteWithOptions(Options{
 		Finder: &defaultSpectraFinder{},
+		Sender: &defaultSendAndHandler{},
 		Args:   os.Args[1:],
 	})
 }
