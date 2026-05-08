@@ -17,7 +17,7 @@ func gitignorePath(projectRoot string) string {
 // --- Happy Path — Ensure ---
 
 func TestGitignoreEnsurer_Ensure_CreatesNewFile(t *testing.T) {
-	t.Skip("blocked: GitignoreEnsurer production type not yet implemented — needs NewGitignoreEnsurer or GitignoreEnsurer struct with Ensure method")
+
 
 	projectRoot := t.TempDir()
 
@@ -31,7 +31,7 @@ func TestGitignoreEnsurer_Ensure_CreatesNewFile(t *testing.T) {
 }
 
 func TestGitignoreEnsurer_Ensure_AppendsWhenMissing_EndsWithNewline(t *testing.T) {
-	t.Skip("blocked: GitignoreEnsurer production type not yet implemented — needs NewGitignoreEnsurer or GitignoreEnsurer struct with Ensure method")
+
 
 	projectRoot := t.TempDir()
 	writeFile(t, gitignorePath(projectRoot), "node_modules\n", 0644)
@@ -44,7 +44,7 @@ func TestGitignoreEnsurer_Ensure_AppendsWhenMissing_EndsWithNewline(t *testing.T
 }
 
 func TestGitignoreEnsurer_Ensure_AppendsWhenMissing_NoTrailingNewline(t *testing.T) {
-	t.Skip("blocked: GitignoreEnsurer production type not yet implemented — needs NewGitignoreEnsurer or GitignoreEnsurer struct with Ensure method")
+
 
 	projectRoot := t.TempDir()
 	writeFile(t, gitignorePath(projectRoot), "node_modules", 0644)
@@ -57,7 +57,7 @@ func TestGitignoreEnsurer_Ensure_AppendsWhenMissing_NoTrailingNewline(t *testing
 }
 
 func TestGitignoreEnsurer_Ensure_AlreadyPresent(t *testing.T) {
-	t.Skip("blocked: GitignoreEnsurer production type not yet implemented — needs NewGitignoreEnsurer or GitignoreEnsurer struct with Ensure method")
+
 
 	projectRoot := t.TempDir()
 	writeFile(t, gitignorePath(projectRoot), "node_modules\n.spectra\n", 0644)
@@ -72,7 +72,7 @@ func TestGitignoreEnsurer_Ensure_AlreadyPresent(t *testing.T) {
 // --- Idempotency ---
 
 func TestGitignoreEnsurer_Ensure_Idempotent(t *testing.T) {
-	t.Skip("blocked: GitignoreEnsurer production type not yet implemented — needs NewGitignoreEnsurer or GitignoreEnsurer struct with Ensure method")
+
 
 	projectRoot := t.TempDir()
 
@@ -101,7 +101,7 @@ func TestGitignoreEnsurer_Ensure_Idempotent(t *testing.T) {
 // --- Boundary Values — Line Matching ---
 
 func TestGitignoreEnsurer_Ensure_MatchesWithLeadingTrailingSpaces(t *testing.T) {
-	t.Skip("blocked: GitignoreEnsurer production type not yet implemented — needs NewGitignoreEnsurer or GitignoreEnsurer struct with Ensure method")
+
 
 	projectRoot := t.TempDir()
 	writeFile(t, gitignorePath(projectRoot), "  .spectra  \n", 0644)
@@ -115,7 +115,7 @@ func TestGitignoreEnsurer_Ensure_MatchesWithLeadingTrailingSpaces(t *testing.T) 
 }
 
 func TestGitignoreEnsurer_Ensure_MatchesWithTabs(t *testing.T) {
-	t.Skip("blocked: GitignoreEnsurer production type not yet implemented — needs NewGitignoreEnsurer or GitignoreEnsurer struct with Ensure method")
+
 
 	projectRoot := t.TempDir()
 	writeFile(t, gitignorePath(projectRoot), "\t.spectra\t\n", 0644)
@@ -129,7 +129,7 @@ func TestGitignoreEnsurer_Ensure_MatchesWithTabs(t *testing.T) {
 }
 
 func TestGitignoreEnsurer_Ensure_DoesNotMatchSpectraSlash(t *testing.T) {
-	t.Skip("blocked: GitignoreEnsurer production type not yet implemented — needs NewGitignoreEnsurer or GitignoreEnsurer struct with Ensure method")
+
 
 	projectRoot := t.TempDir()
 	writeFile(t, gitignorePath(projectRoot), ".spectra/\n", 0644)
@@ -142,7 +142,7 @@ func TestGitignoreEnsurer_Ensure_DoesNotMatchSpectraSlash(t *testing.T) {
 }
 
 func TestGitignoreEnsurer_Ensure_DoesNotMatchCommented(t *testing.T) {
-	t.Skip("blocked: GitignoreEnsurer production type not yet implemented — needs NewGitignoreEnsurer or GitignoreEnsurer struct with Ensure method")
+
 
 	projectRoot := t.TempDir()
 	writeFile(t, gitignorePath(projectRoot), "# .spectra\n", 0644)
@@ -155,7 +155,7 @@ func TestGitignoreEnsurer_Ensure_DoesNotMatchCommented(t *testing.T) {
 }
 
 func TestGitignoreEnsurer_Ensure_DoesNotTrimUnicodeWhitespace(t *testing.T) {
-	t.Skip("blocked: GitignoreEnsurer production type not yet implemented — needs NewGitignoreEnsurer or GitignoreEnsurer struct with Ensure method")
+
 
 	projectRoot := t.TempDir()
 	// NBSP (U+00A0) prefix — should NOT be trimmed, so line does not match
@@ -171,7 +171,7 @@ func TestGitignoreEnsurer_Ensure_DoesNotTrimUnicodeWhitespace(t *testing.T) {
 // --- Null / Empty Input ---
 
 func TestGitignoreEnsurer_Ensure_EmptyFile(t *testing.T) {
-	t.Skip("blocked: GitignoreEnsurer production type not yet implemented — needs NewGitignoreEnsurer or GitignoreEnsurer struct with Ensure method")
+
 
 	projectRoot := t.TempDir()
 	writeFile(t, gitignorePath(projectRoot), "", 0644)
@@ -186,7 +186,7 @@ func TestGitignoreEnsurer_Ensure_EmptyFile(t *testing.T) {
 // --- Error Propagation ---
 
 func TestGitignoreEnsurer_Ensure_ReadPermissionDenied(t *testing.T) {
-	t.Skip("blocked: GitignoreEnsurer production type not yet implemented — needs NewGitignoreEnsurer or GitignoreEnsurer struct with Ensure method")
+
 
 	projectRoot := t.TempDir()
 	path := gitignorePath(projectRoot)
@@ -202,7 +202,7 @@ func TestGitignoreEnsurer_Ensure_ReadPermissionDenied(t *testing.T) {
 }
 
 func TestGitignoreEnsurer_Ensure_WritePermissionDenied(t *testing.T) {
-	t.Skip("blocked: GitignoreEnsurer production type not yet implemented — needs NewGitignoreEnsurer or GitignoreEnsurer struct with Ensure method")
+
 
 	projectRoot := t.TempDir()
 	path := gitignorePath(projectRoot)
@@ -218,7 +218,7 @@ func TestGitignoreEnsurer_Ensure_WritePermissionDenied(t *testing.T) {
 }
 
 func TestGitignoreEnsurer_Ensure_BrokenSymlink(t *testing.T) {
-	t.Skip("blocked: GitignoreEnsurer production type not yet implemented — needs NewGitignoreEnsurer or GitignoreEnsurer struct with Ensure method")
+
 
 	projectRoot := t.TempDir()
 	path := gitignorePath(projectRoot)
@@ -234,7 +234,7 @@ func TestGitignoreEnsurer_Ensure_BrokenSymlink(t *testing.T) {
 // --- Mock / Dependency Interaction ---
 
 func TestGitignoreEnsurer_Ensure_FollowsSymlink(t *testing.T) {
-	t.Skip("blocked: GitignoreEnsurer production type not yet implemented — needs NewGitignoreEnsurer or GitignoreEnsurer struct with Ensure method")
+
 
 	projectRoot := t.TempDir()
 	realFilePath := filepath.Join(projectRoot, "real_gitignore")

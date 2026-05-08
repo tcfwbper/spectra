@@ -169,9 +169,10 @@ func assertDirPermissions(t *testing.T, path string, perm os.FileMode) {
 	require.Equal(t, perm, actual, "dir permission mismatch for %s: want %o, got %o", path, perm, actual)
 }
 
-// assertPathNotExists asserts that the given path does not exist.
+// assertPathNotExists asserts that the given path does not exist or is unreachable
+// (e.g., a parent component is a file rather than a directory).
 func assertPathNotExists(t *testing.T, path string) {
 	t.Helper()
 	_, err := os.Stat(path)
-	require.True(t, os.IsNotExist(err), "assertPathNotExists: %s should not exist but does", path)
+	require.Error(t, err, "assertPathNotExists: %s should not exist but does", path)
 }

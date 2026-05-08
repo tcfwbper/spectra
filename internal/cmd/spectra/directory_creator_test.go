@@ -34,8 +34,6 @@ func createAllDirs(t *testing.T, projectRoot string) {
 // --- Happy Path — CreateAll ---
 
 func TestDirectoryCreator_CreateAll_AllNew(t *testing.T) {
-	t.Skip("blocked: DirectoryCreator production type not yet implemented — needs NewDirectoryCreator or DirectoryCreator struct with CreateAll method")
-
 	projectRoot := t.TempDir()
 
 	creator := NewDirectoryCreator()
@@ -50,8 +48,6 @@ func TestDirectoryCreator_CreateAll_AllNew(t *testing.T) {
 }
 
 func TestDirectoryCreator_CreateAll_PartialExist(t *testing.T) {
-	t.Skip("blocked: DirectoryCreator production type not yet implemented — needs NewDirectoryCreator or DirectoryCreator struct with CreateAll method")
-
 	projectRoot := t.TempDir()
 
 	// Pre-create only .spectra/ and spec/
@@ -73,8 +69,6 @@ func TestDirectoryCreator_CreateAll_PartialExist(t *testing.T) {
 // --- Idempotency ---
 
 func TestDirectoryCreator_CreateAll_AllExist(t *testing.T) {
-	t.Skip("blocked: DirectoryCreator production type not yet implemented — needs NewDirectoryCreator or DirectoryCreator struct with CreateAll method")
-
 	projectRoot := t.TempDir()
 	createAllDirs(t, projectRoot)
 
@@ -91,8 +85,6 @@ func TestDirectoryCreator_CreateAll_AllExist(t *testing.T) {
 }
 
 func TestDirectoryCreator_CreateAll_CalledTwice(t *testing.T) {
-	t.Skip("blocked: DirectoryCreator production type not yet implemented — needs NewDirectoryCreator or DirectoryCreator struct with CreateAll method")
-
 	projectRoot := t.TempDir()
 
 	creator := NewDirectoryCreator()
@@ -115,8 +107,6 @@ func TestDirectoryCreator_CreateAll_CalledTwice(t *testing.T) {
 // --- Ordering — Directory Creation ---
 
 func TestDirectoryCreator_CreateAll_ParentBeforeChild(t *testing.T) {
-	t.Skip("blocked: DirectoryCreator production type not yet implemented — needs NewDirectoryCreator or DirectoryCreator struct with CreateAll method")
-
 	projectRoot := t.TempDir()
 
 	creator := NewDirectoryCreator()
@@ -134,8 +124,6 @@ func TestDirectoryCreator_CreateAll_ParentBeforeChild(t *testing.T) {
 // --- Error Propagation ---
 
 func TestDirectoryCreator_CreateAll_PathExistsAsFile(t *testing.T) {
-	t.Skip("blocked: DirectoryCreator production type not yet implemented — needs NewDirectoryCreator or DirectoryCreator struct with CreateAll method")
-
 	projectRoot := t.TempDir()
 
 	// Create a regular file at the .spectra path
@@ -148,8 +136,6 @@ func TestDirectoryCreator_CreateAll_PathExistsAsFile(t *testing.T) {
 }
 
 func TestDirectoryCreator_CreateAll_PermissionDenied(t *testing.T) {
-	t.Skip("blocked: DirectoryCreator production type not yet implemented — needs NewDirectoryCreator or DirectoryCreator struct with CreateAll method")
-
 	projectRoot := t.TempDir()
 
 	// Make projectRoot read-only
@@ -165,8 +151,6 @@ func TestDirectoryCreator_CreateAll_PermissionDenied(t *testing.T) {
 }
 
 func TestDirectoryCreator_CreateAll_FailFastStopsProcessing(t *testing.T) {
-	t.Skip("blocked: DirectoryCreator production type not yet implemented — needs NewDirectoryCreator or DirectoryCreator struct with CreateAll method")
-
 	projectRoot := t.TempDir()
 
 	// Block .spectra directory creation by placing a file there
@@ -189,8 +173,6 @@ func TestDirectoryCreator_CreateAll_FailFastStopsProcessing(t *testing.T) {
 // --- Boundary Values — projectRoot ---
 
 func TestDirectoryCreator_CreateAll_NestedChildMissing(t *testing.T) {
-	t.Skip("blocked: DirectoryCreator production type not yet implemented — needs NewDirectoryCreator or DirectoryCreator struct with CreateAll method")
-
 	projectRoot := t.TempDir()
 
 	// Pre-create only .spectra/ (parent) — children missing

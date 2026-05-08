@@ -13,7 +13,7 @@ import (
 // --- Happy Path — CopyWorkflows ---
 
 func TestBuiltinResourceCopier_CopyWorkflows_WritesAllFiles(t *testing.T) {
-	t.Skip("blocked: BuiltinResourceCopier production type not yet implemented — needs NewBuiltinResourceCopier constructor accepting embed.FS and StorageLayout interface")
+
 
 	projectRoot := t.TempDir()
 	ensureDir(t, filepath.Join(projectRoot, ".spectra", "workflows"))
@@ -40,7 +40,7 @@ func TestBuiltinResourceCopier_CopyWorkflows_WritesAllFiles(t *testing.T) {
 }
 
 func TestBuiltinResourceCopier_CopyWorkflows_SkipsExisting(t *testing.T) {
-	t.Skip("blocked: BuiltinResourceCopier production type not yet implemented — needs NewBuiltinResourceCopier constructor accepting embed.FS and StorageLayout interface")
+
 
 	projectRoot := t.TempDir()
 	ensureDir(t, filepath.Join(projectRoot, ".spectra", "workflows"))
@@ -67,7 +67,7 @@ func TestBuiltinResourceCopier_CopyWorkflows_SkipsExisting(t *testing.T) {
 // --- Happy Path — CopyAgents ---
 
 func TestBuiltinResourceCopier_CopyAgents_WritesAllFiles(t *testing.T) {
-	t.Skip("blocked: BuiltinResourceCopier production type not yet implemented — needs NewBuiltinResourceCopier constructor accepting embed.FS and StorageLayout interface")
+
 
 	projectRoot := t.TempDir()
 	ensureDir(t, filepath.Join(projectRoot, ".spectra", "agents"))
@@ -89,7 +89,7 @@ func TestBuiltinResourceCopier_CopyAgents_WritesAllFiles(t *testing.T) {
 }
 
 func TestBuiltinResourceCopier_CopyAgents_SkipsExisting(t *testing.T) {
-	t.Skip("blocked: BuiltinResourceCopier production type not yet implemented — needs NewBuiltinResourceCopier constructor accepting embed.FS and StorageLayout interface")
+
 
 	projectRoot := t.TempDir()
 	ensureDir(t, filepath.Join(projectRoot, ".spectra", "agents"))
@@ -116,7 +116,7 @@ func TestBuiltinResourceCopier_CopyAgents_SkipsExisting(t *testing.T) {
 // --- Happy Path — CopySpecFiles ---
 
 func TestBuiltinResourceCopier_CopySpecFiles_WritesAllFiles(t *testing.T) {
-	t.Skip("blocked: BuiltinResourceCopier production type not yet implemented — needs NewBuiltinResourceCopier constructor accepting embed.FS and StorageLayout interface")
+
 
 	projectRoot := t.TempDir()
 	ensureDir(t, filepath.Join(projectRoot, "spec"))
@@ -148,7 +148,7 @@ func TestBuiltinResourceCopier_CopySpecFiles_WritesAllFiles(t *testing.T) {
 }
 
 func TestBuiltinResourceCopier_CopySpecFiles_SkipsExisting(t *testing.T) {
-	t.Skip("blocked: BuiltinResourceCopier production type not yet implemented — needs NewBuiltinResourceCopier constructor accepting embed.FS and StorageLayout interface")
+
 
 	projectRoot := t.TempDir()
 	ensureDir(t, filepath.Join(projectRoot, "spec"))
@@ -173,7 +173,7 @@ func TestBuiltinResourceCopier_CopySpecFiles_SkipsExisting(t *testing.T) {
 }
 
 func TestBuiltinResourceCopier_CopySpecFiles_PreservesSubdirectoryStructure(t *testing.T) {
-	t.Skip("blocked: BuiltinResourceCopier production type not yet implemented — needs NewBuiltinResourceCopier constructor accepting embed.FS and StorageLayout interface")
+
 
 	projectRoot := t.TempDir()
 	ensureDir(t, filepath.Join(projectRoot, "spec", "logic"))
@@ -196,7 +196,7 @@ func TestBuiltinResourceCopier_CopySpecFiles_PreservesSubdirectoryStructure(t *t
 // --- Error Propagation ---
 
 func TestBuiltinResourceCopier_CopyWorkflows_WriteError(t *testing.T) {
-	t.Skip("blocked: BuiltinResourceCopier production type not yet implemented — needs NewBuiltinResourceCopier constructor accepting embed.FS and StorageLayout interface")
+
 
 	projectRoot := t.TempDir()
 	// Do NOT create .spectra/workflows/ — write should fail
@@ -215,7 +215,7 @@ func TestBuiltinResourceCopier_CopyWorkflows_WriteError(t *testing.T) {
 }
 
 func TestBuiltinResourceCopier_CopyAgents_WriteError(t *testing.T) {
-	t.Skip("blocked: BuiltinResourceCopier production type not yet implemented — needs NewBuiltinResourceCopier constructor accepting embed.FS and StorageLayout interface")
+
 
 	projectRoot := t.TempDir()
 	// Do NOT create .spectra/agents/ — write should fail
@@ -234,7 +234,7 @@ func TestBuiltinResourceCopier_CopyAgents_WriteError(t *testing.T) {
 }
 
 func TestBuiltinResourceCopier_CopySpecFiles_WriteError(t *testing.T) {
-	t.Skip("blocked: BuiltinResourceCopier production type not yet implemented — needs NewBuiltinResourceCopier constructor accepting embed.FS and StorageLayout interface")
+
 
 	projectRoot := t.TempDir()
 	// Do NOT create spec/ directory — write should fail
@@ -253,7 +253,7 @@ func TestBuiltinResourceCopier_CopySpecFiles_WriteError(t *testing.T) {
 }
 
 func TestBuiltinResourceCopier_CopyWorkflows_FailFast(t *testing.T) {
-	t.Skip("blocked: BuiltinResourceCopier production type not yet implemented — needs NewBuiltinResourceCopier constructor accepting embed.FS and StorageLayout interface")
+
 
 	projectRoot := t.TempDir()
 	ensureDir(t, filepath.Join(projectRoot, ".spectra", "workflows"))
@@ -285,7 +285,7 @@ func TestBuiltinResourceCopier_CopyWorkflows_FailFast(t *testing.T) {
 // --- Idempotency ---
 
 func TestBuiltinResourceCopier_CopyWorkflows_AllExist(t *testing.T) {
-	t.Skip("blocked: BuiltinResourceCopier production type not yet implemented — needs NewBuiltinResourceCopier constructor accepting embed.FS and StorageLayout interface")
+
 
 	projectRoot := t.TempDir()
 	ensureDir(t, filepath.Join(projectRoot, ".spectra", "workflows"))
@@ -315,7 +315,7 @@ func TestBuiltinResourceCopier_CopyWorkflows_AllExist(t *testing.T) {
 // --- Null / Empty Input ---
 
 func TestBuiltinResourceCopier_CopyWorkflows_EmptyFS(t *testing.T) {
-	t.Skip("blocked: BuiltinResourceCopier production type not yet implemented — needs NewBuiltinResourceCopier constructor accepting embed.FS and StorageLayout interface")
+
 
 	projectRoot := t.TempDir()
 
@@ -331,7 +331,7 @@ func TestBuiltinResourceCopier_CopyWorkflows_EmptyFS(t *testing.T) {
 }
 
 func TestBuiltinResourceCopier_CopyWorkflows_EmptyFileContent(t *testing.T) {
-	t.Skip("blocked: BuiltinResourceCopier production type not yet implemented — needs NewBuiltinResourceCopier constructor accepting embed.FS and StorageLayout interface")
+
 
 	projectRoot := t.TempDir()
 	ensureDir(t, filepath.Join(projectRoot, ".spectra", "workflows"))
@@ -359,7 +359,7 @@ func TestBuiltinResourceCopier_CopyWorkflows_EmptyFileContent(t *testing.T) {
 // --- Boundary Values — Target Exists as Directory ---
 
 func TestBuiltinResourceCopier_CopyWorkflows_TargetIsDirectory(t *testing.T) {
-	t.Skip("blocked: BuiltinResourceCopier production type not yet implemented — needs NewBuiltinResourceCopier constructor accepting embed.FS and StorageLayout interface")
+
 
 	projectRoot := t.TempDir()
 	ensureDir(t, filepath.Join(projectRoot, ".spectra", "workflows"))
@@ -384,7 +384,7 @@ func TestBuiltinResourceCopier_CopyWorkflows_TargetIsDirectory(t *testing.T) {
 // --- Mock / Dependency Interaction ---
 
 func TestBuiltinResourceCopier_CopyWorkflows_UsesStorageLayout(t *testing.T) {
-	t.Skip("blocked: BuiltinResourceCopier production type not yet implemented — needs NewBuiltinResourceCopier constructor accepting embed.FS and StorageLayout interface")
+
 
 	projectRoot := t.TempDir()
 	ensureDir(t, filepath.Join(projectRoot, ".spectra", "workflows"))
@@ -405,7 +405,7 @@ func TestBuiltinResourceCopier_CopyWorkflows_UsesStorageLayout(t *testing.T) {
 }
 
 func TestBuiltinResourceCopier_CopyAgents_UsesStorageLayout(t *testing.T) {
-	t.Skip("blocked: BuiltinResourceCopier production type not yet implemented — needs NewBuiltinResourceCopier constructor accepting embed.FS and StorageLayout interface")
+
 
 	projectRoot := t.TempDir()
 	ensureDir(t, filepath.Join(projectRoot, ".spectra", "agents"))
