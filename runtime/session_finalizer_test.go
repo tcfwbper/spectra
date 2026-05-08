@@ -3,7 +3,6 @@ package runtime
 import (
 	"encoding/json"
 	"errors"
-	"math"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -323,27 +322,46 @@ func TestSessionFinalizer_Finalize_FailedWithUnexpectedErrorType(t *testing.T) {
 	assertLogContainsArg(t, f.logger.errorCalls, "session failed", "error", "something went wrong")
 }
 
-func TestSessionFinalizer_Finalize_FailedWithDetailSerializationError(t *testing.T) {
-	t.Skip("scaffolded: production surface NewSessionFinalizer/Finalize does not exist yet; also needs AgentError with non-serializable Detail which is not representable via current entity API (Detail is json.RawMessage)")
+// TestSessionFinalizer_formatDetail_InvalidJSON tests that formatDetail returns
+// the fallback string when given invalid JSON bytes.
+func TestSessionFinalizer_formatDetail_InvalidJSON(t *testing.T) {
+	sf := NewSessionFinalizer(newDefaultMockLogger())
 
-	// This test verifies fallback when detail JSON serialization fails.
-	// NOTE: Since Detail() returns json.RawMessage (pre-serialized bytes), the
-	// production code must handle the case where Detail contains invalid JSON that
-	// cannot be compacted. We use an invalid JSON byte slice as the detail.
-	//
-	// The test spec mentions math.Inf(1) or channel, but those apply to a
-	// map[string]any representation. With json.RawMessage, we simulate failure
-	// via malformed JSON bytes.
-	_ = math.Inf(1) // referenced by spec; used as conceptual marker only
+	// Invalid JSON that cannot be unmarshalled or compacted.
+	result := sf.formatDetail(json.RawMessage(`{not valid json`))
 
-	f := newSessionFinalizerFixture(t)
+	assert.Equal(t, "<failed to serialize detail>", result)
+}
 
-	// We need a way to produce an AgentError whose Detail() returns bytes
-	// that json.Compact or similar would reject. Since NewAgentError validates
-	// detail, we may need a special mock or the production surface may handle
-	// this differently. This test remains scaffolded.
+// TestSessionFinalizer_formatDetail_EmptyObject tests that formatDetail returns
+// empty string when given an empty JSON object.
+func TestSessionFinalizer_formatDetail_EmptyObject(t *testing.T) {
+	sf := NewSessionFinalizer(newDefaultMockLogger())
 
-	_ = f
+	result := sf.formatDetail(json.RawMessage(`{}`))
+
+	assert.Equal(t, "", result)
+}
+
+// TestSessionFinalizer_formatDetail_Nil tests that formatDetail returns empty
+// string when given nil detail.
+func TestSessionFinalizer_formatDetail_Nil(t *testing.T) {
+	sf := NewSessionFinalizer(newDefaultMockLogger())
+
+	result := sf.formatDetail(nil)
+
+	assert.Equal(t, "", result)
+}
+
+// TestSessionFinalizer_formatDetail_CompactableJSON tests that formatDetail
+// compacts JSON with extra whitespace into minimal form.
+func TestSessionFinalizer_formatDetail_CompactableJSON(t *testing.T) {
+	sf := NewSessionFinalizer(newDefaultMockLogger())
+
+	// JSON with extra whitespace that should be compacted.
+	result := sf.formatDetail(json.RawMessage(`{  "key" :  "value" }`))
+
+	assert.Equal(t, `{"key":"value"}`, result)
 }
 
 // =============================================================================

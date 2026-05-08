@@ -29,14 +29,24 @@ type InitResult struct {
 	Error              error
 }
 
+// SessionFactory defines the interface for constructing a Session entity.
+// In production this calls entitysession.NewSession; tests can replace it.
+type SessionFactory func(id, workflowName, entryNode string, createdAt int64) (Session, error)
+
+// ContextFactory creates a context and cancel function for the initialization flow.
+// In production this returns context.WithTimeout(context.Background(), 30*time.Second).
+type ContextFactory func() (context.Context, context.CancelFunc)
+
 // SessionInitializer orchestrates the initialization flow for creating a new session.
 type SessionInitializer struct {
-	projectRoot string
-	loader      WorkflowLoader
-	dirMgr      SessionDirManager
-	logger      logger.Logger
-	uuidGen     UUIDGenerator
-	nowFunc     func() int64
+	projectRoot    string
+	loader         WorkflowLoader
+	dirMgr         SessionDirManager
+	logger         logger.Logger
+	uuidGen        UUIDGenerator
+	nowFunc        func() int64
+	sessionFactory SessionFactory
+	contextFactory ContextFactory
 }
 
 // NewSessionInitializer validates dependencies and returns a SessionInitializer.
@@ -48,6 +58,16 @@ func NewSessionInitializer(projectRoot string, loader WorkflowLoader, dirMgr Ses
 		logger:      log,
 		uuidGen:     &defaultUUIDGenerator{},
 		nowFunc:     func() int64 { return time.Now().Unix() },
+		sessionFactory: func(id, workflowName, entryNode string, createdAt int64) (Session, error) {
+			sess, err := entitysession.NewSession(id, workflowName, entryNode, createdAt)
+			if err != nil {
+				return nil, err
+			}
+			return &sessionAdapter{sess: sess}, nil
+		},
+		contextFactory: func() (context.Context, context.CancelFunc) {
+			return context.WithTimeout(context.Background(), 30*time.Second)
+		},
 	}
 }
 
@@ -64,7 +84,7 @@ func (si *SessionInitializer) Initialize(workflowName string, terminationNotifie
 	}
 
 	// Step 3: Create context with 30-second timeout.
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	ctx, cancel := si.contextFactory()
 	defer cancel()
 
 	// Step 4: Generate session UUID.
@@ -116,7 +136,7 @@ func (si *SessionInitializer) Initialize(workflowName string, terminationNotifie
 
 	// Step 13: Construct Session entity.
 	now := si.nowFunc()
-	sess, err := entitysession.NewSession(sessionUUID, workflowName, wfDef.EntryNode(), now)
+	sess, err := si.sessionFactory(sessionUUID, workflowName, wfDef.EntryNode(), now)
 	if err != nil {
 		return InitResult{
 			Error: fmt.Errorf("failed to construct session: %s", err.Error()),
@@ -130,7 +150,7 @@ func (si *SessionInitializer) Initialize(workflowName string, terminationNotifie
 	eventStore := storage.NewEventStore(si.projectRoot, sessionUUID, si.logger)
 
 	// Step 17: Construct PersistentSession.
-	ps := NewPersistentSession(&sessionAdapter{sess: sess}, metadataStore, eventStore, si.logger)
+	ps := NewPersistentSession(sess, metadataStore, eventStore, si.logger)
 
 	// Step 18: Check context.
 	if ctx.Err() != nil {

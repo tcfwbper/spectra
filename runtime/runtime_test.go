@@ -18,11 +18,6 @@ import (
 // =============================================================================
 // Test Specification: runtime_test.go
 // Source File Under Test: runtime/runtime.go
-//
-// All tests are scaffolded because runtime/runtime.go does not yet exist.
-// Each test documents the exact production surface it requires via t.Skip().
-// Once the Run() function and its internal dependency seams are implemented,
-// these scaffolds can be converted to concrete assertions.
 // =============================================================================
 
 // --- Happy Path — Run ---
