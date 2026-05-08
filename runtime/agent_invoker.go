@@ -197,7 +197,7 @@ func (ai *AgentInvoker) resolveClaudeSessionID(nodeName string) (string, bool, e
 // buildArgs constructs the CLI arguments for the claude command.
 func (ai *AgentInvoker) buildArgs(agentDef AgentDef, claudeSessionID string, isExisting bool, message string) []string {
 	args := []string{
-		"--permission-mode", "bypassPermission",
+		"--permission-mode", "bypassPermissions",
 		"--model", agentDef.Model(),
 		"--effort", agentDef.Effort(),
 		"--system-prompt", agentDef.SystemPrompt(),
