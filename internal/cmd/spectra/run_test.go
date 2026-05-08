@@ -10,7 +10,7 @@ import (
 // --- Happy Path — Run ---
 
 func TestRun_Success_ExitsZero(t *testing.T) {
-	t.Skip("scaffolded: requires run.go to define RunRuntime interface and RunRunCommand(RunCommandOptions) int")
+
 
 	rt := newFakeRuntime(0, nil)
 	result := runRun(t, rt, []string{"--workflow", "MyWorkflow"})
@@ -20,7 +20,7 @@ func TestRun_Success_ExitsZero(t *testing.T) {
 }
 
 func TestRun_PassesWorkflowNameToRuntime(t *testing.T) {
-	t.Skip("scaffolded: requires run.go to define RunRuntime interface and RunRunCommand(RunCommandOptions) int")
+
 
 	rt := newFakeRuntime(0, nil)
 	_ = runRun(t, rt, []string{"--workflow", "deploy-prod"})
@@ -29,7 +29,7 @@ func TestRun_PassesWorkflowNameToRuntime(t *testing.T) {
 }
 
 func TestRun_PassesLoggerToRuntime(t *testing.T) {
-	t.Skip("scaffolded: requires run.go to define RunRuntime interface and RunRunCommand(RunCommandOptions) int")
+
 
 	rt := newFakeRuntime(0, nil)
 	_ = runRun(t, rt, []string{"--workflow", "MyWorkflow"})
@@ -40,7 +40,7 @@ func TestRun_PassesLoggerToRuntime(t *testing.T) {
 // --- Validation Failures ---
 
 func TestRun_MissingWorkflowFlag_ExitsOne(t *testing.T) {
-	t.Skip("scaffolded: requires run.go to define RunRuntime interface and RunRunCommand(RunCommandOptions) int")
+
 
 	rt := newFakeRuntime(0, nil)
 	result := runRun(t, rt, nil)
@@ -50,7 +50,7 @@ func TestRun_MissingWorkflowFlag_ExitsOne(t *testing.T) {
 }
 
 func TestRun_EmptyWorkflowFlag_ExitsOne(t *testing.T) {
-	t.Skip("scaffolded: requires run.go to define RunRuntime interface and RunRunCommand(RunCommandOptions) int")
+
 
 	rt := newFakeRuntime(0, nil)
 	result := runRun(t, rt, []string{"--workflow", ""})
@@ -60,7 +60,7 @@ func TestRun_EmptyWorkflowFlag_ExitsOne(t *testing.T) {
 }
 
 func TestRun_PositionalArgs_ExitsOne(t *testing.T) {
-	t.Skip("scaffolded: requires run.go to define RunRuntime interface and RunRunCommand(RunCommandOptions) int")
+
 
 	rt := newFakeRuntime(0, nil)
 	result := runRun(t, rt, []string{"MyWorkflow"})
@@ -72,7 +72,7 @@ func TestRun_PositionalArgs_ExitsOne(t *testing.T) {
 // --- Happy Path — Exit Code Mapping ---
 
 func TestRun_SignalInterrupt_ExitsCode130(t *testing.T) {
-	t.Skip("scaffolded: requires run.go to define RunRuntime interface and RunRunCommand(RunCommandOptions) int")
+
 
 	rt := newFakeRuntime(1, errors.New("session terminated by signal interrupt"))
 	result := runRun(t, rt, []string{"--workflow", "MyWorkflow"})
@@ -82,7 +82,7 @@ func TestRun_SignalInterrupt_ExitsCode130(t *testing.T) {
 }
 
 func TestRun_SignalTerminated_ExitsCode143(t *testing.T) {
-	t.Skip("scaffolded: requires run.go to define RunRuntime interface and RunRunCommand(RunCommandOptions) int")
+
 
 	rt := newFakeRuntime(1, errors.New("session terminated by signal terminated"))
 	result := runRun(t, rt, []string{"--workflow", "MyWorkflow"})
@@ -92,7 +92,7 @@ func TestRun_SignalTerminated_ExitsCode143(t *testing.T) {
 }
 
 func TestRun_RuntimeError_ExitsWithRuntimeCode(t *testing.T) {
-	t.Skip("scaffolded: requires run.go to define RunRuntime interface and RunRunCommand(RunCommandOptions) int")
+
 
 	rt := newFakeRuntime(1, errors.New("failed to initialize session: workflow file not found: MyWorkflow"))
 	result := runRun(t, rt, []string{"--workflow", "MyWorkflow"})
@@ -102,7 +102,7 @@ func TestRun_RuntimeError_ExitsWithRuntimeCode(t *testing.T) {
 }
 
 func TestRun_SignalSubstring_ExitsCode130(t *testing.T) {
-	t.Skip("scaffolded: requires run.go to define RunRuntime interface and RunRunCommand(RunCommandOptions) int")
+
 
 	rt := newFakeRuntime(1, errors.New("runtime failure: session terminated by signal interrupt during cleanup"))
 	result := runRun(t, rt, []string{"--workflow", "MyWorkflow"})
@@ -113,7 +113,7 @@ func TestRun_SignalSubstring_ExitsCode130(t *testing.T) {
 // --- Error Propagation ---
 
 func TestRun_RuntimeCleanupTimeout_ExitsOne(t *testing.T) {
-	t.Skip("scaffolded: requires run.go to define RunRuntime interface and RunRunCommand(RunCommandOptions) int")
+
 
 	rt := newFakeRuntime(1, errors.New("cleanup timeout"))
 	result := runRun(t, rt, []string{"--workflow", "MyWorkflow"})
@@ -125,7 +125,7 @@ func TestRun_RuntimeCleanupTimeout_ExitsOne(t *testing.T) {
 // --- Mock / Dependency Interaction ---
 
 func TestRun_InvokesRuntimeExactlyOnce(t *testing.T) {
-	t.Skip("scaffolded: requires run.go to define RunRuntime interface and RunRunCommand(RunCommandOptions) int")
+
 
 	rt := newFakeRuntime(0, nil)
 	_ = runRun(t, rt, []string{"--workflow", "MyWorkflow"})
@@ -134,7 +134,7 @@ func TestRun_InvokesRuntimeExactlyOnce(t *testing.T) {
 }
 
 func TestRun_DoesNotInvokeRuntimeOnValidationFailure(t *testing.T) {
-	t.Skip("scaffolded: requires run.go to define RunRuntime interface and RunRunCommand(RunCommandOptions) int")
+
 
 	rt := newFakeRuntime(0, nil)
 	_ = runRun(t, rt, nil)

@@ -10,6 +10,8 @@ import (
 	"testing/fstest"
 
 	"github.com/stretchr/testify/require"
+
+	"github.com/tcfwbper/spectra/logger"
 )
 
 // --- Sentinel Errors ---
@@ -367,9 +369,9 @@ func newFakeRuntime(exitCode int, err error) *fakeRuntime {
 	}
 }
 
-// Run satisfies the RunRuntime interface (to be defined in run.go).
+// Run satisfies the RunRuntime interface defined in run.go.
 // It captures invocation details and returns the configured result.
-func (f *fakeRuntime) Run(workflowName string, log any) (int, error) {
+func (f *fakeRuntime) Run(workflowName string, log logger.Logger) (int, error) {
 	f.calledCount++
 	f.workflowName = workflowName
 	f.loggerWasNil = (log == nil)

@@ -14,25 +14,40 @@ type rootResult struct {
 
 // executeRoot is a test wiring helper that constructs the root command,
 // sets the given args, captures stdout/stderr, and returns the result.
-//
-// Scaffolded: requires root.go to define:
-//   - NewRootCommand() *cobra.Command (or equivalent constructor)
-//   - An execution path that returns (exitCode int)
 func executeRoot(t *testing.T, args []string) rootResult {
 	t.Helper()
-	t.Skip("scaffolded: requires root.go to define NewRootCommand() and Execute() int")
-	return rootResult{}
+	stdout, stderr := newCapturedBuffers()
+	code := ExecuteWithOptions(RootCommandOptions{
+		Stdout: stdout,
+		Stderr: stderr,
+		Args:   args,
+	})
+	return rootResult{
+		stdout:   stdout.String(),
+		stderr:   stderr.String(),
+		exitCode: code,
+	}
 }
 
 // executeRootWithStubSubcommand is a test wiring helper that registers a stub
 // subcommand with a configurable exit code, then executes the root command.
-//
-// Scaffolded: requires root.go to expose subcommand registration or provide
-// a constructor that accepts additional subcommands for testing.
 func executeRootWithStubSubcommand(t *testing.T, stubName string, stubExitCode int, args []string) rootResult {
 	t.Helper()
-	t.Skip("scaffolded: requires root.go to define NewRootCommand() with subcommand registration seam")
-	return rootResult{}
+	stdout, stderr := newCapturedBuffers()
+
+	cmd := newRootCommandForTest()
+	cmd.AddCommand(newStubSubcommand(stubName, stubExitCode))
+
+	code := executeCommand(cmd, RootCommandOptions{
+		Stdout: stdout,
+		Stderr: stderr,
+		Args:   args,
+	})
+	return rootResult{
+		stdout:   stdout.String(),
+		stderr:   stderr.String(),
+		exitCode: code,
+	}
 }
 
 // newCapturedBuffers returns a pair of bytes.Buffer for stdout and stderr capture.
