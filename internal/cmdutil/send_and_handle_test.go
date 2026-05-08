@@ -1,8 +1,13 @@
 package cmdutil
 
 import (
+	"bufio"
 	"encoding/json"
 	"errors"
+	"fmt"
+	"net"
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -177,4 +182,73 @@ func TestSendAndHandle_DoesNotCallFormatErrorOnSuccess(t *testing.T) {
 
 	fmtCalls := mock.calls()
 	assert.Empty(t, fmtCalls)
+}
+
+// --- PublicSendAndHandle ---
+
+// publicSendAndHandleSocketServer creates a Unix socket listener at a short path
+// (to avoid Unix socket path length limits of 108 chars) and returns the projectRoot.
+func publicSendAndHandleSocketServer(t *testing.T, sessionID, responseJSON string) string {
+	t.Helper()
+
+	// Use a short temp dir to keep socket path under 108-char Unix limit.
+	baseDir, err := os.MkdirTemp("/tmp", "sp")
+	require.NoError(t, err)
+	t.Cleanup(func() { os.RemoveAll(baseDir) })
+
+	socketDir := filepath.Join(baseDir, ".spectra", "sessions", sessionID)
+	require.NoError(t, makeDir(socketDir))
+	socketPath := filepath.Join(socketDir, "runtime.sock")
+
+	listener, err := net.Listen("unix", socketPath)
+	require.NoError(t, err)
+	t.Cleanup(func() { listener.Close() })
+
+	go func() {
+		conn, err := listener.Accept()
+		if err != nil {
+			return
+		}
+		defer conn.Close()
+		// Read one line (the message)
+		scanner := bufio.NewScanner(conn)
+		scanner.Scan()
+		// Write response
+		fmt.Fprint(conn, responseJSON+"\n")
+	}()
+
+	return baseDir
+}
+
+func TestPublicSendAndHandle_DelegatesToSendAndHandle(t *testing.T) {
+	sessionID := "s1"
+	tmpDir := publicSendAndHandleSocketServer(t, sessionID, `{"status":"success","message":"ok"}`)
+
+	msg := testMsg{Type: "event", ClaudeSessionID: "c-1"}
+	exitCode, stdout, stderr := PublicSendAndHandle(sessionID, tmpDir, msg, "Done")
+
+	assert.Equal(t, 0, exitCode)
+	assert.Equal(t, "Done", stdout)
+	assert.Empty(t, stderr)
+}
+
+func TestPublicSendAndHandle_PropagatesTransportError(t *testing.T) {
+	tmpDir := t.TempDir()
+	// Do not create a socket file — the socket path will not exist.
+
+	exitCode, stdout, stderr := PublicSendAndHandle("s1", tmpDir, validStruct{}, "ok")
+
+	assert.Equal(t, ExitTransportError, exitCode)
+	assert.Empty(t, stdout)
+	assert.Contains(t, stderr, "socket")
+}
+
+func TestPublicSendAndHandle_UsesFormatErrorForErrorFormatting(t *testing.T) {
+	sessionID := "s1"
+	tmpDir := publicSendAndHandleSocketServer(t, sessionID, `{"status":"error","message":"bad session"}`)
+
+	exitCode, _, stderr := PublicSendAndHandle(sessionID, tmpDir, validStruct{}, "ok")
+
+	assert.Equal(t, ExitRuntimeError, exitCode)
+	assert.Contains(t, stderr, "Error: bad session")
 }

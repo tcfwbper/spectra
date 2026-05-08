@@ -2,8 +2,14 @@ package cmdutil
 
 import (
 	"net"
+	"os"
 	"sync"
 )
+
+// makeDir creates a directory (and all parents) with default permissions.
+func makeDir(path string) error {
+	return os.MkdirAll(path, 0755)
+}
 
 // --- Mock: Connection wrapper for Close() failure ---
 
