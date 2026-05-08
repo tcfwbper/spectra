@@ -89,6 +89,23 @@ The `message` parameter must serialize to the RuntimeMessage wire format expecte
 - Condition: SocketClient returns exit code 3 with nil Response (malformed response).
   Expected: Returns exit code 3, stderr from SocketClient error (e.g., `"Error: malformed response from Runtime: ..."`).
 
+## PublicSendAndHandle
+
+`PublicSendAndHandle` is an exported convenience wrapper that wires production dependencies (a real SocketClient using storage layout for socket path resolution, and `FormatError` as the error formatter) and delegates to `SendAndHandle`. It exists so that packages outside `cmdutil` (e.g., `spectra-agent` production adapters) can invoke the send-and-handle flow without accessing unexported types.
+
+### Behavior
+
+1. `PublicSendAndHandle(sessionID, projectRoot string, message any, successText string) (exitCode int, stdout string, stderr string)`.
+2. Constructs a production SocketClient that resolves socket paths via `storage.GetRuntimeSocketPath`.
+3. Calls `SendAndHandle(productionClient, FormatError, sessionID, projectRoot, message, successText)`.
+4. Returns the result unchanged.
+
+### Boundaries
+
+- Owns: wiring production SocketClient and error formatter.
+- Delegates: all send-and-handle logic to `SendAndHandle`.
+- Must not: contain any logic beyond construction and delegation.
+
 ## Related
 
 - [SocketClient](./socket_client.md) — performs the actual socket communication

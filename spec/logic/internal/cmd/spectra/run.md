@@ -27,7 +27,7 @@ The `spectra run` command starts workflow execution. It accepts a `--workflow` f
 | `cmdutil.SignalExitCodes` | Exit code constants | Read `ExitSignalINT`, `ExitSignalTERM` | — |
 | `logger.NewSlogLogger` | Logger construction | Construct slog-based Logger for stderr | — |
 
-Construction constraint: Registered as a Cobra subcommand of the root command. No external instantiation needed.
+Construction constraint: Registered as a Cobra subcommand of the root command. The `RunRunCommand` function accepts a `RunCommandOptions` struct with injectable dependencies (`Runtime`, `Workflow`, `WorkflowProvided`, `Args`, `Stdout`, `Stderr`, `Logger`). Production wiring constructs a `productionRuntime` adapter and passes Cobra's captured flag/args state.
 
 ## Behavior
 

@@ -24,9 +24,12 @@ The root command for the `spectra-agent` CLI binary. It provides the Cobra root 
 | Collaborator | Role | Allowed Interaction | Forbidden Interaction |
 |---|---|---|---|
 | `storage.SpectraFinder` | Project root discovery | `FindProjectRoot(startDir)` | Must not use any other storage function |
+| `SendAndHandler` | Message transport | `SendAndHandle(sessionID, projectRoot, message, successText)` | Must not access socket internals |
 | `cobra` (spf13/cobra) | CLI framework | Define commands, register flags, execute | — |
 
-Construction constraint: Exposes a function (e.g., `Execute() int`) that builds and runs the Cobra command tree. Returns the process exit code. The caller (main.go) calls `os.Exit` with this value.
+Construction constraint: Exposes a function (e.g., `Execute() int`) that builds and runs the Cobra command tree with production defaults, and `ExecuteWithOptions(opts Options)` for testability. The `Options` struct carries injectable `Finder` (SpectraFinder), `Sender` (SendAndHandler), and `Args`. The caller (main.go) calls `os.Exit` with the returned exit code.
+
+Production adapters: `Execute()` wires `defaultSpectraFinder` (delegates to `storage.FindSpectraRoot`) and `defaultSendAndHandler` (delegates to `cmdutil.PublicSendAndHandle`). These adapters are unexported thin wrappers with no logic beyond delegation.
 
 ## Behavior
 

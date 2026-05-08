@@ -20,8 +20,13 @@ The root command for the `spectra` CLI binary. It provides the Cobra root comman
 | Collaborator | Role | Allowed Interaction | Forbidden Interaction |
 |---|---|---|---|
 | `cobra` (spf13/cobra) | CLI framework | Define commands, register flags, execute | — |
+| `runtime` | Workflow execution (via adapter) | `Run(workflowName, logger)` | Must not access internals |
+| `storage` | Path composition (via adapters) | `GetWorkflowPath`, `GetAgentPath`, `GetSessionDir`, `GetSessionsDir`, `FindSpectraRoot` | — |
+| `internal/builtin` | Embedded FS sources (via `builtin_resources.go`) | Read `Workflows`, `Agents`, `SpecFiles` | Must not modify |
 
 Construction constraint: Exposes a function (e.g., `Execute() int`) that builds and runs the Cobra command tree. Returns the process exit code. The caller (`main.go`) calls `os.Exit` with this value.
+
+Production adapter wiring: The root command file defines unexported production adapter types that implement the interfaces expected by subcommands (`RunRuntime`, `StorageLayoutInterface`, `ClearSpectraFinder`, `ClearStorageLayout`). Each adapter is a thin wrapper that delegates to the real package-level function (e.g., `runtime.Run`, `storage.GetSessionDir`). These adapters contain no logic beyond delegation. A separate `builtin_resources.go` file assigns `internal/builtin` embed.FS variables to package-level `fs.FS` variables for use by `BuiltinResourceCopier`.
 
 ## Behavior
 
