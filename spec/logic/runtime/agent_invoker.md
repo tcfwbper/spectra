@@ -45,7 +45,7 @@ Construction constraint: AgentInvoker is initialized with a `PersistentSession` 
 9. Validates that the working directory exists and is a directory. If not, returns an error immediately.
 10. Constructs the `claude` CLI command using `exec.Command` with separate arguments:
     - Base command: `claude`
-    - `--permission-mode bypassPermission`
+    - `--permission-mode bypassPermissions`
     - `--model <AgentDefinition.Model()>`
     - `--effort <AgentDefinition.Effort()>`
     - `--system-prompt <AgentDefinition.SystemPrompt()>`
