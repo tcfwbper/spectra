@@ -4,28 +4,6 @@ import (
 	"sync"
 )
 
-// --- Interfaces for testability ---
-
-// socketClientSender defines the interface for SocketClient's Send method.
-// Production code should implement this interface to allow mock injection in tests.
-type socketClientSender interface {
-	Send(sessionID, projectRoot string, message []byte) (*Response, int, error)
-}
-
-// errorFormatterFunc defines the interface for error formatting.
-// Production code should accept this as a dependency to allow mock injection in tests.
-type errorFormatterFunc func(msg string) string
-
-// --- Response type expected from SocketClient ---
-
-// Response represents the parsed JSON response from the Runtime socket.
-// This type must be defined in the production socket_client.go once it exists.
-// Until then, it lives here to allow test compilation.
-type Response struct {
-	Status  string `json:"status"`
-	Message string `json:"message"`
-}
-
 // --- Mock: SocketClient ---
 
 // mockSocketClient records calls to Send and returns configured results.
@@ -122,14 +100,6 @@ func (m *mockStorageLayout) calls() []mockStorageLayoutCall {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	return append([]mockStorageLayoutCall(nil), m.calledWith...)
-}
-
-// --- storageLayoutProvider interface ---
-
-// storageLayoutProvider defines the interface for storage path resolution.
-// Production code should implement this to allow test injection.
-type storageLayoutProvider interface {
-	GetRuntimeSocketPath(projectRoot, sessionID string) string
 }
 
 // --- Test message structs ---

@@ -17,13 +17,9 @@ import (
 // Until then, tests are scaffolded with t.Skip to name the missing production surface.
 
 // callSendAndHandle is a test helper that calls the production SendAndHandle.
-// This function will be wired to the actual production function once send_and_handle.go exists.
-//
-// Missing production surface: SendAndHandle function in internal/cmdutil/send_and_handle.go
 func callSendAndHandle(t *testing.T, client socketClientSender, formatter errorFormatterFunc, sessionID, projectRoot string, message any, successText string) (int, string, string) {
 	t.Helper()
-	t.Skip("scaffolded: production function SendAndHandle not yet implemented in internal/cmdutil/send_and_handle.go")
-	return 0, "", ""
+	return SendAndHandle(client, formatter, sessionID, projectRoot, message, successText)
 }
 
 // --- Happy Path — SendAndHandle ---

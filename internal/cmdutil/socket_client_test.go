@@ -27,6 +27,9 @@ func testSocketServer(t *testing.T, handler func(conn net.Conn)) (socketPath str
 	listener, err := net.Listen("unix", socketPath)
 	require.NoError(t, err)
 
+	var mu sync.Mutex
+	var acceptedConn net.Conn
+
 	var wg sync.WaitGroup
 	wg.Add(1)
 	go func() {
@@ -35,13 +38,28 @@ func testSocketServer(t *testing.T, handler func(conn net.Conn)) (socketPath str
 		if err != nil {
 			return // listener closed
 		}
+		mu.Lock()
+		acceptedConn = conn
+		mu.Unlock()
 		defer conn.Close()
 		handler(conn)
 	}()
 
 	cleanup = func() {
 		listener.Close()
-		wg.Wait()
+		// Close accepted connection to unblock handlers doing I/O.
+		mu.Lock()
+		if acceptedConn != nil {
+			acceptedConn.Close()
+		}
+		mu.Unlock()
+		// Bounded wait: do not block forever if handler never returns.
+		done := make(chan struct{})
+		go func() { wg.Wait(); close(done) }()
+		select {
+		case <-done:
+		case <-time.After(500 * time.Millisecond):
+		}
 	}
 	t.Cleanup(cleanup)
 	return socketPath, cleanup
@@ -131,20 +149,13 @@ func testSocketServerEOFDetectOnMalformed(t *testing.T) (socketPath string, clos
 	return socketPath, closed
 }
 
-// --- callSend is a test helper that calls the production Send function ---
-// Missing production surface: Send function in internal/cmdutil/socket_client.go
-// Also missing: storageLayoutProvider injection seam, timeout injection seam, connection wrapper seam.
+// callSend is a test helper that calls the production Send function.
 func callSend(t *testing.T, layout storageLayoutProvider, sessionID, projectRoot string, message []byte, opts ...sendOption) (*Response, int, error) {
 	t.Helper()
-	t.Skip("scaffolded: production function Send not yet implemented in internal/cmdutil/socket_client.go")
-	return nil, 0, nil
+	return Send(layout, sessionID, projectRoot, message, opts...)
 }
 
-// sendOption represents an optional configuration for the Send function (e.g., timeout override).
-// This will be defined in production to allow test-only timeout injection.
-type sendOption struct {
-	timeout time.Duration
-}
+// sendOption is now defined in socket_client.go (production code).
 
 // --- Happy Path — Send ---
 
