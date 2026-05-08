@@ -36,7 +36,7 @@ Spectra is a framework for defining and executing flexible AI agent workflows fo
 │  [Human] ──CLI──► [spectra]                                     │
 │                     ├─ spectra init                             │
 │                     ├─ spectra run --workflow <WorkflowName>    │
-│                     └─ spectra clear [--session-id <UUID>]      │
+│                     └─ spectra clear <UUID1> <UUID12> ...       │
 └───────────────────────────┬─────────────────────────────────────┘
                             │ Instantiate & run selected workflow
 ┌───────────────────────────▼─────────────────────────────────────┐
