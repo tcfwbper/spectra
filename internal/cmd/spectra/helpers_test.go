@@ -344,3 +344,34 @@ func assertPathNotExists(t *testing.T, path string) {
 	_, err := os.Stat(path)
 	require.Error(t, err, "assertPathNotExists: %s should not exist but does", path)
 }
+
+// --- Fake: Runtime for RunCommand ---
+
+// fakeRuntime records calls to Run() and returns configured values.
+// Used by run_test.go to test the run subcommand in isolation.
+type fakeRuntime struct {
+	// Configuration
+	exitCode int
+	err      error
+
+	// Captured state
+	calledCount  int
+	workflowName string
+	loggerWasNil bool
+}
+
+func newFakeRuntime(exitCode int, err error) *fakeRuntime {
+	return &fakeRuntime{
+		exitCode: exitCode,
+		err:      err,
+	}
+}
+
+// Run satisfies the RunRuntime interface (to be defined in run.go).
+// It captures invocation details and returns the configured result.
+func (f *fakeRuntime) Run(workflowName string, log any) (int, error) {
+	f.calledCount++
+	f.workflowName = workflowName
+	f.loggerWasNil = (log == nil)
+	return f.exitCode, f.err
+}
