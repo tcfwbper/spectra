@@ -1,0 +1,10 @@
+model: opus
+effort: medium
+agentRoot: spec
+allowedTools: []
+disallowedTools:
+  - Agent
+  - Bash(spectra *)
+  - Read(test/**)
+  - Edit(test/**)
+systemPrompt: |-
