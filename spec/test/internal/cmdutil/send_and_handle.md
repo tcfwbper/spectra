@@ -33,3 +33,15 @@
 | `TestSendAndHandle_PassesSessionIDAndProjectRoot` | `unit` | Passes sessionID and projectRoot unchanged to SocketClient.Send. | Mock `SocketClient.Send` to capture arguments and return success. | `sessionID="my-session"`, `projectRoot="/home/user/project"`, `message=validStruct{}`, `successText="ok"` | `SocketClient.Send` called with `sessionID="my-session"`, `projectRoot="/home/user/project"` |
 | `TestSendAndHandle_CallsFormatErrorOnRuntimeError` | `unit` | Calls ErrorFormatter.FormatError with response message on exit code 3 with non-nil response. | Mock `SocketClient.Send` to return `(&Response{Status:"error", Message:"bad request"}, 3, nil)`. Mock `ErrorFormatter.FormatError` to record call and return formatted string. | `sessionID="sess-1"`, `projectRoot="/tmp/project"`, `message=validStruct{}`, `successText="ok"` | `FormatError` called once with `msg="bad request"` |
 | `TestSendAndHandle_DoesNotCallFormatErrorOnSuccess` | `unit` | Does not call ErrorFormatter.FormatError when operation succeeds. | Mock `SocketClient.Send` to return success. Mock `ErrorFormatter.FormatError` to record calls. | `sessionID="sess-1"`, `projectRoot="/tmp/project"`, `message=validStruct{}`, `successText="ok"` | `FormatError` not called |
+
+---
+
+## `PublicSendAndHandle`
+
+### Mock / Dependency Interaction
+
+| Test ID | Category | Description | Setup | Input | Expected |
+|---|---|---|---|---|---|
+| `TestPublicSendAndHandle_DelegatesToSendAndHandle` | `unit` | Delegates to SendAndHandle with production SocketClient and FormatError. | Stub `storage.GetRuntimeSocketPath` to return a known path. Set up a real Unix socket listener at that path that returns a success response. | `sessionID="sess-1"`, `projectRoot=tmpDir`, `message=validStruct{Type:"event", ClaudeSessionID:"c-1"}`, `successText="Done"` | Returns `exitCode == 0`, `stdout == "Done"`, `stderr == ""` |
+| `TestPublicSendAndHandle_PropagatesTransportError` | `unit` | Propagates transport error when socket is unreachable. | Create a temp directory as projectRoot. Do not create a socket file (socket path does not exist). | `sessionID="sess-1"`, `projectRoot=tmpDir`, `message=validStruct{}`, `successText="ok"` | Returns `exitCode == 2`, `stdout == ""`, `stderr` contains error about socket |
+| `TestPublicSendAndHandle_UsesFormatErrorForErrorFormatting` | `unit` | Uses FormatError to format error messages in stderr output. | Set up a real Unix socket listener that returns an error response `{Status:"error", Message:"bad session"}`. Stub `storage.GetRuntimeSocketPath` to return socket path. | `sessionID="sess-1"`, `projectRoot=tmpDir`, `message=validStruct{}`, `successText="ok"` | Returns `exitCode == 3`, `stderr` contains `"Error: bad session"` |
