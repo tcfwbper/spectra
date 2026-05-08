@@ -91,27 +91,21 @@ type executeResult struct {
 	stderr   string
 }
 
-// TODO(scaffold): The execute helper below assumes a production function or command
-// builder that accepts injectable dependencies and args. The exact production API
-// (e.g., ExecuteWithArgs, NewRootCmd, or options pattern) will determine the final
-// wiring. This helper will be updated once the production surface is defined.
-//
-// Expected production seams:
-//   - spectraagent.SpectraFinderFunc or interface for FindProjectRoot injection
-//   - spectraagent.SendAndHandleFunc or interface for SendAndHandle injection
-//   - A way to pass CLI args (e.g., cmd.SetArgs or ExecuteWithArgs)
-
 // executeCommand runs the spectra-agent CLI with given args and fakes, capturing output.
-// This is a scaffold that will be wired to the production command builder.
 func executeCommand(t *testing.T, args []string, finder *fakeSpectraFinder, sender *fakeSendAndHandle) executeResult {
 	t.Helper()
 
-	// Scaffold: Cannot wire to production command tree yet.
-	// Missing: spectraagent.NewRootCmd or spectraagent.Execute with dependency injection seams.
-	_ = args
-	_ = finder
-	_ = sender
-	return executeResult{}
+	exitCode, stdout, stderr := RunForResult(Options{
+		Finder: finder,
+		Sender: sender,
+		Args:   args,
+	})
+
+	return executeResult{
+		exitCode: exitCode,
+		stdout:   stdout,
+		stderr:   stderr,
+	}
 }
 
 // --- Wire format structs for assertion ---

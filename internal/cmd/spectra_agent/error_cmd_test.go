@@ -10,7 +10,6 @@ import (
 // --- Happy Path — ErrorCmd ---
 
 func TestErrorCmd_Success(t *testing.T) {
-	t.Skip("blocked: production function spectraagent.Execute or NewRootCmd with dependency injection seams does not exist yet")
 
 	finder := &fakeSpectraFinder{projectRoot: "/tmp/project"}
 	sender := &fakeSendAndHandle{exitCode: 0, stdout: "Error reported successfully"}
@@ -22,7 +21,6 @@ func TestErrorCmd_Success(t *testing.T) {
 }
 
 func TestErrorCmd_WithDetailObject(t *testing.T) {
-	t.Skip("blocked: production function spectraagent.Execute or NewRootCmd with dependency injection seams does not exist yet")
 
 	finder := &fakeSpectraFinder{projectRoot: "/tmp/project"}
 	sender := &fakeSendAndHandle{exitCode: 0, stdout: "Error reported successfully"}
@@ -39,7 +37,6 @@ func TestErrorCmd_WithDetailObject(t *testing.T) {
 }
 
 func TestErrorCmd_WithDetailNull(t *testing.T) {
-	t.Skip("blocked: production function spectraagent.Execute or NewRootCmd with dependency injection seams does not exist yet")
 
 	finder := &fakeSpectraFinder{projectRoot: "/tmp/project"}
 	sender := &fakeSendAndHandle{exitCode: 0, stdout: "Error reported successfully"}
@@ -56,7 +53,6 @@ func TestErrorCmd_WithDetailNull(t *testing.T) {
 }
 
 func TestErrorCmd_WithClaudeSessionID(t *testing.T) {
-	t.Skip("blocked: production function spectraagent.Execute or NewRootCmd with dependency injection seams does not exist yet")
 
 	finder := &fakeSpectraFinder{projectRoot: "/tmp/project"}
 	sender := &fakeSendAndHandle{exitCode: 0, stdout: "Error reported successfully"}
@@ -72,7 +68,6 @@ func TestErrorCmd_WithClaudeSessionID(t *testing.T) {
 }
 
 func TestErrorCmd_WhitespaceOnlyMessageAccepted(t *testing.T) {
-	t.Skip("blocked: production function spectraagent.Execute or NewRootCmd with dependency injection seams does not exist yet")
 
 	finder := &fakeSpectraFinder{projectRoot: "/tmp/project"}
 	sender := &fakeSendAndHandle{exitCode: 0, stdout: "Error reported successfully"}
@@ -91,7 +86,6 @@ func TestErrorCmd_WhitespaceOnlyMessageAccepted(t *testing.T) {
 // --- Null / Empty Input ---
 
 func TestErrorCmd_MissingMessage(t *testing.T) {
-	t.Skip("blocked: production function spectraagent.Execute or NewRootCmd with dependency injection seams does not exist yet")
 
 	finder := &fakeSpectraFinder{projectRoot: "/tmp/project"}
 	sender := &fakeSendAndHandle{exitCode: 0}
@@ -103,7 +97,6 @@ func TestErrorCmd_MissingMessage(t *testing.T) {
 }
 
 func TestErrorCmd_EmptyMessage(t *testing.T) {
-	t.Skip("blocked: production function spectraagent.Execute or NewRootCmd with dependency injection seams does not exist yet")
 
 	finder := &fakeSpectraFinder{projectRoot: "/tmp/project"}
 	sender := &fakeSendAndHandle{exitCode: 0}
@@ -117,7 +110,6 @@ func TestErrorCmd_EmptyMessage(t *testing.T) {
 // --- Validation Failures — detail ---
 
 func TestErrorCmd_DetailPrimitive(t *testing.T) {
-	t.Skip("blocked: production function spectraagent.Execute or NewRootCmd with dependency injection seams does not exist yet")
 
 	finder := &fakeSpectraFinder{projectRoot: "/tmp/project"}
 	sender := &fakeSendAndHandle{exitCode: 0}
@@ -129,7 +121,6 @@ func TestErrorCmd_DetailPrimitive(t *testing.T) {
 }
 
 func TestErrorCmd_DetailNumber(t *testing.T) {
-	t.Skip("blocked: production function spectraagent.Execute or NewRootCmd with dependency injection seams does not exist yet")
 
 	finder := &fakeSpectraFinder{projectRoot: "/tmp/project"}
 	sender := &fakeSendAndHandle{exitCode: 0}
@@ -141,7 +132,6 @@ func TestErrorCmd_DetailNumber(t *testing.T) {
 }
 
 func TestErrorCmd_DetailBoolean(t *testing.T) {
-	t.Skip("blocked: production function spectraagent.Execute or NewRootCmd with dependency injection seams does not exist yet")
 
 	finder := &fakeSpectraFinder{projectRoot: "/tmp/project"}
 	sender := &fakeSendAndHandle{exitCode: 0}
@@ -153,7 +143,6 @@ func TestErrorCmd_DetailBoolean(t *testing.T) {
 }
 
 func TestErrorCmd_DetailArray(t *testing.T) {
-	t.Skip("blocked: production function spectraagent.Execute or NewRootCmd with dependency injection seams does not exist yet")
 
 	finder := &fakeSpectraFinder{projectRoot: "/tmp/project"}
 	sender := &fakeSendAndHandle{exitCode: 0}
@@ -165,7 +154,6 @@ func TestErrorCmd_DetailArray(t *testing.T) {
 }
 
 func TestErrorCmd_DetailInvalidJSON(t *testing.T) {
-	t.Skip("blocked: production function spectraagent.Execute or NewRootCmd with dependency injection seams does not exist yet")
 
 	finder := &fakeSpectraFinder{projectRoot: "/tmp/project"}
 	sender := &fakeSendAndHandle{exitCode: 0}
@@ -179,7 +167,6 @@ func TestErrorCmd_DetailInvalidJSON(t *testing.T) {
 // --- Mock / Dependency Interaction ---
 
 func TestErrorCmd_ConstructsWireFormat(t *testing.T) {
-	t.Skip("blocked: production function spectraagent.Execute or NewRootCmd with dependency injection seams does not exist yet")
 
 	finder := &fakeSpectraFinder{projectRoot: "/tmp/proj"}
 	sender := &fakeSendAndHandle{exitCode: 0, stdout: "Error reported successfully"}
@@ -204,7 +191,6 @@ func TestErrorCmd_ConstructsWireFormat(t *testing.T) {
 }
 
 func TestErrorCmd_DefaultDetail(t *testing.T) {
-	t.Skip("blocked: production function spectraagent.Execute or NewRootCmd with dependency injection seams does not exist yet")
 
 	finder := &fakeSpectraFinder{projectRoot: "/tmp/project"}
 	sender := &fakeSendAndHandle{exitCode: 0, stdout: "Error reported successfully"}
@@ -220,7 +206,6 @@ func TestErrorCmd_DefaultDetail(t *testing.T) {
 }
 
 func TestErrorCmd_DefaultClaudeSessionID(t *testing.T) {
-	t.Skip("blocked: production function spectraagent.Execute or NewRootCmd with dependency injection seams does not exist yet")
 
 	finder := &fakeSpectraFinder{projectRoot: "/tmp/project"}
 	sender := &fakeSendAndHandle{exitCode: 0, stdout: "Error reported successfully"}
@@ -235,7 +220,6 @@ func TestErrorCmd_DefaultClaudeSessionID(t *testing.T) {
 }
 
 func TestErrorCmd_PassesCorrectSuccessText(t *testing.T) {
-	t.Skip("blocked: production function spectraagent.Execute or NewRootCmd with dependency injection seams does not exist yet")
 
 	finder := &fakeSpectraFinder{projectRoot: "/tmp/project"}
 	sender := &fakeSendAndHandle{exitCode: 0, stdout: "Error reported successfully"}

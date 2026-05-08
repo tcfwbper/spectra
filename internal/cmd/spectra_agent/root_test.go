@@ -14,8 +14,6 @@ var errNotInitialized = errors.New("spectra not initialized: .spectra directory 
 // --- Happy Path — Execute ---
 
 func TestExecute_NoSubcommandPrintsUsage(t *testing.T) {
-	t.Skip("blocked: production function spectraagent.Execute or NewRootCmd with dependency injection seams does not exist yet")
-
 	finder := &fakeSpectraFinder{projectRoot: "/tmp/project"}
 	sender := &fakeSendAndHandle{exitCode: 0}
 
@@ -26,8 +24,6 @@ func TestExecute_NoSubcommandPrintsUsage(t *testing.T) {
 }
 
 func TestExecute_HelpFlag(t *testing.T) {
-	t.Skip("blocked: production function spectraagent.Execute or NewRootCmd with dependency injection seams does not exist yet")
-
 	finder := &fakeSpectraFinder{projectRoot: "/tmp/project"}
 	sender := &fakeSendAndHandle{exitCode: 0}
 
@@ -40,8 +36,6 @@ func TestExecute_HelpFlag(t *testing.T) {
 // --- Validation Failures — session-id ---
 
 func TestExecute_MissingSessionID(t *testing.T) {
-	t.Skip("blocked: production function spectraagent.Execute or NewRootCmd with dependency injection seams does not exist yet")
-
 	finder := &fakeSpectraFinder{projectRoot: "/tmp/project"}
 	sender := &fakeSendAndHandle{exitCode: 0}
 
@@ -52,8 +46,6 @@ func TestExecute_MissingSessionID(t *testing.T) {
 }
 
 func TestExecute_EmptySessionID(t *testing.T) {
-	t.Skip("blocked: production function spectraagent.Execute or NewRootCmd with dependency injection seams does not exist yet")
-
 	finder := &fakeSpectraFinder{projectRoot: "/tmp/project"}
 	sender := &fakeSendAndHandle{exitCode: 0}
 
@@ -64,8 +56,6 @@ func TestExecute_EmptySessionID(t *testing.T) {
 }
 
 func TestExecute_InvalidUUIDSessionIDAccepted(t *testing.T) {
-	t.Skip("blocked: production function spectraagent.Execute or NewRootCmd with dependency injection seams does not exist yet")
-
 	finder := &fakeSpectraFinder{projectRoot: "/tmp/project"}
 	sender := &fakeSendAndHandle{exitCode: 0}
 
@@ -78,8 +68,6 @@ func TestExecute_InvalidUUIDSessionIDAccepted(t *testing.T) {
 // --- Validation Failures ---
 
 func TestExecute_ProjectRootNotFound(t *testing.T) {
-	t.Skip("blocked: production function spectraagent.Execute or NewRootCmd with dependency injection seams does not exist yet")
-
 	finder := &fakeSpectraFinder{err: errNotInitialized}
 	sender := &fakeSendAndHandle{exitCode: 0}
 
@@ -90,8 +78,6 @@ func TestExecute_ProjectRootNotFound(t *testing.T) {
 }
 
 func TestExecute_UnknownSubcommand(t *testing.T) {
-	t.Skip("blocked: production function spectraagent.Execute or NewRootCmd with dependency injection seams does not exist yet")
-
 	finder := &fakeSpectraFinder{projectRoot: "/tmp/project"}
 	sender := &fakeSendAndHandle{exitCode: 0}
 
@@ -104,8 +90,6 @@ func TestExecute_UnknownSubcommand(t *testing.T) {
 // --- Error Propagation ---
 
 func TestExecute_PropagatesSubcommandExitCode2(t *testing.T) {
-	t.Skip("blocked: production function spectraagent.Execute or NewRootCmd with dependency injection seams does not exist yet")
-
 	finder := &fakeSpectraFinder{projectRoot: "/tmp/project"}
 	sender := &fakeSendAndHandle{exitCode: 2, stderr: "Error: socket not found"}
 
@@ -115,8 +99,6 @@ func TestExecute_PropagatesSubcommandExitCode2(t *testing.T) {
 }
 
 func TestExecute_PropagatesSubcommandExitCode3(t *testing.T) {
-	t.Skip("blocked: production function spectraagent.Execute or NewRootCmd with dependency injection seams does not exist yet")
-
 	finder := &fakeSpectraFinder{projectRoot: "/tmp/project"}
 	sender := &fakeSendAndHandle{exitCode: 3, stderr: "Error: runtime error"}
 
@@ -128,8 +110,6 @@ func TestExecute_PropagatesSubcommandExitCode3(t *testing.T) {
 // --- Mock / Dependency Interaction ---
 
 func TestExecute_CallsSpectraFinderWithEmptyString(t *testing.T) {
-	t.Skip("blocked: production function spectraagent.Execute or NewRootCmd with dependency injection seams does not exist yet")
-
 	finder := &fakeSpectraFinder{projectRoot: "/tmp/project"}
 	sender := &fakeSendAndHandle{exitCode: 0}
 
@@ -141,8 +121,6 @@ func TestExecute_CallsSpectraFinderWithEmptyString(t *testing.T) {
 }
 
 func TestExecute_PropagatesSessionIDToSubcommand(t *testing.T) {
-	t.Skip("blocked: production function spectraagent.Execute or NewRootCmd with dependency injection seams does not exist yet")
-
 	finder := &fakeSpectraFinder{projectRoot: "/tmp/project"}
 	sender := &fakeSendAndHandle{exitCode: 0, stdout: "Error reported successfully"}
 
@@ -154,8 +132,6 @@ func TestExecute_PropagatesSessionIDToSubcommand(t *testing.T) {
 }
 
 func TestExecute_PropagatesProjectRootToSubcommand(t *testing.T) {
-	t.Skip("blocked: production function spectraagent.Execute or NewRootCmd with dependency injection seams does not exist yet")
-
 	finder := &fakeSpectraFinder{projectRoot: "/tmp/my-project"}
 	sender := &fakeSendAndHandle{exitCode: 0, stdout: "Error reported successfully"}
 

@@ -10,7 +10,6 @@ import (
 // --- Happy Path — EventEmitCmd ---
 
 func TestEventEmitCmd_Success(t *testing.T) {
-	t.Skip("blocked: production function spectraagent.Execute or NewRootCmd with dependency injection seams does not exist yet")
 
 	finder := &fakeSpectraFinder{projectRoot: "/tmp/project"}
 	sender := &fakeSendAndHandle{exitCode: 0, stdout: "Event emitted successfully"}
@@ -22,7 +21,6 @@ func TestEventEmitCmd_Success(t *testing.T) {
 }
 
 func TestEventEmitCmd_WithMessage(t *testing.T) {
-	t.Skip("blocked: production function spectraagent.Execute or NewRootCmd with dependency injection seams does not exist yet")
 
 	finder := &fakeSpectraFinder{projectRoot: "/tmp/project"}
 	sender := &fakeSendAndHandle{exitCode: 0, stdout: "Event emitted successfully"}
@@ -39,7 +37,6 @@ func TestEventEmitCmd_WithMessage(t *testing.T) {
 }
 
 func TestEventEmitCmd_WithPayloadObject(t *testing.T) {
-	t.Skip("blocked: production function spectraagent.Execute or NewRootCmd with dependency injection seams does not exist yet")
 
 	finder := &fakeSpectraFinder{projectRoot: "/tmp/project"}
 	sender := &fakeSendAndHandle{exitCode: 0, stdout: "Event emitted successfully"}
@@ -56,7 +53,6 @@ func TestEventEmitCmd_WithPayloadObject(t *testing.T) {
 }
 
 func TestEventEmitCmd_WithClaudeSessionID(t *testing.T) {
-	t.Skip("blocked: production function spectraagent.Execute or NewRootCmd with dependency injection seams does not exist yet")
 
 	finder := &fakeSpectraFinder{projectRoot: "/tmp/project"}
 	sender := &fakeSendAndHandle{exitCode: 0, stdout: "Event emitted successfully"}
@@ -72,7 +68,6 @@ func TestEventEmitCmd_WithClaudeSessionID(t *testing.T) {
 }
 
 func TestEventEmitCmd_EmptyMessageAccepted(t *testing.T) {
-	t.Skip("blocked: production function spectraagent.Execute or NewRootCmd with dependency injection seams does not exist yet")
 
 	finder := &fakeSpectraFinder{projectRoot: "/tmp/project"}
 	sender := &fakeSendAndHandle{exitCode: 0, stdout: "Event emitted successfully"}
@@ -91,7 +86,6 @@ func TestEventEmitCmd_EmptyMessageAccepted(t *testing.T) {
 // --- Null / Empty Input ---
 
 func TestEventEmitCmd_MissingType(t *testing.T) {
-	t.Skip("blocked: production function spectraagent.Execute or NewRootCmd with dependency injection seams does not exist yet")
 
 	finder := &fakeSpectraFinder{projectRoot: "/tmp/project"}
 	sender := &fakeSendAndHandle{exitCode: 0}
@@ -103,7 +97,6 @@ func TestEventEmitCmd_MissingType(t *testing.T) {
 }
 
 func TestEventEmitCmd_EmptyType(t *testing.T) {
-	t.Skip("blocked: production function spectraagent.Execute or NewRootCmd with dependency injection seams does not exist yet")
 
 	finder := &fakeSpectraFinder{projectRoot: "/tmp/project"}
 	sender := &fakeSendAndHandle{exitCode: 0}
@@ -117,7 +110,6 @@ func TestEventEmitCmd_EmptyType(t *testing.T) {
 // --- Validation Failures — payload ---
 
 func TestEventEmitCmd_PayloadPrimitive(t *testing.T) {
-	t.Skip("blocked: production function spectraagent.Execute or NewRootCmd with dependency injection seams does not exist yet")
 
 	finder := &fakeSpectraFinder{projectRoot: "/tmp/project"}
 	sender := &fakeSendAndHandle{exitCode: 0}
@@ -129,7 +121,6 @@ func TestEventEmitCmd_PayloadPrimitive(t *testing.T) {
 }
 
 func TestEventEmitCmd_PayloadArray(t *testing.T) {
-	t.Skip("blocked: production function spectraagent.Execute or NewRootCmd with dependency injection seams does not exist yet")
 
 	finder := &fakeSpectraFinder{projectRoot: "/tmp/project"}
 	sender := &fakeSendAndHandle{exitCode: 0}
@@ -141,7 +132,6 @@ func TestEventEmitCmd_PayloadArray(t *testing.T) {
 }
 
 func TestEventEmitCmd_PayloadInvalidJSON(t *testing.T) {
-	t.Skip("blocked: production function spectraagent.Execute or NewRootCmd with dependency injection seams does not exist yet")
 
 	finder := &fakeSpectraFinder{projectRoot: "/tmp/project"}
 	sender := &fakeSendAndHandle{exitCode: 0}
@@ -153,7 +143,6 @@ func TestEventEmitCmd_PayloadInvalidJSON(t *testing.T) {
 }
 
 func TestEventEmitCmd_PayloadNull(t *testing.T) {
-	t.Skip("blocked: production function spectraagent.Execute or NewRootCmd with dependency injection seams does not exist yet")
 
 	finder := &fakeSpectraFinder{projectRoot: "/tmp/project"}
 	sender := &fakeSendAndHandle{exitCode: 0}
@@ -167,7 +156,6 @@ func TestEventEmitCmd_PayloadNull(t *testing.T) {
 // --- Mock / Dependency Interaction ---
 
 func TestEventEmitCmd_ConstructsWireFormat(t *testing.T) {
-	t.Skip("blocked: production function spectraagent.Execute or NewRootCmd with dependency injection seams does not exist yet")
 
 	finder := &fakeSpectraFinder{projectRoot: "/tmp/proj"}
 	sender := &fakeSendAndHandle{exitCode: 0, stdout: "Event emitted successfully"}
@@ -194,7 +182,6 @@ func TestEventEmitCmd_ConstructsWireFormat(t *testing.T) {
 }
 
 func TestEventEmitCmd_DefaultPayload(t *testing.T) {
-	t.Skip("blocked: production function spectraagent.Execute or NewRootCmd with dependency injection seams does not exist yet")
 
 	finder := &fakeSpectraFinder{projectRoot: "/tmp/project"}
 	sender := &fakeSendAndHandle{exitCode: 0, stdout: "Event emitted successfully"}
@@ -210,7 +197,6 @@ func TestEventEmitCmd_DefaultPayload(t *testing.T) {
 }
 
 func TestEventEmitCmd_DefaultMessage(t *testing.T) {
-	t.Skip("blocked: production function spectraagent.Execute or NewRootCmd with dependency injection seams does not exist yet")
 
 	finder := &fakeSpectraFinder{projectRoot: "/tmp/project"}
 	sender := &fakeSendAndHandle{exitCode: 0, stdout: "Event emitted successfully"}
@@ -226,7 +212,6 @@ func TestEventEmitCmd_DefaultMessage(t *testing.T) {
 }
 
 func TestEventEmitCmd_DefaultClaudeSessionID(t *testing.T) {
-	t.Skip("blocked: production function spectraagent.Execute or NewRootCmd with dependency injection seams does not exist yet")
 
 	finder := &fakeSpectraFinder{projectRoot: "/tmp/project"}
 	sender := &fakeSendAndHandle{exitCode: 0, stdout: "Event emitted successfully"}
@@ -241,7 +226,6 @@ func TestEventEmitCmd_DefaultClaudeSessionID(t *testing.T) {
 }
 
 func TestEventEmitCmd_PassesCorrectSuccessText(t *testing.T) {
-	t.Skip("blocked: production function spectraagent.Execute or NewRootCmd with dependency injection seams does not exist yet")
 
 	finder := &fakeSpectraFinder{projectRoot: "/tmp/project"}
 	sender := &fakeSendAndHandle{exitCode: 0, stdout: "Event emitted successfully"}
