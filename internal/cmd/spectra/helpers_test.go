@@ -1,6 +1,7 @@
 package spectra
 
 import (
+	"errors"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -10,6 +11,173 @@ import (
 
 	"github.com/stretchr/testify/require"
 )
+
+// --- Sentinel Errors ---
+
+var (
+	errFakeFinderFailure = errors.New("fake: spectra finder failed")
+	errFakeGetwdFailure  = errors.New("fake: os.Getwd failed")
+	errFakePhaseFailure  = errors.New("fake: phase failed")
+)
+
+// --- Fake: SpectraFinder for ClearCommand ---
+
+// fakeSpectraFinderForClear records calls to Find() and returns configured values.
+type fakeSpectraFinderForClear struct {
+	projectRoot   string
+	err           error
+	findCallCount int
+}
+
+func (f *fakeSpectraFinderForClear) Find() (string, error) {
+	f.findCallCount++
+	if f.err != nil {
+		return "", f.err
+	}
+	return f.projectRoot, nil
+}
+
+// --- Fake: StorageLayout for ClearCommand ---
+
+// clearSessionDirCall records a single invocation of GetSessionDir.
+type clearSessionDirCall struct {
+	projectRoot string
+	uuid        string
+}
+
+// fakeClearStorageLayout records calls and returns session directory paths.
+type fakeClearStorageLayout struct {
+	projectRoot string
+
+	getSessionDirCalls      []clearSessionDirCall
+	getSessionsDirCallCount int
+	getSessionsDirOverride  string
+}
+
+func (f *fakeClearStorageLayout) GetSessionDir(projectRoot, uuid string) string {
+	f.getSessionDirCalls = append(f.getSessionDirCalls, clearSessionDirCall{
+		projectRoot: projectRoot,
+		uuid:        uuid,
+	})
+	return filepath.Join(projectRoot, ".spectra", "sessions", uuid)
+}
+
+func (f *fakeClearStorageLayout) GetSessionsDir(projectRoot string) string {
+	f.getSessionsDirCallCount++
+	if f.getSessionsDirOverride != "" {
+		return f.getSessionsDirOverride
+	}
+	return filepath.Join(projectRoot, ".spectra", "sessions")
+}
+
+// --- Fake: InitCommand Dependencies ---
+
+// fakeGitignoreEnsurer records calls to Ensure().
+type fakeGitignoreEnsurer struct {
+	receivedProjectRoot string
+	called              bool
+	err                 error
+	callOrder           *[]string // shared slice for ordering verification
+}
+
+func (f *fakeGitignoreEnsurer) Ensure(projectRoot string) error {
+	f.called = true
+	f.receivedProjectRoot = projectRoot
+	if f.callOrder != nil {
+		*f.callOrder = append(*f.callOrder, "gitignore")
+	}
+	return f.err
+}
+
+// fakeDirectoryCreator records calls to CreateAll().
+type fakeDirectoryCreator struct {
+	receivedProjectRoot string
+	called              bool
+	err                 error
+	callOrder           *[]string // shared slice for ordering verification
+}
+
+func (f *fakeDirectoryCreator) CreateAll(projectRoot string) error {
+	f.called = true
+	f.receivedProjectRoot = projectRoot
+	if f.callOrder != nil {
+		*f.callOrder = append(*f.callOrder, "directories")
+	}
+	return f.err
+}
+
+// fakeBuiltinResourceCopier records calls to Copy methods.
+type fakeBuiltinResourceCopier struct {
+	receivedProjectRoot string
+
+	copyWorkflowsCalled bool
+	copyAgentsCalled    bool
+	copySpecFilesCalled bool
+
+	copyWorkflowsWarnings []string
+	copyAgentsWarnings    []string
+	copySpecFilesWarnings []string
+
+	copyWorkflowsErr error
+	copyAgentsErr    error
+	copySpecFilesErr error
+
+	callOrder *[]string // shared slice for ordering verification
+}
+
+func (f *fakeBuiltinResourceCopier) CopyWorkflows(projectRoot string) ([]string, error) {
+	f.copyWorkflowsCalled = true
+	f.receivedProjectRoot = projectRoot
+	if f.callOrder != nil {
+		*f.callOrder = append(*f.callOrder, "workflows")
+	}
+	return f.copyWorkflowsWarnings, f.copyWorkflowsErr
+}
+
+func (f *fakeBuiltinResourceCopier) CopyAgents(projectRoot string) ([]string, error) {
+	f.copyAgentsCalled = true
+	f.receivedProjectRoot = projectRoot
+	if f.callOrder != nil {
+		*f.callOrder = append(*f.callOrder, "agents")
+	}
+	return f.copyAgentsWarnings, f.copyAgentsErr
+}
+
+func (f *fakeBuiltinResourceCopier) CopySpecFiles(projectRoot string) ([]string, error) {
+	f.copySpecFilesCalled = true
+	f.receivedProjectRoot = projectRoot
+	if f.callOrder != nil {
+		*f.callOrder = append(*f.callOrder, "specfiles")
+	}
+	return f.copySpecFilesWarnings, f.copySpecFilesErr
+}
+
+// fakeInitDeps bundles all dependencies for init command tests.
+type fakeInitDeps struct {
+	cwd              string
+	getwdErr         error
+	gitignoreEnsurer *fakeGitignoreEnsurer
+	directoryCreator *fakeDirectoryCreator
+	copier           *fakeBuiltinResourceCopier
+	callOrder        []string
+}
+
+// newFakeInitDeps returns a fully configured fakeInitDeps with no errors
+// and a default CWD of "/tmp/fake-project". All fakes share a single
+// callOrder slice so phase ordering can be verified.
+func newFakeInitDeps() *fakeInitDeps {
+	deps := &fakeInitDeps{
+		cwd:              "/tmp/fake-project",
+		gitignoreEnsurer: &fakeGitignoreEnsurer{},
+		directoryCreator: &fakeDirectoryCreator{},
+		copier:           &fakeBuiltinResourceCopier{},
+	}
+	// Wire all fakes to the shared callOrder slice for ordering tests.
+	deps.gitignoreEnsurer.callOrder = &deps.callOrder
+	deps.directoryCreator.callOrder = &deps.callOrder
+	deps.copier.callOrder = &deps.callOrder
+	return deps
+}
 
 // --- Fake: StorageLayout ---
 
