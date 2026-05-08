@@ -492,7 +492,7 @@ func TestAgentInvoker_Invoke_CommandStructure(t *testing.T) {
 	// Assert: command path is "claude", args contain flags in expected order
 	require.NoError(t, err)
 	assert.Equal(t, "claude", cmdStarter.path)
-	assert.True(t, argsContainSequence(cmdStarter.args, "--permission-mode", "bypassPermission"))
+	assert.True(t, argsContainSequence(cmdStarter.args, "--permission-mode", "bypassPermissions"))
 	assert.True(t, argsContainSequence(cmdStarter.args, "--model", "opus"))
 	assert.True(t, argsContainSequence(cmdStarter.args, "--effort", "low"))
 	assert.True(t, argsContainSequence(cmdStarter.args, "--system-prompt", "sys prompt"))
