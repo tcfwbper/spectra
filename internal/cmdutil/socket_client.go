@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net"
 	"os"
 	"strings"
@@ -25,7 +26,9 @@ type storageLayoutProvider interface {
 
 // sendOption represents an optional configuration for the Send function.
 type sendOption struct {
-	timeout time.Duration
+	timeout  time.Duration
+	wrapConn func(net.Conn) net.Conn
+	stderr   io.Writer
 }
 
 // defaultTimeout is the default timeout for the entire Send operation.
@@ -36,11 +39,19 @@ const defaultTimeout = 30 * time.Second
 // (connect + send + receive) and classifies errors into transport errors
 // (exit code 2) or runtime errors (exit code 3).
 func Send(layout storageLayoutProvider, sessionID, projectRoot string, message []byte, opts ...sendOption) (*Response, int, error) {
-	// Determine timeout.
+	// Determine options.
 	timeout := defaultTimeout
+	var wrapConn func(net.Conn) net.Conn
+	stderrWriter := io.Writer(os.Stderr)
 	for _, opt := range opts {
 		if opt.timeout > 0 {
 			timeout = opt.timeout
+		}
+		if opt.wrapConn != nil {
+			wrapConn = opt.wrapConn
+		}
+		if opt.stderr != nil {
+			stderrWriter = opt.stderr
 		}
 	}
 
@@ -54,16 +65,23 @@ func Send(layout storageLayoutProvider, sessionID, projectRoot string, message [
 
 	// Connect to the Unix domain socket with deadline.
 	deadline := time.Now().Add(timeout)
-	conn, err := net.DialTimeout("unix", socketPath, timeout)
+	rawConn, err := net.DialTimeout("unix", socketPath, timeout)
 	if err != nil {
 		if os.IsTimeout(err) {
 			return nil, ExitTransportError, fmt.Errorf("connection timeout after %s", timeout)
 		}
 		return nil, ExitTransportError, fmt.Errorf("connection refused: Runtime is not running for session %s", sessionID)
 	}
+
+	// Apply connection wrapper if provided (used for testing Close() failures).
+	var conn net.Conn = rawConn
+	if wrapConn != nil {
+		conn = wrapConn(rawConn)
+	}
+
 	defer func() {
 		if closeErr := conn.Close(); closeErr != nil {
-			fmt.Fprintf(os.Stderr, "Warning: failed to close socket: %s\n", closeErr)
+			fmt.Fprintf(stderrWriter, "Warning: failed to close socket: %s\n", closeErr)
 		}
 	}()
 

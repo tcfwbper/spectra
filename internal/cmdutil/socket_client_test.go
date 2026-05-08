@@ -2,6 +2,7 @@ package cmdutil
 
 import (
 	"bufio"
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"net"
@@ -340,20 +341,23 @@ func TestSend_ClosesConnectionOnError(t *testing.T) {
 }
 
 func TestSend_CloseFailureWarning(t *testing.T) {
-	// This test requires a connection wrapper seam where Close() returns an error.
-	// The production code needs to support injecting a connection wrapper for this test.
-	// Missing seam: connection wrapper injection in socket_client.go (e.g., connDialer option or connWrapper interface)
-	t.Skip("scaffolded: requires connection wrapper seam in socket_client.go to inject Close() error")
-
 	socketPath := testSocketServerRespond(t, `{"status":"success","message":"ok"}`+"\n")
 	layout := &mockStorageLayout{socketPath: socketPath}
 
-	// Once the seam exists, inject a connection wrapper where Close() returns an error
-	// and capture stderr output to verify the warning message.
-	_, exitCode, _ := callSend(t, layout, "sess-1", "/tmp/project", []byte(`{}`))
+	// Capture stderr output.
+	var stderrBuf bytes.Buffer
 
+	// Inject a connection wrapper where Close() returns an error.
+	wrapConn := func(c net.Conn) net.Conn {
+		return &failCloseConn{Conn: c, closeErr: fmt.Errorf("simulated close error")}
+	}
+
+	_, exitCode, err := callSend(t, layout, "sess-1", "/tmp/project", []byte(`{}`),
+		sendOption{wrapConn: wrapConn, stderr: &stderrBuf})
+
+	require.NoError(t, err)
 	assert.Equal(t, 0, exitCode)
-	// assert stderr contains "Warning: failed to close socket"
+	assert.Contains(t, stderrBuf.String(), "Warning: failed to close socket")
 }
 
 // --- Boundary Values — sessionID ---

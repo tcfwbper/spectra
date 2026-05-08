@@ -1,8 +1,23 @@
 package cmdutil
 
 import (
+	"net"
 	"sync"
 )
+
+// --- Mock: Connection wrapper for Close() failure ---
+
+// failCloseConn wraps a net.Conn and returns a configured error on Close().
+type failCloseConn struct {
+	net.Conn
+	closeErr error
+}
+
+func (f *failCloseConn) Close() error {
+	// Close the underlying connection to release resources, but return our injected error.
+	_ = f.Conn.Close()
+	return f.closeErr
+}
 
 // --- Mock: SocketClient ---
 
