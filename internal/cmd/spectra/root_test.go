@@ -26,7 +26,7 @@ func TestRoot_Version_PrintsVersion(t *testing.T) {
 	result := executeRoot(t, []string{"--version"})
 
 	assert.Equal(t, 0, result.exitCode)
-	assert.Contains(t, result.stdout, "spectra version v0.1.0")
+	assert.Contains(t, result.stdout, "spectra version")
 }
 
 // --- Happy Path — Subcommand Registration ---

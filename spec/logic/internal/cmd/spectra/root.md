@@ -34,7 +34,7 @@ Production adapter wiring: The root command file defines unexported production a
 2. Registers three subcommands: `init`, `run`, `clear`.
 3. If invoked without a subcommand, prints usage information and exits with code 0.
 4. If invoked with `--help`, prints usage information and exits with code 0.
-5. If invoked with `--version`, prints the version string in format `"spectra version <version-string>"` and exits with code 0. Version string follows semantic versioning (e.g., `v0.1.0`).
+5. If invoked with `--version`, prints the version string in format `"spectra version <version-string>"` and exits with code 0.
 6. If invoked with an unknown subcommand, prints `"Error: unknown command \"<subcommand>\" for \"spectra\""` to stderr and exits with code 1.
 7. After successful initialization, delegates execution to the appropriate subcommand handler.
 8. Propagates subcommand exit codes unchanged.
@@ -83,7 +83,7 @@ Production adapter wiring: The root command file defines unexported production a
   Expected: Print usage to stdout, exit with code 0.
 
 - Condition: User invokes `spectra --version`.
-  Expected: Print `"spectra version v0.1.0"` to stdout, exit with code 0.
+  Expected: Print `"spectra version x.y.z"` to stdout, exit with code 0.
 
 - Condition: User invokes `spectra foo` (unknown subcommand).
   Expected: Exit with code 1, stderr `"Error: unknown command \"foo\" for \"spectra\""`.

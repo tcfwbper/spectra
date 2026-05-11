@@ -18,7 +18,7 @@
 |---|---|---|---|---|---|
 | `TestRoot_NoArgs_PrintsUsage` | `unit` | Prints usage information when invoked without arguments. | Construct root command with subcommands registered. | No arguments | stdout contains `"spectra [command]"`; exit code 0 |
 | `TestRoot_Help_PrintsUsage` | `unit` | Prints usage information when invoked with --help. | Construct root command with subcommands registered. | `--help` | stdout contains `"spectra [command]"`; exit code 0 |
-| `TestRoot_Version_PrintsVersion` | `unit` | Prints version string when invoked with --version. | Construct root command with subcommands registered. | `--version` | stdout contains `"spectra version v0.1.0"`; exit code 0 |
+| `TestRoot_Version_PrintsVersion` | `unit` | Prints version string when invoked with --version. | Construct root command with subcommands registered. | `--version` | stdout contains `"spectra version"`; exit code 0 |
 
 ### Happy Path — Subcommand Registration
 
