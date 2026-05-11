@@ -10,8 +10,8 @@ import (
 // socket. It is a pure data entity — it does not perform serialization,
 // transmission, size checking, or payload semantic validation.
 type RuntimeMessage struct {
-	msgType        string
-	payload        json.RawMessage
+	msgType         string
+	payload         json.RawMessage
 	claudeSessionID string
 }
 
@@ -30,8 +30,8 @@ func NewRuntimeMessage(msgType string, payload json.RawMessage, claudeSessionID 
 	copy(copied, payload)
 
 	return &RuntimeMessage{
-		msgType:        msgType,
-		payload:        copied,
+		msgType:         msgType,
+		payload:         copied,
 		claudeSessionID: claudeSessionID,
 	}, nil
 }

@@ -11,7 +11,6 @@ import (
 
 func TestRun_Success_ExitsZero(t *testing.T) {
 
-
 	rt := newFakeRuntime(0, nil)
 	result := runRun(t, rt, []string{"--workflow", "MyWorkflow"})
 
@@ -21,7 +20,6 @@ func TestRun_Success_ExitsZero(t *testing.T) {
 
 func TestRun_PassesWorkflowNameToRuntime(t *testing.T) {
 
-
 	rt := newFakeRuntime(0, nil)
 	_ = runRun(t, rt, []string{"--workflow", "deploy-prod"})
 
@@ -29,7 +27,6 @@ func TestRun_PassesWorkflowNameToRuntime(t *testing.T) {
 }
 
 func TestRun_PassesLoggerToRuntime(t *testing.T) {
-
 
 	rt := newFakeRuntime(0, nil)
 	_ = runRun(t, rt, []string{"--workflow", "MyWorkflow"})
@@ -41,7 +38,6 @@ func TestRun_PassesLoggerToRuntime(t *testing.T) {
 
 func TestRun_MissingWorkflowFlag_ExitsOne(t *testing.T) {
 
-
 	rt := newFakeRuntime(0, nil)
 	result := runRun(t, rt, nil)
 
@@ -51,7 +47,6 @@ func TestRun_MissingWorkflowFlag_ExitsOne(t *testing.T) {
 
 func TestRun_EmptyWorkflowFlag_ExitsOne(t *testing.T) {
 
-
 	rt := newFakeRuntime(0, nil)
 	result := runRun(t, rt, []string{"--workflow", ""})
 
@@ -60,7 +55,6 @@ func TestRun_EmptyWorkflowFlag_ExitsOne(t *testing.T) {
 }
 
 func TestRun_PositionalArgs_ExitsOne(t *testing.T) {
-
 
 	rt := newFakeRuntime(0, nil)
 	result := runRun(t, rt, []string{"MyWorkflow"})
@@ -73,7 +67,6 @@ func TestRun_PositionalArgs_ExitsOne(t *testing.T) {
 
 func TestRun_SignalInterrupt_ExitsCode130(t *testing.T) {
 
-
 	rt := newFakeRuntime(1, errors.New("session terminated by signal interrupt"))
 	result := runRun(t, rt, []string{"--workflow", "MyWorkflow"})
 
@@ -82,7 +75,6 @@ func TestRun_SignalInterrupt_ExitsCode130(t *testing.T) {
 }
 
 func TestRun_SignalTerminated_ExitsCode143(t *testing.T) {
-
 
 	rt := newFakeRuntime(1, errors.New("session terminated by signal terminated"))
 	result := runRun(t, rt, []string{"--workflow", "MyWorkflow"})
@@ -93,7 +85,6 @@ func TestRun_SignalTerminated_ExitsCode143(t *testing.T) {
 
 func TestRun_RuntimeError_ExitsWithRuntimeCode(t *testing.T) {
 
-
 	rt := newFakeRuntime(1, errors.New("failed to initialize session: workflow file not found: MyWorkflow"))
 	result := runRun(t, rt, []string{"--workflow", "MyWorkflow"})
 
@@ -102,7 +93,6 @@ func TestRun_RuntimeError_ExitsWithRuntimeCode(t *testing.T) {
 }
 
 func TestRun_SignalSubstring_ExitsCode130(t *testing.T) {
-
 
 	rt := newFakeRuntime(1, errors.New("runtime failure: session terminated by signal interrupt during cleanup"))
 	result := runRun(t, rt, []string{"--workflow", "MyWorkflow"})
@@ -113,7 +103,6 @@ func TestRun_SignalSubstring_ExitsCode130(t *testing.T) {
 // --- Error Propagation ---
 
 func TestRun_RuntimeCleanupTimeout_ExitsOne(t *testing.T) {
-
 
 	rt := newFakeRuntime(1, errors.New("cleanup timeout"))
 	result := runRun(t, rt, []string{"--workflow", "MyWorkflow"})
@@ -126,7 +115,6 @@ func TestRun_RuntimeCleanupTimeout_ExitsOne(t *testing.T) {
 
 func TestRun_InvokesRuntimeExactlyOnce(t *testing.T) {
 
-
 	rt := newFakeRuntime(0, nil)
 	_ = runRun(t, rt, []string{"--workflow", "MyWorkflow"})
 
@@ -134,7 +122,6 @@ func TestRun_InvokesRuntimeExactlyOnce(t *testing.T) {
 }
 
 func TestRun_DoesNotInvokeRuntimeOnValidationFailure(t *testing.T) {
-
 
 	rt := newFakeRuntime(0, nil)
 	_ = runRun(t, rt, nil)

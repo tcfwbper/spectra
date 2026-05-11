@@ -645,4 +645,3 @@ func TestSessionMetadataStore_Write_OneByteOverMaxPayloadSize(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "session metadata size exceeds limit:")
 }
-

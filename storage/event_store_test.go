@@ -543,4 +543,3 @@ func TestEventStore_Append_OneByteOverMaxPayloadSize(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "event size exceeds limit:")
 }
-
