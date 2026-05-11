@@ -18,7 +18,6 @@ func gitignorePath(projectRoot string) string {
 
 func TestGitignoreEnsurer_Ensure_CreatesNewFile(t *testing.T) {
 
-
 	projectRoot := t.TempDir()
 
 	ensurer := NewGitignoreEnsurer()
@@ -32,7 +31,6 @@ func TestGitignoreEnsurer_Ensure_CreatesNewFile(t *testing.T) {
 
 func TestGitignoreEnsurer_Ensure_AppendsWhenMissing_EndsWithNewline(t *testing.T) {
 
-
 	projectRoot := t.TempDir()
 	writeFile(t, gitignorePath(projectRoot), "node_modules\n", 0644)
 
@@ -45,7 +43,6 @@ func TestGitignoreEnsurer_Ensure_AppendsWhenMissing_EndsWithNewline(t *testing.T
 
 func TestGitignoreEnsurer_Ensure_AppendsWhenMissing_NoTrailingNewline(t *testing.T) {
 
-
 	projectRoot := t.TempDir()
 	writeFile(t, gitignorePath(projectRoot), "node_modules", 0644)
 
@@ -57,7 +54,6 @@ func TestGitignoreEnsurer_Ensure_AppendsWhenMissing_NoTrailingNewline(t *testing
 }
 
 func TestGitignoreEnsurer_Ensure_AlreadyPresent(t *testing.T) {
-
 
 	projectRoot := t.TempDir()
 	writeFile(t, gitignorePath(projectRoot), "node_modules\n.spectra\n", 0644)
@@ -72,7 +68,6 @@ func TestGitignoreEnsurer_Ensure_AlreadyPresent(t *testing.T) {
 // --- Idempotency ---
 
 func TestGitignoreEnsurer_Ensure_Idempotent(t *testing.T) {
-
 
 	projectRoot := t.TempDir()
 
@@ -102,7 +97,6 @@ func TestGitignoreEnsurer_Ensure_Idempotent(t *testing.T) {
 
 func TestGitignoreEnsurer_Ensure_MatchesWithLeadingTrailingSpaces(t *testing.T) {
 
-
 	projectRoot := t.TempDir()
 	writeFile(t, gitignorePath(projectRoot), "  .spectra  \n", 0644)
 
@@ -115,7 +109,6 @@ func TestGitignoreEnsurer_Ensure_MatchesWithLeadingTrailingSpaces(t *testing.T) 
 }
 
 func TestGitignoreEnsurer_Ensure_MatchesWithTabs(t *testing.T) {
-
 
 	projectRoot := t.TempDir()
 	writeFile(t, gitignorePath(projectRoot), "\t.spectra\t\n", 0644)
@@ -130,7 +123,6 @@ func TestGitignoreEnsurer_Ensure_MatchesWithTabs(t *testing.T) {
 
 func TestGitignoreEnsurer_Ensure_DoesNotMatchSpectraSlash(t *testing.T) {
 
-
 	projectRoot := t.TempDir()
 	writeFile(t, gitignorePath(projectRoot), ".spectra/\n", 0644)
 
@@ -143,7 +135,6 @@ func TestGitignoreEnsurer_Ensure_DoesNotMatchSpectraSlash(t *testing.T) {
 
 func TestGitignoreEnsurer_Ensure_DoesNotMatchCommented(t *testing.T) {
 
-
 	projectRoot := t.TempDir()
 	writeFile(t, gitignorePath(projectRoot), "# .spectra\n", 0644)
 
@@ -155,7 +146,6 @@ func TestGitignoreEnsurer_Ensure_DoesNotMatchCommented(t *testing.T) {
 }
 
 func TestGitignoreEnsurer_Ensure_DoesNotTrimUnicodeWhitespace(t *testing.T) {
-
 
 	projectRoot := t.TempDir()
 	// NBSP (U+00A0) prefix — should NOT be trimmed, so line does not match
@@ -172,7 +162,6 @@ func TestGitignoreEnsurer_Ensure_DoesNotTrimUnicodeWhitespace(t *testing.T) {
 
 func TestGitignoreEnsurer_Ensure_EmptyFile(t *testing.T) {
 
-
 	projectRoot := t.TempDir()
 	writeFile(t, gitignorePath(projectRoot), "", 0644)
 
@@ -186,7 +175,6 @@ func TestGitignoreEnsurer_Ensure_EmptyFile(t *testing.T) {
 // --- Error Propagation ---
 
 func TestGitignoreEnsurer_Ensure_ReadPermissionDenied(t *testing.T) {
-
 
 	projectRoot := t.TempDir()
 	path := gitignorePath(projectRoot)
@@ -203,7 +191,6 @@ func TestGitignoreEnsurer_Ensure_ReadPermissionDenied(t *testing.T) {
 
 func TestGitignoreEnsurer_Ensure_WritePermissionDenied(t *testing.T) {
 
-
 	projectRoot := t.TempDir()
 	path := gitignorePath(projectRoot)
 	writeFile(t, path, "node_modules\n", 0444)
@@ -219,7 +206,6 @@ func TestGitignoreEnsurer_Ensure_WritePermissionDenied(t *testing.T) {
 
 func TestGitignoreEnsurer_Ensure_BrokenSymlink(t *testing.T) {
 
-
 	projectRoot := t.TempDir()
 	path := gitignorePath(projectRoot)
 	// Create a symlink pointing to a non-existent target
@@ -234,7 +220,6 @@ func TestGitignoreEnsurer_Ensure_BrokenSymlink(t *testing.T) {
 // --- Mock / Dependency Interaction ---
 
 func TestGitignoreEnsurer_Ensure_FollowsSymlink(t *testing.T) {
-
 
 	projectRoot := t.TempDir()
 	realFilePath := filepath.Join(projectRoot, "real_gitignore")

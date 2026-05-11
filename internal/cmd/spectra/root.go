@@ -306,4 +306,3 @@ func mapSignalExitCode(runtimeExitCode int, err error) int {
 	}
 	return runtimeExitCode
 }
-

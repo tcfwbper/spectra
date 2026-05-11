@@ -4,8 +4,8 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/tcfwbper/spectra/storage"
 	"github.com/stretchr/testify/assert"
+	"github.com/tcfwbper/spectra/storage"
 )
 
 func TestStorageLayout_ConcurrentAccess(t *testing.T) {

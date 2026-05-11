@@ -6,9 +6,9 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/tcfwbper/spectra/storage"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/tcfwbper/spectra/storage"
 )
 
 func TestCreateSessionDirectory_ConcurrentSameUUID(t *testing.T) {
