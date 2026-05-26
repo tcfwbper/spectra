@@ -132,7 +132,7 @@ This project prefers a spec-first contribution workflow.
 3. Keep changes small and focused, and include the relevant validation.
 4. When practical, prefer using `spectra` to support the development workflow.
 
-For more details, see [CONTRIBUTING.md](/home/pesci/spectra/CONTRIBUTING.md).
+For more details, see [CONTRIBUTING.md](/CONTRIBUTING.md).
 
 # Maintainer Release Flow
 
