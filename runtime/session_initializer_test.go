@@ -355,6 +355,32 @@ func TestSessionInitializer_Initialize_CallsCreateSessionDirectoryWithUserUUID(t
 	assert.Equal(t, "550e8400-e29b-41d4-a716-446655440000", f.dirMgr.createSessionDirUUID)
 }
 
+func TestSessionInitializer_Initialize_PassesOsPidToNewSession(t *testing.T) {
+	// Scaffolded: Once the SessionFactory signature is updated to accept pid (int),
+	// and the production Initialize method passes os.Getpid() as the pid argument,
+	// this test will verify that the resulting session's Pid field == os.Getpid().
+	//
+	// Missing production surface:
+	//   - SessionFactory type must include pid parameter
+	//   - SessionInitializer.Initialize must call os.Getpid() and pass it to the factory
+	//   - The Session interface / mockSession must expose a Pid field or getter
+	t.Skip("blocked: SessionFactory does not yet accept pid parameter — awaiting production surface update to pass os.Getpid() to NewSession")
+
+	// Once production surface exists, the test should:
+	// 1. Configure fixture with successful mocks
+	// 2. Call si.Initialize("wf", "", make(chan struct{}, 2))
+	// 3. Assert result.PersistentSession's underlying session has Pid == os.Getpid()
+	//
+	// Example implementation:
+	// f := newSessionInitializerFixture(t).withWorkflowLoaderSuccess(t).withDirManagerSuccess()
+	// si := NewSessionInitializer(f.projectRoot, f.loader, f.dirMgr, f.logger)
+	// result := si.Initialize("wf", "", make(chan struct{}, 2))
+	// require.NoError(t, result.Error)
+	// require.NotNil(t, result.PersistentSession)
+	// snapshot := result.PersistentSession.GetMetadataSnapshotSafe()
+	// assert.Equal(t, os.Getpid(), snapshot.Pid)
+}
+
 // =============================================================================
 // Error Propagation
 // =============================================================================

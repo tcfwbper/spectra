@@ -17,6 +17,7 @@ import (
 // --- Fixture Builders for SessionMetadataStore tests ---
 
 // makeValidMetadata creates a valid SessionMetadata snapshot with all fields populated and Error=nil.
+// TODO: Once SessionMetadata.Pid field is added, include Pid: 1234 in the fixture.
 func makeValidMetadata() session.SessionMetadata {
 	return session.SessionMetadata{
 		ID:           testSessionUUID,
@@ -237,6 +238,28 @@ func TestSessionMetadataStore_Write_AgentErrorEmptyRole(t *testing.T) {
 	assert.Equal(t, "", errObj["agentRole"])
 }
 
+func TestSessionMetadataStore_Write_PidAlwaysSerialized(t *testing.T) {
+	// Scaffolded: SessionMetadata.Pid field does not yet exist.
+	// Once the field is added with json:"pid" (no omitempty), this test verifies
+	// that "pid" is always present in the written JSON.
+	//
+	// Missing production surface:
+	//   - SessionMetadata must have: Pid int `json:"pid"`
+	t.Skip("blocked: SessionMetadata.Pid field does not yet exist — awaiting production surface update")
+
+	// Once production surface exists:
+	// projectRoot, sessionDir := makeSessionDirFixture(t)
+	// meta := makeValidMetadata()
+	// meta.Pid = 1234
+	//
+	// store := NewSessionMetadataStore(projectRoot, testSessionUUID)
+	// require.NoError(t, store.Write(meta))
+	//
+	// filePath := filepath.Join(sessionDir, SessionMetadataFile)
+	// data, _ := os.ReadFile(filePath)
+	// assert.Contains(t, string(data), `"pid": 1234`)
+}
+
 func TestSessionMetadataStore_Write_UpdatedAtPassThrough(t *testing.T) {
 	projectRoot, sessionDir := makeSessionDirFixture(t)
 	meta := makeValidMetadata()
@@ -336,6 +359,34 @@ func TestSessionMetadataStore_Read_IgnoresEventHistoryField(t *testing.T) {
 	require.NoError(t, err)
 	// EventHistory is not part of SessionMetadata struct, so it should be ignored.
 	assert.Equal(t, testSessionUUID, meta.ID)
+}
+
+func TestSessionMetadataStore_Read_LegacyFileMissingPid(t *testing.T) {
+	// Scaffolded: SessionMetadata.Pid field does not yet exist.
+	// Once added, reading a legacy JSON file that lacks "pid" should default Pid to 0.
+	//
+	// Missing production surface:
+	//   - SessionMetadata must have: Pid int `json:"pid"`
+	t.Skip("blocked: SessionMetadata.Pid field does not yet exist — awaiting production surface update")
+
+	// Once production surface exists:
+	// projectRoot, sessionDir := makeSessionDirFixture(t)
+	// // Legacy JSON with no "pid" field
+	// legacyJSON := `{
+	//   "id": "550e8400-e29b-41d4-a716-446655440000",
+	//   "workflowName": "CodeReview",
+	//   "status": "running",
+	//   "createdAt": 1700000000,
+	//   "updatedAt": 1700000100,
+	//   "currentState": "ReviewCode",
+	//   "sessionData": {}
+	// }`
+	// writeSessionFile(t, sessionDir, legacyJSON)
+	//
+	// store := NewSessionMetadataStore(projectRoot, testSessionUUID)
+	// meta, err := store.Read()
+	// require.NoError(t, err)
+	// assert.Equal(t, 0, meta.Pid)
 }
 
 // --- Error Propagation ---
