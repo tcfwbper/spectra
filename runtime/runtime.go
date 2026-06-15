@@ -65,9 +65,9 @@ var newSubTimerFunc = func(d time.Duration) (<-chan struct{}, func()) {
 
 // sessionInitializeFunc is a seam for constructing and invoking SessionInitializer.
 // In production it constructs a real SessionInitializer and calls Initialize.
-var sessionInitializeFunc = func(projectRoot string, wfLoader WorkflowLoader, dirMgr SessionDirManager, log logger.Logger, workflowName string, terminationNotifier chan<- struct{}) InitResult {
+var sessionInitializeFunc = func(projectRoot string, wfLoader WorkflowLoader, dirMgr SessionDirManager, log logger.Logger, workflowName string, sessionID string, terminationNotifier chan<- struct{}) InitResult {
 	si := NewSessionInitializer(projectRoot, wfLoader, dirMgr, log)
-	return si.Initialize(workflowName, terminationNotifier)
+	return si.Initialize(workflowName, sessionID, terminationNotifier)
 }
 
 // constructPostSessionDepsFunc is a seam for constructing post-session dependencies.
@@ -138,7 +138,7 @@ func (a *messageHandlerAdapter) Handle(sessionUUID string, msg entities.RuntimeM
 // initializes a session, creates the runtime socket, performs the initial
 // dispatch of the entry node, runs the main event loop, handles termination
 // signals, and returns an exit code with an optional error.
-func Run(workflowName string, log logger.Logger) (int, error) {
+func Run(workflowName string, sessionID string, log logger.Logger) (int, error) {
 	// Step 2: Locate project root.
 	projectRoot, err := spectraFinderFunc()
 	if err != nil {
@@ -155,7 +155,7 @@ func Run(workflowName string, log logger.Logger) (int, error) {
 	}
 
 	// Step 7-8: Construct SessionInitializer and initialize session.
-	initResult := sessionInitializeFunc(projectRoot, wfLoader, dirMgr, log, workflowName, terminationNotifier)
+	initResult := sessionInitializeFunc(projectRoot, wfLoader, dirMgr, log, workflowName, sessionID, terminationNotifier)
 
 	// Step 9-10: Handle initialization failure.
 	if initResult.Error != nil {

@@ -12,7 +12,7 @@ import (
 // RunRuntime defines the interface for workflow execution used by the run command.
 // The runtime executes the named workflow, using the provided logger for structured output.
 type RunRuntime interface {
-	Run(workflowName string, log logger.Logger) (int, error)
+	Run(workflowName string, sessionID string, log logger.Logger) (int, error)
 }
 
 // RunCommandOptions holds injectable dependencies for the run command.
@@ -20,6 +20,7 @@ type RunCommandOptions struct {
 	Runtime          RunRuntime
 	Workflow         string
 	WorkflowProvided bool
+	SessionID        string
 	Args             []string
 	Stdout           io.Writer
 	Stderr           io.Writer
@@ -58,7 +59,7 @@ func RunRunCommand(opts RunCommandOptions) int {
 	}
 
 	// Invoke runtime
-	exitCode, err := opts.Runtime.Run(opts.Workflow, log)
+	exitCode, err := opts.Runtime.Run(opts.Workflow, opts.SessionID, log)
 	if err != nil {
 		_, _ = fmt.Fprintf(opts.Stderr, "%s\n", cmdutil.FormatError(err.Error()))
 		return mapSignalExitCode(exitCode, err)
