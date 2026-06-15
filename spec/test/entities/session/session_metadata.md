@@ -14,7 +14,7 @@
 
 | Test ID | Category | Description | Setup | Input | Expected |
 |---|---|---|---|---|---|
-| `TestSessionMetadata_AccessViaSession` | `unit` | SessionMetadata fields are accessible directly on the Session (embedded struct). | Construct session via `NewSession` with known inputs | Access `session.ID`, `session.WorkflowName`, `session.Status`, `session.CreatedAt`, `session.UpdatedAt`, `session.CurrentState`, `session.SessionData`, `session.Error` | All fields match the values established by `NewSession` |
+| `TestSessionMetadata_AccessViaSession` | `unit` | SessionMetadata fields are accessible directly on the Session (embedded struct). | Construct session via `NewSession` with known inputs (including `pid=42`) | Access `session.ID`, `session.WorkflowName`, `session.Pid`, `session.Status`, `session.CreatedAt`, `session.UpdatedAt`, `session.CurrentState`, `session.SessionData`, `session.Error` | All fields match the values established by `NewSession`; `session.Pid == 42` |
 
 ### Data Independence (Copy Semantics)
 
