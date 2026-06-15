@@ -52,19 +52,21 @@ type mockRuntimeSessionInitializer struct {
 	mu                   sync.Mutex
 	initializeCalled     int
 	capturedWorkflowName string
+	capturedSessionID    string
 	capturedTermNotifier chan<- struct{}
 	result               InitResult
-	initializeFunc       func(workflowName string, terminationNotifier chan<- struct{}) InitResult
+	initializeFunc       func(workflowName string, sessionID string, terminationNotifier chan<- struct{}) InitResult
 }
 
-func (m *mockRuntimeSessionInitializer) Initialize(workflowName string, terminationNotifier chan<- struct{}) InitResult {
+func (m *mockRuntimeSessionInitializer) Initialize(workflowName string, sessionID string, terminationNotifier chan<- struct{}) InitResult {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.initializeCalled++
 	m.capturedWorkflowName = workflowName
+	m.capturedSessionID = sessionID
 	m.capturedTermNotifier = terminationNotifier
 	if m.initializeFunc != nil {
-		return m.initializeFunc(workflowName, terminationNotifier)
+		return m.initializeFunc(workflowName, sessionID, terminationNotifier)
 	}
 	return m.result
 }
@@ -479,8 +481,8 @@ func wireFixtureToSeams(t *testing.T, f *runtimeTestFixture) {
 	}
 
 	// Wire sessionInitializeFunc.
-	sessionInitializeFunc = func(projectRoot string, wfLoader WorkflowLoader, dirMgr SessionDirManager, log logger.Logger, workflowName string, terminationNotifier chan<- struct{}) InitResult {
-		return f.SessionInitializer.Initialize(workflowName, terminationNotifier)
+	sessionInitializeFunc = func(projectRoot string, wfLoader WorkflowLoader, dirMgr SessionDirManager, log logger.Logger, workflowName string, sessionID string, terminationNotifier chan<- struct{}) InitResult {
+		return f.SessionInitializer.Initialize(workflowName, sessionID, terminationNotifier)
 	}
 
 	// Wire constructPostSessionDepsFunc.

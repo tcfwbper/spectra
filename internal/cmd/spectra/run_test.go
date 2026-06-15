@@ -34,6 +34,22 @@ func TestRun_PassesLoggerToRuntime(t *testing.T) {
 	assert.False(t, rt.loggerWasNil, "expected a non-nil logger to be passed to Runtime.Run")
 }
 
+func TestRun_PassesSessionIDToRuntime(t *testing.T) {
+
+	rt := newFakeRuntime(0, nil)
+	_ = runRun(t, rt, []string{"--workflow", "MyWorkflow", "--session-id", "550e8400-e29b-41d4-a716-446655440000"})
+
+	assert.Equal(t, "550e8400-e29b-41d4-a716-446655440000", rt.sessionID)
+}
+
+func TestRun_OmittedSessionID_PassesEmptyString(t *testing.T) {
+
+	rt := newFakeRuntime(0, nil)
+	_ = runRun(t, rt, []string{"--workflow", "MyWorkflow"})
+
+	assert.Equal(t, "", rt.sessionID)
+}
+
 // --- Validation Failures ---
 
 func TestRun_MissingWorkflowFlag_ExitsOne(t *testing.T) {
