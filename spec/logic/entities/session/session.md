@@ -19,7 +19,7 @@ This file defines the **entity struct, its fields, the lock, construction, and t
 ## Boundaries
 
 - Owns: in-memory state management (status transitions, event history, current state, session data), field validation at construction, and thread-safe access serialization via read-write lock.
-- Owns: immutability of construction-time fields (`ID`, `WorkflowName`, `CreatedAt`).
+- Owns: immutability of construction-time fields (`ID`, `WorkflowName`, `Pid`, `CreatedAt`).
 - Owns: terminal-state notification via `terminationNotifier` channel (Done, Fail).
 - Delegates: persistence of session state to the runtime caller. Session does not know about or invoke any persistence mechanism.
 - Delegates: UUID generation, workflow definition lookup, and `terminationNotifier` channel creation to the runtime caller (provided as constructor arguments).
@@ -39,7 +39,7 @@ Construction constraint: Must be constructed via `NewSession(...)`. Direct struc
 
 ### Construction
 
-`NewSession(id string, workflowName string, entryNode string, createdAt int64) (*Session, error)`
+`NewSession(id string, workflowName string, entryNode string, pid int, createdAt int64) (*Session, error)`
 
 Validates all inputs and returns an initialized Session. Initial values:
 
@@ -49,6 +49,7 @@ Validates all inputs and returns an initialized Session. Initial values:
 |---|---|
 | `ID` | Validated `id` parameter (UUID format) |
 | `WorkflowName` | Validated `workflowName` parameter |
+| `Pid` | Validated `pid` parameter (> 0) |
 | `Status` | `"initializing"` |
 | `CreatedAt` | Validated `createdAt` parameter (> 0) |
 | `UpdatedAt` | Same value as `CreatedAt` |
@@ -67,7 +68,8 @@ Validation rules:
 1. `id` must be a valid UUID format string. If not, return error `"invalid session ID: must be a valid UUID"`.
 2. `workflowName` must be non-empty. If empty, return error `"workflow name cannot be empty"`.
 3. `entryNode` must be non-empty. If empty, return error `"entry node cannot be empty"`.
-4. `createdAt` must be > 0. If not, return error `"createdAt must be a positive POSIX timestamp"`.
+4. `pid` must be > 0. If not, return error `"pid must be a positive integer"`.
+5. `createdAt` must be > 0. If not, return error `"createdAt must be a positive POSIX timestamp"`.
 
 After construction, all field access must go through the thread-safe methods listed in the table above.
 
@@ -97,6 +99,7 @@ Session embeds [SessionMetadata](./session_metadata.md) as an anonymous field, p
 |---|---|---|---|
 | `ID` | string (UUID) | Valid UUID format; immutable after construction | Unique session identifier |
 | `WorkflowName` | string | Non-empty; immutable after construction | Name of the workflow being executed |
+| `Pid` | int | > 0; immutable after construction | OS process ID of the `spectra run` process that owns this session |
 | `Status` | string | Enum: `"initializing"`, `"running"`, `"completed"`, `"failed"` | Current execution status |
 | `CreatedAt` | int64 (POSIX seconds) | > 0; immutable after construction | Timestamp at construction |
 | `UpdatedAt` | int64 (POSIX seconds) | >= `CreatedAt` | Timestamp of last in-memory mutation; refreshed by every mutating method |
@@ -118,6 +121,7 @@ Session embeds [SessionMetadata](./session_metadata.md) as an anonymous field, p
 | `invalid session ID: must be a valid UUID` | `id` is not valid UUID format |
 | `workflow name cannot be empty` | `workflowName == ""` |
 | `entry node cannot be empty` | `entryNode == ""` |
+| `pid must be a positive integer` | `pid <= 0` |
 | `createdAt must be a positive POSIX timestamp` | `createdAt <= 0` |
 
 ## Invariants
@@ -161,6 +165,9 @@ Cross-method edge cases are listed below. Per-method edge cases live in the corr
 
 - **Condition**: Constructor receives empty `workflowName` or `entryNode`.
   Expected: Returns validation error. No Session is created.
+
+- **Condition**: Constructor receives `pid <= 0`.
+  Expected: Returns validation error `"pid must be a positive integer"`. No Session is created.
 
 - **Condition**: Constructor receives `createdAt <= 0`.
   Expected: Returns validation error. No Session is created.

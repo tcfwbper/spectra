@@ -2,7 +2,7 @@
 
 ## Overview
 
-SessionMetadataStore manages persistent storage of SessionMetadata for a single session. It reads and writes the `session.json` file in pretty-printed JSON format, ensuring metadata is written with file-level write locks. SessionMetadataStore serializes the SessionMetadata fields (ID, WorkflowName, Status, CreatedAt, UpdatedAt, CurrentState, SessionData, Error) and does not serialize EventHistory, which is persisted separately by EventStore. SessionMetadataStore does not manage the parent session directory; it expects the directory to exist before writing metadata.
+SessionMetadataStore manages persistent storage of SessionMetadata for a single session. It reads and writes the `session.json` file in pretty-printed JSON format, ensuring metadata is written with file-level write locks. SessionMetadataStore serializes the SessionMetadata fields (ID, WorkflowName, Pid, Status, CreatedAt, UpdatedAt, CurrentState, SessionData, Error) and does not serialize EventHistory, which is persisted separately by EventStore. SessionMetadataStore does not manage the parent session directory; it expects the directory to exist before writing metadata.
 
 **Persistence Role**: SessionMetadataStore provides best-effort, last-write-wins persistence for user inspection and debugging. The Read operation is intended for external tools only (e.g., `spectra clear`, `spectra status`). The running Runtime must never read from SessionMetadataStore to determine behavior; the in-memory Session entity is the authoritative source of truth.
 
@@ -122,33 +122,37 @@ No error — constructor does not perform I/O.
 
 2. **EventHistory Exclusion**: SessionMetadataStore must only serialize SessionMetadata fields. EventHistory is persisted separately by EventStore.
 
-3. **Error Field Omitempty**: When `Error` is nil, the field is omitted from the JSON output. When set, the full error structure is serialized without an explicit discriminator.
+3. **Pid Field Serialization**: The `pid` field is always serialized as a JSON number (no omitempty). It is always > 0 for newly created sessions. When reading legacy `session.json` files that lack the `pid` field, SessionMetadataStore defaults `Pid` to 0 without returning an error (backward compatibility).
 
-4. **Error Type Via Mutual Exclusion**: When `Error` is non-nil, the concrete type is determined by mutually exclusive fields: `"agentRole"` (present only for AgentError) and `"issuer"` (present only for RuntimeError). No `"errorType"` discriminator field is written or expected. The `"agentRole"` key must always be written for AgentError regardless of whether the value is an empty string (i.e., no omitempty on this field during serialization).
+4. **Error Field Omitempty**: When `Error` is nil, the field is omitted from the JSON output. When set, the full error structure is serialized without an explicit discriminator.
 
-5. **File-Level Locking**: Write operations must acquire an exclusive lock. Read operations must acquire a shared lock. Locks must be released before the function returns (including error paths).
+5. **Error Type Via Mutual Exclusion**: When `Error` is non-nil, the concrete type is determined by mutually exclusive fields: `"agentRole"` (present only for AgentError) and `"issuer"` (present only for RuntimeError). No `"errorType"` discriminator field is written or expected. The `"agentRole"` key must always be written for AgentError regardless of whether the value is an empty string (i.e., no omitempty on this field during serialization).
 
-6. **Truncate-and-Write**: Each metadata write replaces the entire file content. Partial updates are not supported.
+6. **File-Level Locking**: Write operations must acquire an exclusive lock. Read operations must acquire a shared lock. Locks must be released before the function returns (including error paths).
 
-7. **File Permissions**: Newly created `session.json` files must have permissions `0644`.
+7. **Truncate-and-Write**: Each metadata write replaces the entire file content. Partial updates are not supported.
 
-8. **No In-Memory Cache**: SessionMetadataStore does not cache metadata in memory. Each read operation reads from disk.
+8. **File Permissions**: Newly created `session.json` files must have permissions `0644`.
 
-9. **UpdatedAt Pass-Through**: SessionMetadataStore serializes `UpdatedAt` as-is from the provided snapshot. It must not overwrite or modify this value.
+9. **No In-Memory Cache**: SessionMetadataStore does not cache metadata in memory. Each read operation reads from disk.
 
-10. **Parent Directory Requirement**: SessionMetadataStore must not create the session directory. It returns an error if the directory does not exist.
+10. **UpdatedAt Pass-Through**: SessionMetadataStore serializes `UpdatedAt` as-is from the provided snapshot. It must not overwrite or modify this value.
 
-11. **Idempotent Read**: Reading session metadata multiple times returns the same result if the file has not been modified.
+11. **Parent Directory Requirement**: SessionMetadataStore must not create the session directory. It returns an error if the directory does not exist.
 
-12. **No State Transition Validation**: SessionMetadataStore does not validate session status transitions. It persists whatever snapshot it receives.
+12. **Idempotent Read**: Reading session metadata multiple times returns the same result if the file has not been modified.
 
-13. **Concurrent Access Safety**: File-level locks support both single-process (multiple goroutines) and multi-process concurrent access. Last write wins.
+13. **No State Transition Validation**: SessionMetadataStore does not validate session status transitions. It persists whatever snapshot it receives.
 
-14. **Size Limit**: Each serialized metadata payload must not exceed `MaxPayloadSize` (defined as a package-level constant in the storage package).
+14. **Concurrent Access Safety**: File-level locks support both single-process (multiple goroutines) and multi-process concurrent access. Last write wins.
 
-15. **No Constructor I/O**: The constructor performs only path composition. No filesystem access occurs until Write or Read is called.
+15. **Size Limit**: Each serialized metadata payload must not exceed `MaxPayloadSize` (defined as a package-level constant in the storage package).
 
-16. **Error Reconstruction Via Constructors**: When reading the Error field, SessionMetadataStore must reconstruct `*AgentError` or `*RuntimeError` via their respective constructors (`NewAgentError`, `NewRuntimeError`), not via direct struct literal assignment.
+16. **No Constructor I/O**: The constructor performs only path composition. No filesystem access occurs until Write or Read is called.
+
+17. **Error Reconstruction Via Constructors**: When reading the Error field, SessionMetadataStore must reconstruct `*AgentError` or `*RuntimeError` via their respective constructors (`NewAgentError`, `NewRuntimeError`), not via direct struct literal assignment.
+
+18. **Pid Backward Compatibility**: When reading a `session.json` that lacks the `"pid"` field, `Pid` defaults to 0. No error is raised. This allows external tools to handle legacy sessions gracefully.
 
 ## Edge Cases
 
@@ -202,6 +206,9 @@ No error — constructor does not perform I/O.
 
 - **Condition**: JSON file contains an `"eventHistory"` field from a manual edit.
   **Expected**: The field is ignored during parsing. The returned SessionMetadata does not include EventHistory.
+
+- **Condition**: JSON file was created by an older version and lacks the `"pid"` field.
+  **Expected**: `Pid` defaults to 0 in the returned SessionMetadata. No error is raised.
 
 ## Related
 

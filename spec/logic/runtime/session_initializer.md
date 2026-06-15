@@ -60,7 +60,7 @@ Construction constraint: SessionInitializer is constructed with `projectRoot`, `
 10. Calls `SessionDirectoryManager.CreateSessionDirectory(projectRoot, sessionUUID)` to create the session directory.
 11. If directory creation fails, returns an error: `"failed to create session directory: <error>"`. No session entity is returned.
 12. Checks `ctx.Err()`. If context is cancelled, returns a timeout error.
-13. Constructs a Session entity via `NewSession(sessionUUID, workflowName, workflowDefinition.EntryNode(), now())`.
+13. Constructs a Session entity via `NewSession(sessionUUID, workflowName, workflowDefinition.EntryNode(), os.Getpid(), now())`. The PID is obtained from the OS at this point — it is the process ID of the running `spectra run` process.
 14. If Session construction fails, returns an error: `"failed to construct session: <error>"`. No session entity is returned.
 15. Constructs `SessionMetadataStore` via `NewSessionMetadataStore(projectRoot, sessionUUID)`.
 16. Constructs `EventStore` via `NewEventStore(projectRoot, sessionUUID, logger)`.
