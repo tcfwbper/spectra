@@ -31,12 +31,9 @@ const (
 // --- Fixture Builders ---
 
 // newTestSession constructs a valid session for testing using default test constants.
-// TODO: Once NewSession accepts a pid parameter, update call to:
-//
-//	NewSession(testUUID, testWorkflow, testEntryNode, testPid, testCreatedAt)
 func newTestSession(t *testing.T) *Session {
 	t.Helper()
-	s, err := NewSession(testUUID, testWorkflow, testEntryNode, testCreatedAt)
+	s, err := NewSession(testUUID, testWorkflow, testEntryNode, testPid, testCreatedAt)
 	if err != nil {
 		t.Fatalf("newTestSession: unexpected error: %v", err)
 	}

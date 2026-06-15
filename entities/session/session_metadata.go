@@ -5,6 +5,7 @@ package session
 type SessionMetadata struct {
 	ID           string         `json:"id"`
 	WorkflowName string         `json:"workflowName"`
+	Pid          int            `json:"pid"`
 	Status       string         `json:"status"`
 	CreatedAt    int64          `json:"createdAt"`
 	UpdatedAt    int64          `json:"updatedAt"`

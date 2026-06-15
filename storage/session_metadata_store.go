@@ -131,6 +131,12 @@ func (s *SessionMetadataStore) Read() (session.SessionMetadata, error) {
 	if err := json.Unmarshal(raw["workflowName"], &meta.WorkflowName); err != nil {
 		return zero, fmt.Errorf("failed to parse session metadata: %w", err)
 	}
+	// Parse pid if present (defaults to 0 for legacy files missing the field).
+	if pidRaw, ok := raw["pid"]; ok {
+		if err := json.Unmarshal(pidRaw, &meta.Pid); err != nil {
+			return zero, fmt.Errorf("failed to parse session metadata: %w", err)
+		}
+	}
 	if err := json.Unmarshal(raw["status"], &meta.Status); err != nil {
 		return zero, fmt.Errorf("failed to parse session metadata: %w", err)
 	}
@@ -165,6 +171,7 @@ func (s *SessionMetadataStore) serializeMetadata(meta session.SessionMetadata) (
 	output := map[string]any{
 		"id":           meta.ID,
 		"workflowName": meta.WorkflowName,
+		"pid":          meta.Pid,
 		"status":       meta.Status,
 		"createdAt":    meta.CreatedAt,
 		"updatedAt":    meta.UpdatedAt,

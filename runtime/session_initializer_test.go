@@ -3,6 +3,7 @@ package runtime
 import (
 	"context"
 	"errors"
+	"os"
 	"sync"
 	"testing"
 
@@ -356,29 +357,15 @@ func TestSessionInitializer_Initialize_CallsCreateSessionDirectoryWithUserUUID(t
 }
 
 func TestSessionInitializer_Initialize_PassesOsPidToNewSession(t *testing.T) {
-	// Scaffolded: Once the SessionFactory signature is updated to accept pid (int),
-	// and the production Initialize method passes os.Getpid() as the pid argument,
-	// this test will verify that the resulting session's Pid field == os.Getpid().
-	//
-	// Missing production surface:
-	//   - SessionFactory type must include pid parameter
-	//   - SessionInitializer.Initialize must call os.Getpid() and pass it to the factory
-	//   - The Session interface / mockSession must expose a Pid field or getter
-	t.Skip("blocked: SessionFactory does not yet accept pid parameter — awaiting production surface update to pass os.Getpid() to NewSession")
+	f := newSessionInitializerFixture(t).withWorkflowLoaderSuccess(t).withDirManagerSuccess()
 
-	// Once production surface exists, the test should:
-	// 1. Configure fixture with successful mocks
-	// 2. Call si.Initialize("wf", "", make(chan struct{}, 2))
-	// 3. Assert result.PersistentSession's underlying session has Pid == os.Getpid()
-	//
-	// Example implementation:
-	// f := newSessionInitializerFixture(t).withWorkflowLoaderSuccess(t).withDirManagerSuccess()
-	// si := NewSessionInitializer(f.projectRoot, f.loader, f.dirMgr, f.logger)
-	// result := si.Initialize("wf", "", make(chan struct{}, 2))
-	// require.NoError(t, result.Error)
-	// require.NotNil(t, result.PersistentSession)
-	// snapshot := result.PersistentSession.GetMetadataSnapshotSafe()
-	// assert.Equal(t, os.Getpid(), snapshot.Pid)
+	si := NewSessionInitializer(f.projectRoot, f.loader, f.dirMgr, f.logger)
+	result := si.Initialize("wf", "", make(chan struct{}, 2))
+
+	require.NoError(t, result.Error)
+	require.NotNil(t, result.PersistentSession)
+	snapshot := result.PersistentSession.GetMetadataSnapshotSafe()
+	assert.Equal(t, os.Getpid(), snapshot.Pid)
 }
 
 // =============================================================================
@@ -436,7 +423,7 @@ func TestSessionInitializer_Initialize_SessionConstructionFails(t *testing.T) {
 	// Act
 	si := NewSessionInitializer(f.projectRoot, f.loader, f.dirMgr, f.logger)
 	// Inject a failing session factory.
-	si.sessionFactory = func(id, workflowName, entryNode string, createdAt int64) (Session, error) {
+	si.sessionFactory = func(id, workflowName, entryNode string, pid int, createdAt int64) (Session, error) {
 		return nil, errors.New("invalid session parameters")
 	}
 	result := si.Initialize("wf", "", make(chan struct{}, 2))
@@ -453,7 +440,7 @@ func TestSessionInitializer_Initialize_RunFails(t *testing.T) {
 	// Act
 	si := NewSessionInitializer(f.projectRoot, f.loader, f.dirMgr, f.logger)
 	// Inject a session factory that returns a mock session whose Run() fails.
-	si.sessionFactory = func(id, workflowName, entryNode string, createdAt int64) (Session, error) {
+	si.sessionFactory = func(id, workflowName, entryNode string, pid int, createdAt int64) (Session, error) {
 		ms := newDefaultMockSession()
 		ms.id = id
 		ms.workflowName = workflowName
@@ -512,7 +499,7 @@ func TestSessionInitializer_Initialize_TimeoutAfterPersistentSession(t *testing.
 	}
 	// Inject a session factory that cancels context after returning (simulates
 	// timeout occurring between session construction and step 18 check).
-	si.sessionFactory = func(id, workflowName, entryNode string, createdAt int64) (Session, error) {
+	si.sessionFactory = func(id, workflowName, entryNode string, pid int, createdAt int64) (Session, error) {
 		ms := newDefaultMockSession()
 		ms.id = id
 		ms.workflowName = workflowName
@@ -545,7 +532,7 @@ func TestSessionInitializer_Initialize_TimeoutAfterRunSucceeds(t *testing.T) {
 		return ctx, cancel
 	}
 	// Inject a session factory whose Run() cancels the context on success.
-	si.sessionFactory = func(id, workflowName, entryNode string, createdAt int64) (Session, error) {
+	si.sessionFactory = func(id, workflowName, entryNode string, pid int, createdAt int64) (Session, error) {
 		ms := newDefaultMockSession()
 		ms.id = id
 		ms.workflowName = workflowName
@@ -569,7 +556,7 @@ func TestSessionInitializer_Initialize_RunFailsRuntimeErrorDetails(t *testing.T)
 	var capturedFailErr error
 	// Act
 	si := NewSessionInitializer(f.projectRoot, f.loader, f.dirMgr, f.logger)
-	si.sessionFactory = func(id, workflowName, entryNode string, createdAt int64) (Session, error) {
+	si.sessionFactory = func(id, workflowName, entryNode string, pid int, createdAt int64) (Session, error) {
 		ms := newDefaultMockSession()
 		ms.id = id
 		ms.workflowName = workflowName

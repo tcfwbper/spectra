@@ -3,6 +3,7 @@ package runtime
 import (
 	"context"
 	"fmt"
+	"os"
 	"regexp"
 	"time"
 
@@ -40,7 +41,7 @@ type InitResult struct {
 
 // SessionFactory defines the interface for constructing a Session entity.
 // In production this calls entitysession.NewSession; tests can replace it.
-type SessionFactory func(id, workflowName, entryNode string, createdAt int64) (Session, error)
+type SessionFactory func(id, workflowName, entryNode string, pid int, createdAt int64) (Session, error)
 
 // ContextFactory creates a context and cancel function for the initialization flow.
 // In production this returns context.WithTimeout(context.Background(), 30*time.Second).
@@ -54,6 +55,7 @@ type SessionInitializer struct {
 	logger         logger.Logger
 	uuidGen        UUIDGenerator
 	nowFunc        func() int64
+	pidFunc        func() int
 	sessionFactory SessionFactory
 	contextFactory ContextFactory
 }
@@ -67,8 +69,9 @@ func NewSessionInitializer(projectRoot string, loader WorkflowLoader, dirMgr Ses
 		logger:      log,
 		uuidGen:     &defaultUUIDGenerator{},
 		nowFunc:     func() int64 { return time.Now().Unix() },
-		sessionFactory: func(id, workflowName, entryNode string, createdAt int64) (Session, error) {
-			sess, err := entitysession.NewSession(id, workflowName, entryNode, createdAt)
+		pidFunc:     os.Getpid,
+		sessionFactory: func(id, workflowName, entryNode string, pid int, createdAt int64) (Session, error) {
+			sess, err := entitysession.NewSession(id, workflowName, entryNode, pid, createdAt)
 			if err != nil {
 				return nil, err
 			}
@@ -162,7 +165,8 @@ func (si *SessionInitializer) Initialize(workflowName string, sessionID string, 
 
 	// Step 13: Construct Session entity.
 	now := si.nowFunc()
-	sess, err := si.sessionFactory(sessionUUID, workflowName, wfDef.EntryNode(), now)
+	pid := si.pidFunc()
+	sess, err := si.sessionFactory(sessionUUID, workflowName, wfDef.EntryNode(), pid, now)
 	if err != nil {
 		return InitResult{
 			Error: fmt.Errorf("failed to construct session: %s", err.Error()),
