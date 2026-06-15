@@ -2,11 +2,12 @@
 
 ## Overview
 
-The `spectra run` command starts workflow execution. It accepts a `--workflow` flag, constructs a Logger, invokes `Runtime.Run(workflowName, logger)`, examines the returned exit code and error, maps signal-terminated errors to exit codes 130/143, and exits with the determined exit code. This command is the user-facing entry point for running Spectra workflows.
+The `spectra run` command starts workflow execution. It accepts a `--workflow` flag and an optional `--session-id` flag, constructs a Logger, invokes `Runtime.Run(workflowName, sessionID, logger)`, examines the returned exit code and error, maps signal-terminated errors to exit codes 130/143, and exits with the determined exit code. This command is the user-facing entry point for running Spectra workflows.
 
 ## Boundaries
 
 - Owns: `--workflow` flag parsing and validation (required, non-empty).
+- Owns: `--session-id` flag parsing (optional).
 - Owns: positional argument rejection.
 - Owns: Logger construction (slog-based, output to stderr).
 - Owns: exit code mapping from Runtime result to process exit code (signal detection).
@@ -15,6 +16,7 @@ The `spectra run` command starts workflow execution. It accepts a `--workflow` f
 - Delegates: error message formatting to `cmdutil.ErrorFormatter`.
 - Must not: register signal handlers (Runtime owns signal handling).
 - Must not: validate workflow name format or existence (Runtime's responsibility).
+- Must not: validate session-id UUID format (SessionInitializer's responsibility).
 - Must not: retry on failure.
 - Must not: print success messages (SessionFinalizer logs via Logger).
 
@@ -22,12 +24,12 @@ The `spectra run` command starts workflow execution. It accepts a `--workflow` f
 
 | Collaborator | Role | Allowed Interaction | Forbidden Interaction |
 |---|---|---|---|
-| `Runtime` | Workflow execution | `Run(workflowName, logger) (int, error)` | Must not access internals |
+| `Runtime` | Workflow execution | `Run(workflowName, sessionID, logger) (int, error)` | Must not access internals |
 | `cmdutil.ErrorFormatter` | Error formatting | `FormatError(msg)` | — |
 | `cmdutil.SignalExitCodes` | Exit code constants | Read `ExitSignalINT`, `ExitSignalTERM` | — |
 | `logger.NewSlogLogger` | Logger construction | Construct slog-based Logger for stderr | — |
 
-Construction constraint: Registered as a Cobra subcommand of the root command. The `RunRunCommand` function accepts a `RunCommandOptions` struct with injectable dependencies (`Runtime`, `Workflow`, `WorkflowProvided`, `Args`, `Stdout`, `Stderr`, `Logger`). Production wiring constructs a `productionRuntime` adapter and passes Cobra's captured flag/args state.
+Construction constraint: Registered as a Cobra subcommand of the root command. The `RunRunCommand` function accepts a `RunCommandOptions` struct with injectable dependencies (`Runtime`, `Workflow`, `WorkflowProvided`, `SessionID`, `Args`, `Stdout`, `Stderr`, `Logger`). Production wiring constructs a `productionRuntime` adapter and passes Cobra's captured flag/args state.
 
 ## Behavior
 
@@ -35,10 +37,12 @@ Construction constraint: Registered as a Cobra subcommand of the root command. T
 
 1. `spectra run` is invoked as a subcommand of `spectra`.
 2. Accepts one required flag: `--workflow <WorkflowName>` (non-empty string).
-3. If `--workflow` is not provided, prints `"Error: required flag --workflow not provided"` to stderr and exits with code 1.
-4. If `--workflow` is an empty string, prints `"Error: --workflow flag cannot be empty"` to stderr and exits with code 1.
-5. If positional arguments are provided, prints `"Error: unexpected argument '<argument>'. Use --workflow flag to specify workflow name."` to stderr and exits with code 1.
-6. Does not validate workflow name format or existence. Validation is delegated to Runtime.
+3. Accepts one optional flag: `--session-id <UUID>` (string, default empty).
+4. If `--workflow` is not provided, prints `"Error: required flag --workflow not provided"` to stderr and exits with code 1.
+5. If `--workflow` is an empty string, prints `"Error: --workflow flag cannot be empty"` to stderr and exits with code 1.
+6. If positional arguments are provided, prints `"Error: unexpected argument '<argument>'. Use --workflow flag to specify workflow name."` to stderr and exits with code 1.
+7. Does not validate workflow name format or existence. Validation is delegated to Runtime.
+8. Does not validate `--session-id` UUID format. Validation is delegated to SessionInitializer via Runtime. If not provided, the empty string is passed to Runtime which signals auto-generation.
 
 ### Logger Construction
 
@@ -48,7 +52,7 @@ Construction constraint: Registered as a Cobra subcommand of the root command. T
 
 ### Runtime Invocation
 
-10. Calls `Runtime.Run(workflowName, logger)` which returns `(exitCode int, err error)`.
+10. Calls `Runtime.Run(workflowName, sessionID, logger)` which returns `(exitCode int, err error)`.
 11. `Runtime.Run()` is a blocking call that manages the entire workflow execution lifecycle.
 
 ### Exit Code Determination
@@ -72,6 +76,7 @@ Construction constraint: Registered as a Cobra subcommand of the root command. T
 | Argument | Type | Constraints | Required | Description |
 |----------|------|-------------|----------|-------------|
 | `--workflow` | string | Non-empty | Yes | Name of the workflow to execute |
+| `--session-id` | string | Valid UUID format (validated downstream by SessionInitializer) | No | User-specified session UUID. If not provided, SessionInitializer auto-generates one. |
 
 ### From Runtime
 
@@ -104,13 +109,14 @@ Construction constraint: Registered as a Cobra subcommand of the root command. T
 
 1. **Single Runtime Invocation**: Invokes `Runtime.Run()` exactly once per command execution.
 2. **No Workflow Validation**: Does not validate workflow name format or existence.
-3. **Signal Detection via Substring**: Exit code 130/143 is determined by substring matching of the error message.
-4. **Signal Exit Code Priority**: Signal-based exit codes (130, 143) take precedence over the Runtime-returned exit code.
-5. **No Additional Output on Success**: On success, no messages are printed (Logger output handled by Runtime internals).
-6. **No Signal Handling**: Does not register signal handlers. Signal handling is Runtime's responsibility.
-7. **No Retry**: Does not retry Runtime invocation on failure.
-8. **Error Prefix Consistency**: All error messages are prefixed with `"Error: "` via ErrorFormatter.
-9. **Logger to stderr**: The constructed Logger outputs to stderr, not stdout.
+3. **No Session ID Validation**: Does not validate `--session-id` UUID format. Passes the raw string value (or empty string if not provided) to Runtime.
+4. **Signal Detection via Substring**: Exit code 130/143 is determined by substring matching of the error message.
+5. **Signal Exit Code Priority**: Signal-based exit codes (130, 143) take precedence over the Runtime-returned exit code.
+6. **No Additional Output on Success**: On success, no messages are printed (Logger output handled by Runtime internals).
+7. **No Signal Handling**: Does not register signal handlers. Signal handling is Runtime's responsibility.
+8. **No Retry**: Does not retry Runtime invocation on failure.
+9. **Error Prefix Consistency**: All error messages are prefixed with `"Error: "` via ErrorFormatter.
+10. **Logger to stderr**: The constructed Logger outputs to stderr, not stdout.
 
 ## Edge Cases
 

@@ -2,7 +2,7 @@
 
 ## Overview
 
-Runtime is the top-level orchestrator invoked by `spectra run`. It receives a workflow name and a Logger, bootstraps all dependencies, initializes a session, creates the runtime socket, performs the initial dispatch of the entry node, runs the main event loop, handles termination signals (session completion/failure, listener errors, OS signals), enforces a grace period for cleanup, and returns an exit code with an optional error. Runtime is the single entry point for workflow execution and coordinates the lifecycle of all runtime components.
+Runtime is the top-level orchestrator invoked by `spectra run`. It receives a workflow name, an optional session ID, and a Logger, bootstraps all dependencies, initializes a session, creates the runtime socket, performs the initial dispatch of the entry node, runs the main event loop, handles termination signals (session completion/failure, listener errors, OS signals), enforces a grace period for cleanup, and returns an exit code with an optional error. Runtime is the single entry point for workflow execution and coordinates the lifecycle of all runtime components.
 
 Runtime does not manage session directory creation or deletion (SessionInitializer and `spectra clear` respectively), does not validate messages (RuntimeSocketManager and processors), and does not evaluate transitions (TransitionEvaluator).
 
@@ -36,7 +36,7 @@ Runtime does not manage session directory creation or deletion (SessionInitializ
 | Collaborator | Role | Allowed Interaction | Forbidden Interaction |
 |---|---|---|---|
 | `SpectraFinder` | Project root discovery | `Find()` | — |
-| `SessionInitializer` | Session bootstrap | `Initialize(workflowName, terminationNotifier)` | Must not call after initialization |
+| `SessionInitializer` | Session bootstrap | `Initialize(workflowName, sessionID, terminationNotifier)` | Must not call after initialization |
 | `PersistentSession` | State container with auto-persist | `Fail(err, notifier)`, `GetStatusSafe()`, read `ID`, `WorkflowName` | Must not call `Run()`, `Done()`, must not modify fields directly, must not call stores directly |
 | `RuntimeSocketManager` | Socket lifecycle | `CreateSocket()`, `Listen(handler)`, `DeleteSocket()` | Must not construct via struct literal |
 | `MessageRouter` | Message dispatch | Pass as MessageHandler to Listen | Must not invoke Handle directly |
@@ -46,13 +46,13 @@ Runtime does not manage session directory creation or deletion (SessionInitializ
 | `Logger` | Structured logging | `Info(msg, args...)`, `Warn(msg, args...)`, `Error(msg, args...)` | Must not use for session status output (SessionFinalizer's job) |
 | `WorkflowDefinition` | Configuration source | Read `EntryNode()` for initial dispatch | Must not modify |
 
-Construction constraint: Runtime is an exported function `Run(workflowName string, logger logger.Logger) (int, error)`. It is not a struct. All dependencies are constructed internally during execution. Logger is the only externally injected dependency.
+Construction constraint: Runtime is an exported function `Run(workflowName string, sessionID string, logger logger.Logger) (int, error)`. It is not a struct. All dependencies are constructed internally during execution. Logger is the only externally injected dependency. `sessionID` is an optional parameter: empty string means SessionInitializer will auto-generate a UUID.
 
 ## Behavior
 
 ### Initialization and Bootstrap
 
-1. Runtime is invoked by `spectra run` with inputs: `workflowName` (string) and `logger` (logger.Logger).
+1. Runtime is invoked by `spectra run` with inputs: `workflowName` (string), `sessionID` (string, may be empty), and `logger` (logger.Logger).
 2. Calls `SpectraFinder.Find()` to locate the `.spectra` directory and obtain the `projectRoot` absolute path.
 3. If `SpectraFinder.Find()` returns an error, returns `(1, error)` with message: `"failed to locate project root: <error>"`. No resources created.
 4. Creates a buffered channel `terminationNotifier` with capacity 2 (`make(chan struct{}, 2)`).
@@ -61,7 +61,7 @@ Construction constraint: Runtime is an exported function `Run(workflowName strin
    2. `SessionDirectoryManager` (requires `projectRoot`)
 6. If any dependency construction fails, returns `(1, error)` with message: `"failed to initialize runtime dependencies: <error>"`.
 7. Constructs `SessionInitializer` with `projectRoot`, `WorkflowDefinitionLoader`, `SessionDirectoryManager`, and `logger`.
-8. Invokes `SessionInitializer.Initialize(workflowName, terminationNotifier)` which returns an `InitResult` containing `PersistentSession`, `WorkflowDefinition`, and `Error`.
+8. Invokes `SessionInitializer.Initialize(workflowName, sessionID, terminationNotifier)` which returns an `InitResult` containing `PersistentSession`, `WorkflowDefinition`, and `Error`.
 9. If `InitResult.Error != nil` and `InitResult.PersistentSession == nil` (failure before session entity construction), returns `(1, error)` with message: `"failed to initialize session: <error>"`. SessionFinalizer is not invoked.
 10. If `InitResult.Error != nil` and `InitResult.PersistentSession != nil` (failure after session entity construction), proceeds to cleanup and SessionFinalizer (steps 33-39), then returns the exit code from SessionFinalizer and error: `"failed to initialize session: <error>"`.
 
@@ -134,6 +134,7 @@ Construction constraint: Runtime is an exported function `Run(workflowName strin
 | Field | Type | Constraints | Required |
 |-------|------|-------------|----------|
 | workflowName | string | Non-empty, must reference a valid workflow definition file | Yes |
+| sessionID | string | Valid UUID format if non-empty; empty string means auto-generate | No |
 | logger | logger.Logger | Non-nil Logger interface implementation | Yes |
 
 ## Outputs
@@ -166,7 +167,7 @@ Construction constraint: Runtime is an exported function `Run(workflowName strin
 
 2. **Function Form**: Runtime is an exported function, not a struct. All dependencies are constructed internally.
 
-3. **Logger Injection**: Logger is the only externally provided dependency. All other dependencies are constructed within Runtime using projectRoot and session UUID.
+3. **Logger and SessionID Injection**: Logger and sessionID are the only externally provided dependencies. All other dependencies are constructed within Runtime using projectRoot and session UUID. Runtime passes sessionID through to SessionInitializer without validation.
 
 4. **ProjectRoot Discovery**: Runtime must call `SpectraFinder.Find()` at the beginning of execution. projectRoot is not passed as input.
 
