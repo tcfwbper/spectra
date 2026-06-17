@@ -20,6 +20,7 @@ export interface StubWebview {
   postMessage: sinon.SinonStub;
   onDidReceiveMessage: sinon.SinonStub;
   html: string;
+  options: any;
 }
 
 /**
@@ -31,6 +32,7 @@ export function createStubWebview(cspSource = "https://test.csp"): StubWebview {
     postMessage: sinon.stub().resolves(true),
     onDidReceiveMessage: sinon.stub(),
     html: "",
+    options: {},
   };
 }
 

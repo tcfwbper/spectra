@@ -126,33 +126,24 @@ describe("ProjectRootResolver", () => {
 
   describe("Happy Path — isInitialized", () => {
     it("should return true when .spectra directory exists", async function () {
-      // Scaffolded: missing production surface ProjectRootResolver.isInitialized
-      this.skip();
-      // Expected implementation once production surface exists:
-      // const fsProvider = createMockFsProvider(true);
-      // const uriFile = createMockUriFile();
-      // const result = await ProjectRootResolver.isInitialized('/workspace', { stat: fsProvider.stat, uriFile });
-      // expect(result).to.be.true;
+      const fsProvider = createMockFsProvider(true);
+      const uriFile = createMockUriFile();
+      const result = await ProjectRootResolver.isInitialized('/workspace', { stat: fsProvider.stat, uriFile });
+      expect(result).to.be.true;
     });
 
     it("should return false when .spectra directory does not exist", async function () {
-      // Scaffolded: missing production surface ProjectRootResolver.isInitialized
-      this.skip();
-      // Expected implementation once production surface exists:
-      // const fsProvider = createMockFsProvider(false);
-      // const uriFile = createMockUriFile();
-      // const result = await ProjectRootResolver.isInitialized('/workspace', { stat: fsProvider.stat, uriFile });
-      // expect(result).to.be.false;
+      const fsProvider = createMockFsProvider(false);
+      const uriFile = createMockUriFile();
+      const result = await ProjectRootResolver.isInitialized('/workspace', { stat: fsProvider.stat, uriFile });
+      expect(result).to.be.false;
     });
 
     it("should construct URI with path.join of projectRoot and .spectra", async function () {
-      // Scaffolded: missing production surface ProjectRootResolver.isInitialized
-      this.skip();
-      // Expected implementation once production surface exists:
-      // const fsProvider = createMockFsProvider(true);
-      // const uriFile = createMockUriFile();
-      // await ProjectRootResolver.isInitialized('/my/project', { stat: fsProvider.stat, uriFile });
-      // expect(uriFile.calledWith(path.join('/my/project', '.spectra'))).to.be.true;
+      const fsProvider = createMockFsProvider(true);
+      const uriFile = createMockUriFile();
+      await ProjectRootResolver.isInitialized('/my/project', { stat: fsProvider.stat, uriFile });
+      expect(uriFile.calledWith(path.join('/my/project', '.spectra'))).to.be.true;
     });
   });
 
@@ -257,13 +248,10 @@ describe("ProjectRootResolver", () => {
     });
 
     it("should call vscode.workspace.fs.stat in isInitialized", async function () {
-      // Scaffolded: missing production surface ProjectRootResolver.isInitialized
-      this.skip();
-      // Expected implementation once production surface exists:
-      // const fsProvider = createMockFsProvider(true);
-      // const uriFile = createMockUriFile();
-      // await ProjectRootResolver.isInitialized('/workspace', { stat: fsProvider.stat, uriFile });
-      // expect(fsProvider.stat.calledOnce).to.be.true;
+      const fsProvider = createMockFsProvider(true);
+      const uriFile = createMockUriFile();
+      await ProjectRootResolver.isInitialized('/workspace', { stat: fsProvider.stat, uriFile });
+      expect(fsProvider.stat.calledOnce).to.be.true;
       // The URI passed should correspond to '/workspace/.spectra'
     });
   });

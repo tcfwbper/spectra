@@ -1,7 +1,8 @@
 /**
  * ProjectRootResolver — resolves the effective project root path for the
  * Spectra extension by combining the VS Code workspace folder with the
- * optional `spectra.projectRoot` configuration value.
+ * optional `spectra.projectRoot` configuration value. Also checks whether
+ * the project has been initialized (.spectra/ directory exists).
  *
  * Logic spec: spec/logic/vscode/src/services/projectRootResolver.md
  */
@@ -16,6 +17,22 @@ export interface WorkspaceProvider {
     | ReadonlyArray<{ uri: { fsPath: string } }>
     | undefined;
   getConfiguration(section: string): { get<T>(key: string): T | undefined };
+}
+
+/**
+ * Minimal interface for the filesystem stat provider used by isInitialized.
+ * In production this is satisfied by vscode.workspace.fs; in tests a stub is passed.
+ */
+export interface FsProvider {
+  stat(uri: any): Promise<any>;
+}
+
+/**
+ * Minimal interface for URI construction used by isInitialized.
+ * In production this is satisfied by vscode.Uri.file; in tests a stub is passed.
+ */
+export interface UriFileProvider {
+  (path: string): any;
 }
 
 /**
@@ -58,5 +75,32 @@ export class ProjectRootResolver {
 
     // Step 5: Join workspace path with configuration value.
     return path.join(workspacePath, projectRoot);
+  }
+
+  /**
+   * Checks whether the project has been initialized by verifying
+   * that the .spectra/ directory exists at the given project root.
+   *
+   * @param projectRoot - The resolved project root path.
+   * @param fsProvider - Injectable filesystem stat provider (for testing).
+   * @returns True if .spectra/ directory exists, false otherwise.
+   */
+  static async isInitialized(
+    projectRoot: string,
+    fsProvider: { stat: FsProvider["stat"]; uriFile: UriFileProvider },
+  ): Promise<boolean> {
+    // Step 6: Construct URI for .spectra directory
+    const spectraPath = path.join(projectRoot, ".spectra");
+    const uri = fsProvider.uriFile(spectraPath);
+
+    try {
+      // Step 7: Call stat
+      await fsProvider.stat(uri);
+      // Step 8: If stat succeeds, return true
+      return true;
+    } catch {
+      // Step 9: If stat throws, return false
+      return false;
+    }
   }
 }

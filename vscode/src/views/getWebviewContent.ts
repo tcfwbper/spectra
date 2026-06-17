@@ -1,7 +1,12 @@
 /**
- * getWebviewContent — generates the complete HTML string for the SpectraPanel webview.
+ * getWebviewContent — generates the complete HTML string for the Spectra sidebar webview.
  *
  * Logic spec: spec/logic/vscode/src/views/getWebviewContent.md
+ *
+ * Produces a self-contained document with inline CSS and JavaScript that renders
+ * three pages (not-initialized notice, sessions list, and session detail),
+ * handles client-side page routing via window.addEventListener('message', ...),
+ * and communicates with the extension host via vscode.postMessage(...).
  */
 import * as crypto from "crypto";
 
@@ -110,10 +115,19 @@ button:disabled {
 #btn-back {
   margin-bottom: 12px;
 }
+.not-initialized-text {
+  color: var(--vscode-descriptionForeground, #999);
+  text-align: center;
+  padding: 32px 16px;
+}
 </style>
 </head>
 <body>
 <h1>Spectra</h1>
+
+<div id="page-not-initialized" class="page hidden">
+  <div class="not-initialized-text">Please run <code>spectra init</code> to initialize the project.</div>
+</div>
 
 <div id="page-sessions" class="page">
   <div class="row">
@@ -137,6 +151,7 @@ button:disabled {
 (function() {
   const vscode = acquireVsCodeApi();
 
+  const pageNotInitialized = document.getElementById('page-not-initialized');
   const pageSessions = document.getElementById('page-sessions');
   const pageDetail = document.getElementById('page-detail');
   const workflowSelect = document.getElementById('workflow-select');
@@ -202,8 +217,15 @@ button:disabled {
     const msg = event.data;
     if (!msg) return;
 
+    if (msg.type === 'showNotInitialized') {
+      pageNotInitialized.classList.remove('hidden');
+      pageSessions.classList.add('hidden');
+      pageDetail.classList.add('hidden');
+    }
+
     if (msg.type === 'showSessions') {
       pageSessions.classList.remove('hidden');
+      pageNotInitialized.classList.add('hidden');
       pageDetail.classList.add('hidden');
 
       const state = msg.state || {};
@@ -259,6 +281,7 @@ button:disabled {
 
     if (msg.type === 'showDetail') {
       pageDetail.classList.remove('hidden');
+      pageNotInitialized.classList.add('hidden');
       pageSessions.classList.add('hidden');
 
       const state = msg.state || {};
