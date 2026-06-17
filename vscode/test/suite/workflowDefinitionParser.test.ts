@@ -13,8 +13,7 @@ import {
   type FsStubs,
 } from "./helpers/fsStubs";
 
-// TODO: Uncomment once production module exists:
-// import { WorkflowDefinitionParser } from "../../src/services/workflowDefinitionParser";
+import { WorkflowDefinitionParser } from "../../src/services/workflowDefinitionParser";
 
 /**
  * Builds a valid YAML string from structured input.
@@ -68,9 +67,7 @@ function buildYaml(opts: {
 /**
  * Creates a bound parseWorkflowDefinition function that injects fs stubs.
  *
- * Scaffolded: The actual import/invocation depends on the production module
- * exporting WorkflowDefinitionParser with a static parseWorkflowDefinition method
- * accepting (projectRoot, workflowName, logger, fs?) parameters.
+ * Reason: staged scaffold replacement — production module now exists.
  */
 function createParseWithStubs(fsStubs: FsStubs) {
   return async function parseWorkflowDefinition(
@@ -78,14 +75,11 @@ function createParseWithStubs(fsStubs: FsStubs) {
     workflowName: string,
     logger: { warn(msg: string): void },
   ): Promise<{ entryNode: string; eventTypes: string[] }> {
-    // TODO: Replace with actual production call once module exists:
-    // return WorkflowDefinitionParser.parseWorkflowDefinition(projectRoot, workflowName, logger, fsStubs);
-    //
-    // Scaffolded placeholder — this enables the test structure to be verified
-    // but will fail until the production surface is implemented.
-    throw new Error(
-      "Production module WorkflowDefinitionParser not yet implemented. " +
-        "Replace this scaffold with actual call.",
+    return WorkflowDefinitionParser.parseWorkflowDefinition(
+      projectRoot,
+      workflowName,
+      logger,
+      fsStubs,
     );
   };
 }
