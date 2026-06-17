@@ -3,14 +3,6 @@
  *
  * Test spec: spec/test/vscode/src/views/spectraPanel.md
  * Source under test: vscode/src/views/spectraPanel.ts
- *
- * Scaffolded: The source file does not yet exist. These tests are structured
- * to compile and provide coverage once the production surface is created.
- *
- * Missing production surface:
- *   - vscode/src/views/spectraPanel.ts
- *   - SpectraPanel class (static createOrReveal, showSessionList, showSessionDetail, dispose)
- *   - vscode/src/views/getWebviewContent.ts (imported by SpectraPanel)
  */
 import * as sinon from "sinon";
 import { expect } from "chai";
@@ -28,10 +20,7 @@ import {
 
 import { SpectraPanel } from "../../src/views/spectraPanel";
 
-// Stub for getWebviewContent — will be wired via sinon/proxyquire when
-// the production module exists.
-// The exact stubbing mechanism depends on the module loader. For now,
-// we define the expected interaction shape and use sinon stubs.
+// Stub for getWebviewContent — wired via the SpectraPanelDeps DI seam.
 
 describe("SpectraPanel", function () {
   let sandbox: sinon.SinonSandbox;
@@ -69,33 +58,25 @@ describe("SpectraPanel", function () {
   // ─── Helper: reset singleton state ─────────────────────────────────────────
   /**
    * Ensures the SpectraPanel singleton is cleared between tests.
-   * Production surface must clear the static instance on dispose (per spec).
-   * This helper triggers dispose if an instance exists, or accesses a
-   * test-only reset path.
-   *
-   * Scaffolded: exact mechanism will depend on the production singleton
-   * implementation. May need module reload or a static `_resetForTest()`.
+   * Uses the production _resetForTest() static method exposed for testing.
    */
   function resetSingleton(): void {
-    // Attempt to clear via the public API by triggering dispose on any
-    // existing mock panel. When the production surface exists, the
-    // onDidDispose callback clears the static instance.
-    // For now this is a no-op placeholder.
+    SpectraPanel._resetForTest();
   }
 
   // ─── Helper: create panel via static factory ────────────────────────────────
   /**
-   * Calls SpectraPanel.createOrReveal with the test mocks.
-   *
-   * NOTE: The exact wiring of createWebviewPanelStub and getWebviewContentStub
-   * into the production module depends on the module loader / DI approach.
-   * When the production surface exists, this may use proxyquire or a DI seam.
+   * Calls SpectraPanel.createOrReveal with the test mocks wired via the DI seam.
    */
   function createOrReveal(): any {
     return SpectraPanel.createOrReveal(
       mockContext as any,
       mockExtensionUri as any,
       mockLogger as any,
+      {
+        createWebviewPanel: createWebviewPanelStub,
+        getWebviewContent: getWebviewContentStub,
+      },
     );
   }
 
