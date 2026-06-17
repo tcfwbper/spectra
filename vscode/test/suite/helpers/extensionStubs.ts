@@ -289,15 +289,18 @@ export interface ExtensionTestFixture {
  *   Pass `undefined` to simulate no workspace. Defaults to "/workspace".
  */
 export function createExtensionTestFixture(
-  projectRoot: string | undefined = "/workspace",
+  projectRoot?: string | undefined,
 ): ExtensionTestFixture {
+  // Use "/workspace" only when no argument is provided (arguments.length === 0).
+  // Explicit `undefined` must be preserved to test the "no workspace" path.
+  const resolvedProjectRoot = arguments.length === 0 ? "/workspace" : projectRoot;
   const context = createMockExtensionContext();
   const outputChannel = createMockOutputChannel();
   const viewProvider = createMockViewProvider();
   const sessionListController = createMockSessionListController();
   const sessionDetailController = createMockSessionDetailController();
 
-  const resolveProjectRoot = sinon.stub().returns(projectRoot);
+  const resolveProjectRoot = sinon.stub().returns(resolvedProjectRoot);
   const showErrorMessage = sinon.stub();
   const registerCommand = sinon.stub().returns({ dispose: () => {} });
   const createViewProvider = sinon.stub().returns(viewProvider);
