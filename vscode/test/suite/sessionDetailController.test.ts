@@ -54,7 +54,7 @@ describe("SessionDetailController", function () {
 
   // ─── Helper: construct instance ───────────────────────────────────────────
   function createInstance(): SessionDetailController {
-    return new SessionDetailController('/project', logger, deps);
+    return new SessionDetailController("/project", logger, deps);
   }
 
   // ─── Happy Path — Construction ────────────────────────────────────────────
@@ -87,9 +87,14 @@ describe("SessionDetailController", function () {
 
   describe("Happy Path — open", function () {
     it("should create EventWatcher and fire onDidUpdate with assembled state", async function () {
-      deps.parseWorkflowDefinition.resolves({ entryNode: "start", eventTypes: ["submit"] });
+      deps.parseWorkflowDefinition.resolves({
+        entryNode: "start",
+        eventTypes: ["submit"],
+      });
       deps.scanEvents.resolves([{ type: "submit", ts: 100 }]);
-      deps.scanSessions.resolves([{ id: "s1", currentState: "running", status: "running", pid: 42 }]);
+      deps.scanSessions.resolves([
+        { id: "s1", currentState: "running", status: "running", pid: 42 },
+      ]);
 
       const instance = createInstance();
       await instance.open("s1", "wf1");
@@ -125,7 +130,8 @@ describe("SessionDetailController", function () {
       await instance.open("s1", "my-workflow");
 
       expect(deps.parseWorkflowDefinition.calledOnce).to.be.true;
-      const [projectRoot, workflowName, loggerArg] = deps.parseWorkflowDefinition.firstCall.args;
+      const [projectRoot, workflowName, loggerArg] =
+        deps.parseWorkflowDefinition.firstCall.args;
       expect(projectRoot).to.equal("/project");
       expect(workflowName).to.equal("my-workflow");
       expect(loggerArg).to.equal(logger);
@@ -144,9 +150,14 @@ describe("SessionDetailController", function () {
 
   describe("Happy Path — internal scan routine", function () {
     it("should re-scan and fire onDidUpdate when onDidChange fires", async function () {
-      deps.parseWorkflowDefinition.resolves({ entryNode: "start", eventTypes: ["submit"] });
+      deps.parseWorkflowDefinition.resolves({
+        entryNode: "start",
+        eventTypes: ["submit"],
+      });
       deps.scanEvents.resolves([{ type: "submit", ts: 100 }]);
-      deps.scanSessions.resolves([{ id: "s1", currentState: "running", status: "running", pid: 42 }]);
+      deps.scanSessions.resolves([
+        { id: "s1", currentState: "running", status: "running", pid: 42 },
+      ]);
 
       const instance = createInstance();
       await instance.open("s1", "wf1");
@@ -154,7 +165,9 @@ describe("SessionDetailController", function () {
       // Reset for re-scan
       stateEmitter.fire.resetHistory();
       deps.scanEvents.resolves([{ type: "ack", ts: 200 }]);
-      deps.scanSessions.resolves([{ id: "s1", currentState: "done", status: "completed", pid: 42 }]);
+      deps.scanSessions.resolves([
+        { id: "s1", currentState: "done", status: "completed", pid: 42 },
+      ]);
 
       eventWatcher.triggerChange();
       await new Promise((r) => setImmediate(r));
@@ -166,9 +179,14 @@ describe("SessionDetailController", function () {
     });
 
     it("should include previously stored entryNode and eventTypes in re-scan state", async function () {
-      deps.parseWorkflowDefinition.resolves({ entryNode: "start", eventTypes: ["go"] });
+      deps.parseWorkflowDefinition.resolves({
+        entryNode: "start",
+        eventTypes: ["go"],
+      });
       deps.scanEvents.resolves([]);
-      deps.scanSessions.resolves([{ id: "s1", currentState: "start", status: "running", pid: 1 }]);
+      deps.scanSessions.resolves([
+        { id: "s1", currentState: "start", status: "running", pid: 1 },
+      ]);
 
       const instance = createInstance();
       await instance.open("s1", "wf1");
@@ -189,19 +207,26 @@ describe("SessionDetailController", function () {
 
   describe("Happy Path — sendEvent", function () {
     it("should call EventDispatcher.dispatch with correct arguments", async function () {
-      deps.parseWorkflowDefinition.resolves({ entryNode: "start", eventTypes: ["submit"] });
+      deps.parseWorkflowDefinition.resolves({
+        entryNode: "start",
+        eventTypes: ["submit"],
+      });
       deps.scanEvents.resolves([]);
-      deps.scanSessions.resolves([{ id: "s1", currentState: "start", status: "running", pid: 1 }]);
+      deps.scanSessions.resolves([
+        { id: "s1", currentState: "start", status: "running", pid: 1 },
+      ]);
 
       const instance = createInstance();
       await instance.open("s1", "wf1");
       await instance.sendEvent("submit", "hello");
 
       expect(deps.dispatchEvent.calledOnce).to.be.true;
-      const [eventType, sessionId, message, loggerArg] = deps.dispatchEvent.firstCall.args;
+      const [eventType, sessionId, message, projectRoot, loggerArg] =
+        deps.dispatchEvent.firstCall.args;
       expect(eventType).to.equal("submit");
       expect(sessionId).to.equal("s1");
       expect(message).to.equal("hello");
+      expect(projectRoot).to.equal("/project");
       expect(loggerArg).to.equal(logger);
     });
   });
@@ -223,9 +248,14 @@ describe("SessionDetailController", function () {
     });
 
     it("should fire onDidError and log when sendEvent dispatch fails with ENOENT", async function () {
-      deps.parseWorkflowDefinition.resolves({ entryNode: "start", eventTypes: ["submit"] });
+      deps.parseWorkflowDefinition.resolves({
+        entryNode: "start",
+        eventTypes: ["submit"],
+      });
       deps.scanEvents.resolves([]);
-      deps.scanSessions.resolves([{ id: "s1", currentState: "start", status: "running", pid: 1 }]);
+      deps.scanSessions.resolves([
+        { id: "s1", currentState: "start", status: "running", pid: 1 },
+      ]);
       deps.dispatchEvent.rejects(new Error("ENOENT"));
 
       const instance = createInstance();
@@ -239,9 +269,14 @@ describe("SessionDetailController", function () {
     });
 
     it("should fire onDidError and log when sendEvent dispatch fails with EACCES", async function () {
-      deps.parseWorkflowDefinition.resolves({ entryNode: "start", eventTypes: ["submit"] });
+      deps.parseWorkflowDefinition.resolves({
+        entryNode: "start",
+        eventTypes: ["submit"],
+      });
       deps.scanEvents.resolves([]);
-      deps.scanSessions.resolves([{ id: "s1", currentState: "start", status: "running", pid: 1 }]);
+      deps.scanSessions.resolves([
+        { id: "s1", currentState: "start", status: "running", pid: 1 },
+      ]);
       deps.dispatchEvent.rejects(new Error("EACCES"));
 
       const instance = createInstance();
@@ -262,8 +297,13 @@ describe("SessionDetailController", function () {
       const deferred1 = createDeferred<any[]>();
       deps.scanEvents.onFirstCall().returns(deferred1.promise);
       deps.scanEvents.onSecondCall().resolves([{ type: "new", ts: 500 }]);
-      deps.parseWorkflowDefinition.resolves({ entryNode: "start", eventTypes: [] });
-      deps.scanSessions.resolves([{ id: "s2", currentState: "start", status: "running", pid: 2 }]);
+      deps.parseWorkflowDefinition.resolves({
+        entryNode: "start",
+        eventTypes: [],
+      });
+      deps.scanSessions.resolves([
+        { id: "s2", currentState: "start", status: "running", pid: 2 },
+      ]);
 
       const watcher1 = createMockEventWatcherInstance();
       const watcher2 = createMockEventWatcherInstance();
@@ -287,9 +327,14 @@ describe("SessionDetailController", function () {
     });
 
     it("should dispose previous watcher when open is called again", async function () {
-      deps.parseWorkflowDefinition.resolves({ entryNode: "start", eventTypes: [] });
+      deps.parseWorkflowDefinition.resolves({
+        entryNode: "start",
+        eventTypes: [],
+      });
       deps.scanEvents.resolves([]);
-      deps.scanSessions.resolves([{ id: "s1", currentState: "start", status: "running", pid: 1 }]);
+      deps.scanSessions.resolves([
+        { id: "s1", currentState: "start", status: "running", pid: 1 },
+      ]);
 
       const watcher1 = createMockEventWatcherInstance();
       const watcher2 = createMockEventWatcherInstance();
@@ -299,16 +344,23 @@ describe("SessionDetailController", function () {
       const instance = createInstance();
       await instance.open("s1", "wf1");
 
-      deps.scanSessions.resolves([{ id: "s2", currentState: "start", status: "running", pid: 2 }]);
+      deps.scanSessions.resolves([
+        { id: "s2", currentState: "start", status: "running", pid: 2 },
+      ]);
       await instance.open("s2", "wf2");
 
       expect(watcher1.dispose.calledOnce).to.be.true;
     });
 
     it("should coalesce overlapping scans via dirty flag", async function () {
-      deps.parseWorkflowDefinition.resolves({ entryNode: "start", eventTypes: [] });
+      deps.parseWorkflowDefinition.resolves({
+        entryNode: "start",
+        eventTypes: [],
+      });
       deps.scanEvents.resolves([]);
-      deps.scanSessions.resolves([{ id: "s1", currentState: "start", status: "running", pid: 1 }]);
+      deps.scanSessions.resolves([
+        { id: "s1", currentState: "start", status: "running", pid: 1 },
+      ]);
 
       const instance = createInstance();
       await instance.open("s1", "wf1");
@@ -333,9 +385,14 @@ describe("SessionDetailController", function () {
     });
 
     it("should discard scan result when generation changes mid-scan", async function () {
-      deps.parseWorkflowDefinition.resolves({ entryNode: "start", eventTypes: [] });
+      deps.parseWorkflowDefinition.resolves({
+        entryNode: "start",
+        eventTypes: [],
+      });
       deps.scanEvents.resolves([]);
-      deps.scanSessions.resolves([{ id: "s1", currentState: "start", status: "running", pid: 1 }]);
+      deps.scanSessions.resolves([
+        { id: "s1", currentState: "start", status: "running", pid: 1 },
+      ]);
 
       const instance = createInstance();
       await instance.open("s1", "wf1");
@@ -370,9 +427,14 @@ describe("SessionDetailController", function () {
 
   describe("Resource Cleanup", function () {
     it("should dispose watcher and emitters on dispose", async function () {
-      deps.parseWorkflowDefinition.resolves({ entryNode: "start", eventTypes: [] });
+      deps.parseWorkflowDefinition.resolves({
+        entryNode: "start",
+        eventTypes: [],
+      });
       deps.scanEvents.resolves([]);
-      deps.scanSessions.resolves([{ id: "s1", currentState: "start", status: "running", pid: 1 }]);
+      deps.scanSessions.resolves([
+        { id: "s1", currentState: "start", status: "running", pid: 1 },
+      ]);
 
       const instance = createInstance();
       await instance.open("s1", "wf1");
@@ -384,9 +446,14 @@ describe("SessionDetailController", function () {
     });
 
     it("should suppress onDidUpdate after dispose", async function () {
-      deps.parseWorkflowDefinition.resolves({ entryNode: "start", eventTypes: [] });
+      deps.parseWorkflowDefinition.resolves({
+        entryNode: "start",
+        eventTypes: [],
+      });
       deps.scanEvents.resolves([]);
-      deps.scanSessions.resolves([{ id: "s1", currentState: "start", status: "running", pid: 1 }]);
+      deps.scanSessions.resolves([
+        { id: "s1", currentState: "start", status: "running", pid: 1 },
+      ]);
 
       const instance = createInstance();
       await instance.open("s1", "wf1");
@@ -425,9 +492,14 @@ describe("SessionDetailController", function () {
     });
 
     it("should set watcher to null after dispose", async function () {
-      deps.parseWorkflowDefinition.resolves({ entryNode: "start", eventTypes: [] });
+      deps.parseWorkflowDefinition.resolves({
+        entryNode: "start",
+        eventTypes: [],
+      });
       deps.scanEvents.resolves([]);
-      deps.scanSessions.resolves([{ id: "s1", currentState: "start", status: "running", pid: 1 }]);
+      deps.scanSessions.resolves([
+        { id: "s1", currentState: "start", status: "running", pid: 1 },
+      ]);
 
       const instance = createInstance();
       await instance.open("s1", "wf1");
@@ -442,9 +514,14 @@ describe("SessionDetailController", function () {
 
   describe("Idempotency", function () {
     it("should handle multiple dispose calls without error", async function () {
-      deps.parseWorkflowDefinition.resolves({ entryNode: "start", eventTypes: [] });
+      deps.parseWorkflowDefinition.resolves({
+        entryNode: "start",
+        eventTypes: [],
+      });
       deps.scanEvents.resolves([]);
-      deps.scanSessions.resolves([{ id: "s1", currentState: "start", status: "running", pid: 1 }]);
+      deps.scanSessions.resolves([
+        { id: "s1", currentState: "start", status: "running", pid: 1 },
+      ]);
 
       const instance = createInstance();
       await instance.open("s1", "wf1");
@@ -461,9 +538,14 @@ describe("SessionDetailController", function () {
 
   describe("Null / Empty Input", function () {
     it("should push empty events array when EventScanner returns empty", async function () {
-      deps.parseWorkflowDefinition.resolves({ entryNode: "start", eventTypes: ["go"] });
+      deps.parseWorkflowDefinition.resolves({
+        entryNode: "start",
+        eventTypes: ["go"],
+      });
       deps.scanEvents.resolves([]);
-      deps.scanSessions.resolves([{ id: "s1", currentState: "start", status: "running", pid: 1 }]);
+      deps.scanSessions.resolves([
+        { id: "s1", currentState: "start", status: "running", pid: 1 },
+      ]);
 
       const instance = createInstance();
       await instance.open("s1", "wf1");
@@ -476,7 +558,9 @@ describe("SessionDetailController", function () {
     it("should push empty eventTypes when WorkflowDefinitionParser returns empty", async function () {
       deps.parseWorkflowDefinition.resolves({ entryNode: "", eventTypes: [] });
       deps.scanEvents.resolves([]);
-      deps.scanSessions.resolves([{ id: "s1", currentState: "", status: "initializing", pid: 0 }]);
+      deps.scanSessions.resolves([
+        { id: "s1", currentState: "", status: "initializing", pid: 0 },
+      ]);
 
       const instance = createInstance();
       await instance.open("s1", "wf1");
@@ -488,9 +572,14 @@ describe("SessionDetailController", function () {
     });
 
     it("should default session fields when SessionScanner has no matching session", async function () {
-      deps.parseWorkflowDefinition.resolves({ entryNode: "start", eventTypes: ["go"] });
+      deps.parseWorkflowDefinition.resolves({
+        entryNode: "start",
+        eventTypes: ["go"],
+      });
       deps.scanEvents.resolves([]);
-      deps.scanSessions.resolves([{ id: "other", currentState: "done", status: "completed", pid: 99 }]);
+      deps.scanSessions.resolves([
+        { id: "other", currentState: "done", status: "completed", pid: 99 },
+      ]);
 
       const instance = createInstance();
       await instance.open("s1", "wf1");
@@ -509,9 +598,14 @@ describe("SessionDetailController", function () {
     it("should not read or write any files directly", async function () {
       // Verified by the DI design: the controller has no fs dependency.
       // All file I/O is delegated to scanners/watchers via injected stubs.
-      deps.parseWorkflowDefinition.resolves({ entryNode: "start", eventTypes: ["submit"] });
+      deps.parseWorkflowDefinition.resolves({
+        entryNode: "start",
+        eventTypes: ["submit"],
+      });
       deps.scanEvents.resolves([{ type: "submit", ts: 100 }]);
-      deps.scanSessions.resolves([{ id: "s1", currentState: "start", status: "running", pid: 1 }]);
+      deps.scanSessions.resolves([
+        { id: "s1", currentState: "start", status: "running", pid: 1 },
+      ]);
 
       const fsReadFile = sinon.spy();
       const fsWriteFile = sinon.spy();
@@ -528,9 +622,14 @@ describe("SessionDetailController", function () {
 
     it("should not spawn processes directly", async function () {
       // Verified by DI: the controller has no child_process dependency.
-      deps.parseWorkflowDefinition.resolves({ entryNode: "start", eventTypes: ["submit"] });
+      deps.parseWorkflowDefinition.resolves({
+        entryNode: "start",
+        eventTypes: ["submit"],
+      });
       deps.scanEvents.resolves([]);
-      deps.scanSessions.resolves([{ id: "s1", currentState: "start", status: "running", pid: 1 }]);
+      deps.scanSessions.resolves([
+        { id: "s1", currentState: "start", status: "running", pid: 1 },
+      ]);
 
       const cpSpawn = sinon.spy();
       const cpExec = sinon.spy();

@@ -37,24 +37,36 @@ describe("SessionLauncher", function () {
 
   describe("Happy Path — launch", function () {
     it("should spawn detached process with correct arguments", async function () {
-      await SessionLauncher.launch("myWorkflow", logger, deps);
+      await SessionLauncher.launch("myWorkflow", "/workspace", logger, deps);
       expect(deps.spawn.calledOnce).to.be.true;
       const [binary, args, options] = deps.spawn.firstCall.args;
       expect(binary).to.equal("spectra");
       expect(args).to.deep.equal([
-        "run", "--workflow", "myWorkflow", "--session-id", "test-uuid-1234",
+        "run",
+        "--workflow",
+        "myWorkflow",
+        "--session-id",
+        "test-uuid-1234",
       ]);
-      expect(options).to.deep.equal({ detached: true, stdio: "ignore" });
+      expect(options).to.deep.equal({
+        detached: true,
+        stdio: "ignore",
+        cwd: "/workspace",
+      });
     });
 
     it("should call unref on the child process", async function () {
-      await SessionLauncher.launch("wf", logger, deps);
+      await SessionLauncher.launch("wf", "/workspace", logger, deps);
       expect(mockChild.unref.calledOnce).to.be.true;
     });
 
     it("should log info message with workflow name and session id", async function () {
-      const uuidDeps = createSessionLauncherDeps("spectra", mockChild, "uuid-abc");
-      await SessionLauncher.launch("deploy", logger, uuidDeps);
+      const uuidDeps = createSessionLauncherDeps(
+        "spectra",
+        mockChild,
+        "uuid-abc",
+      );
+      await SessionLauncher.launch("deploy", "/workspace", logger, uuidDeps);
       expect(logger.info.calledOnce).to.be.true;
       const infoMsg = logger.info.firstCall.args[0];
       expect(infoMsg).to.include("deploy");
@@ -62,29 +74,42 @@ describe("SessionLauncher", function () {
     });
 
     it("should resolve with void on successful spawn", async function () {
-      const result = await SessionLauncher.launch("wf", logger, deps);
+      const result = await SessionLauncher.launch(
+        "wf",
+        "/workspace",
+        logger,
+        deps,
+      );
       expect(result).to.be.undefined;
     });
   });
 
   describe("Happy Path — configuration default", function () {
     it("should default to spectra when config is undefined", async function () {
-      const undefinedDeps = createSessionLauncherDeps(undefined, mockChild, "uuid");
-      await SessionLauncher.launch("wf", logger, undefinedDeps);
+      const undefinedDeps = createSessionLauncherDeps(
+        undefined,
+        mockChild,
+        "uuid",
+      );
+      await SessionLauncher.launch("wf", "/workspace", logger, undefinedDeps);
       const [binary] = undefinedDeps.spawn.firstCall.args;
       expect(binary).to.equal("spectra");
     });
 
     it("should default to spectra when config is empty string", async function () {
       const emptyDeps = createSessionLauncherDeps("" as any, mockChild, "uuid");
-      await SessionLauncher.launch("wf", logger, emptyDeps);
+      await SessionLauncher.launch("wf", "/workspace", logger, emptyDeps);
       const [binary] = emptyDeps.spawn.firstCall.args;
       expect(binary).to.equal("spectra");
     });
 
     it("should use custom binary path from configuration", async function () {
-      const customDeps = createSessionLauncherDeps("/usr/local/bin/spectra", mockChild, "uuid");
-      await SessionLauncher.launch("wf", logger, customDeps);
+      const customDeps = createSessionLauncherDeps(
+        "/usr/local/bin/spectra",
+        mockChild,
+        "uuid",
+      );
+      await SessionLauncher.launch("wf", "/workspace", logger, customDeps);
       const [binary] = customDeps.spawn.firstCall.args;
       expect(binary).to.equal("/usr/local/bin/spectra");
     });
@@ -93,7 +118,11 @@ describe("SessionLauncher", function () {
   describe("Error Propagation", function () {
     it("should throw when spawn fails with ENOENT", async function () {
       const errorChild = createMockChildProcess();
-      const enoentDeps = createSessionLauncherDeps("/missing/spectra", errorChild, "uuid");
+      const enoentDeps = createSessionLauncherDeps(
+        "/missing/spectra",
+        errorChild,
+        "uuid",
+      );
       enoentDeps.spawn.callsFake(() => {
         const cp = createMockChildProcess();
         process.nextTick(() => {
@@ -104,7 +133,7 @@ describe("SessionLauncher", function () {
         return cp;
       });
       try {
-        await SessionLauncher.launch("wf", logger, enoentDeps);
+        await SessionLauncher.launch("wf", "/workspace", logger, enoentDeps);
         expect.fail("should have thrown");
       } catch (err: any) {
         expect(err.message).to.include("/missing/spectra");
@@ -112,7 +141,11 @@ describe("SessionLauncher", function () {
     });
 
     it("should throw when spawn fails with EACCES", async function () {
-      const eaccesDeps = createSessionLauncherDeps("/no-exec/spectra", createMockChildProcess(), "uuid");
+      const eaccesDeps = createSessionLauncherDeps(
+        "/no-exec/spectra",
+        createMockChildProcess(),
+        "uuid",
+      );
       eaccesDeps.spawn.callsFake(() => {
         const cp = createMockChildProcess();
         process.nextTick(() => {
@@ -123,7 +156,7 @@ describe("SessionLauncher", function () {
         return cp;
       });
       try {
-        await SessionLauncher.launch("wf", logger, eaccesDeps);
+        await SessionLauncher.launch("wf", "/workspace", logger, eaccesDeps);
         expect.fail("should have thrown");
       } catch {
         // Expected rejection
@@ -135,8 +168,8 @@ describe("SessionLauncher", function () {
     it("should generate a fresh UUID for every invocation", async function () {
       deps.randomUUID.onFirstCall().returns("uuid-1");
       deps.randomUUID.onSecondCall().returns("uuid-2");
-      await SessionLauncher.launch("wf", logger, deps);
-      await SessionLauncher.launch("wf", logger, deps);
+      await SessionLauncher.launch("wf", "/workspace", logger, deps);
+      await SessionLauncher.launch("wf", "/workspace", logger, deps);
       const firstArgs = deps.spawn.firstCall.args[1];
       const secondArgs = deps.spawn.secondCall.args[1];
       expect(firstArgs).to.include("uuid-1");
@@ -144,25 +177,36 @@ describe("SessionLauncher", function () {
     });
 
     it("should spawn with detached true", async function () {
-      await SessionLauncher.launch("wf", logger, deps);
+      await SessionLauncher.launch("wf", "/workspace", logger, deps);
       const options = deps.spawn.firstCall.args[2];
       expect(options.detached).to.be.true;
     });
 
     it("should spawn with stdio ignore", async function () {
-      await SessionLauncher.launch("wf", logger, deps);
+      await SessionLauncher.launch("wf", "/workspace", logger, deps);
       const options = deps.spawn.firstCall.args[2];
       expect(options.stdio).to.equal("ignore");
     });
 
+    it("should set cwd to projectRoot in spawn options", async function () {
+      await SessionLauncher.launch("wf", "/my/project", logger, deps);
+      const options = deps.spawn.firstCall.args[2];
+      expect(options.cwd).to.equal("/my/project");
+    });
+
     it("should read configuration on every invocation", async function () {
-      await SessionLauncher.launch("wf", logger, deps);
-      await SessionLauncher.launch("wf", logger, deps);
+      await SessionLauncher.launch("wf", "/workspace", logger, deps);
+      await SessionLauncher.launch("wf", "/workspace", logger, deps);
       expect(deps.getConfiguration.callCount).to.be.at.least(2);
     });
 
     it("should pass workflowName with special characters as single argv element", async function () {
-      await SessionLauncher.launch("my workflow (v2)", logger, deps);
+      await SessionLauncher.launch(
+        "my workflow (v2)",
+        "/workspace",
+        logger,
+        deps,
+      );
       const args = deps.spawn.firstCall.args[1];
       const workflowIdx = args.indexOf("--workflow") + 1;
       expect(args[workflowIdx]).to.equal("my workflow (v2)");

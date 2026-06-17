@@ -55,7 +55,7 @@ describe("SessionListController", function () {
 
   // ─── Helper: construct instance ───────────────────────────────────────────
   function createInstance(): SessionListController {
-    return new SessionListController('/project', logger, deps);
+    return new SessionListController("/project", logger, deps);
   }
 
   /**
@@ -179,7 +179,7 @@ describe("SessionListController", function () {
   // ─── Happy Path — launch ──────────────────────────────────────────────────
 
   describe("Happy Path — launch", function () {
-    it("should call SessionLauncher.launch with workflowName and logger", async function () {
+    it("should call SessionLauncher.launch with workflowName, projectRoot, and logger", async function () {
       deps.scanSessions.resolves([]);
       deps.scanWorkflows.resolves([]);
 
@@ -188,8 +188,9 @@ describe("SessionListController", function () {
       await instance.launch("my-workflow");
 
       expect(deps.launch.calledOnce).to.be.true;
-      const [workflowName, loggerArg] = deps.launch.firstCall.args;
+      const [workflowName, projectRoot, loggerArg] = deps.launch.firstCall.args;
       expect(workflowName).to.equal("my-workflow");
+      expect(projectRoot).to.equal("/project");
       expect(loggerArg).to.equal(logger);
     });
   });
@@ -283,7 +284,11 @@ describe("SessionListController", function () {
     it("should fire onDidError and log when terminate returns EPERM", async function () {
       deps.scanSessions.resolves([]);
       deps.scanWorkflows.resolves([]);
-      deps.terminate.resolves({ method: "sigterm", terminated: false, error: new Error("EPERM") });
+      deps.terminate.resolves({
+        method: "sigterm",
+        terminated: false,
+        error: new Error("EPERM"),
+      });
 
       const instance = createInstance();
       await waitForInitialScan();

@@ -23,22 +23,28 @@ import type { SessionWatcherDeps } from "../../src/services/sessionWatcher";
 describe("SessionWatcher", function () {
   let sandbox: sinon.SinonSandbox;
   let clock: sinon.SinonFakeTimers;
-  let mockWatcher: MockFileSystemWatcher;
+  let mockFileWatcher: MockFileSystemWatcher;
+  let mockDirWatcher: MockFileSystemWatcher;
   let mockEmitter: MockEventEmitter;
   let deps: SessionWatcherDeps;
-  let relativePatternArgs: any[];
+  let relativePatternArgs: any[][];
 
   beforeEach(function () {
     sandbox = sinon.createSandbox();
     clock = sinon.useFakeTimers();
-    mockWatcher = createMockFileSystemWatcher();
+    mockFileWatcher = createMockFileSystemWatcher();
+    mockDirWatcher = createMockFileSystemWatcher();
     mockEmitter = createMockEventEmitter();
     relativePatternArgs = [];
 
+    const createFileSystemWatcherStub = sinon.stub();
+    createFileSystemWatcherStub.onFirstCall().returns(mockFileWatcher);
+    createFileSystemWatcherStub.onSecondCall().returns(mockDirWatcher);
+
     deps = {
-      createFileSystemWatcher: sinon.stub().returns(mockWatcher),
+      createFileSystemWatcher: createFileSystemWatcherStub,
       createRelativePattern: sinon.stub().callsFake((...args: any[]) => {
-        relativePatternArgs.push(...args);
+        relativePatternArgs.push(args);
         return { pattern: args };
       }),
       createEventEmitter: sinon.stub().returns(mockEmitter),
@@ -61,59 +67,85 @@ describe("SessionWatcher", function () {
       expect(instance.onDidChange).to.be.a("function");
     });
 
-    it("should create file system watcher with correct glob pattern", function () {
+    it("should create file watcher with correct glob pattern for session.json files", function () {
       new SessionWatcher("/my/root", deps);
-      // Verify createFileSystemWatcher called with RelativePattern
-      // matching: /my/root/.spectra/sessions/*/session.json
-      expect((deps.createRelativePattern as sinon.SinonStub).calledOnce).to.be
-        .true;
-      expect(relativePatternArgs[0]).to.equal("/my/root");
-      expect(relativePatternArgs[1]).to.equal(
+      // First call to createRelativePattern should be for session.json files
+      expect(relativePatternArgs.length).to.be.at.least(1);
+      expect(relativePatternArgs[0][0]).to.equal("/my/root");
+      expect(relativePatternArgs[0][1]).to.equal(
         ".spectra/sessions/*/session.json",
       );
+      // First createFileSystemWatcher call for the file pattern
+      expect((deps.createFileSystemWatcher as sinon.SinonStub).calledTwice).to
+        .be.true;
+    });
+
+    it("should create directory watcher with correct glob pattern for session directories", function () {
+      new SessionWatcher("/my/root", deps);
+      // Second call to createRelativePattern should be for session directories
+      expect(relativePatternArgs.length).to.be.at.least(2);
+      expect(relativePatternArgs[1][0]).to.equal("/my/root");
+      expect(relativePatternArgs[1][1]).to.equal(".spectra/sessions/*");
+      // Second createFileSystemWatcher call for the directory pattern
+      expect((deps.createFileSystemWatcher as sinon.SinonStub).calledTwice).to
+        .be.true;
     });
   });
 
   describe("Happy Path — onDidChange", function () {
     it("should fire onDidChange after debounce when session file is created", function () {
       new SessionWatcher("/project", deps);
-      mockWatcher.onDidCreate.fire({});
+      mockFileWatcher.onDidCreate.fire({});
       clock.tick(300);
       expect(mockEmitter.fire.calledOnce).to.be.true;
     });
 
     it("should fire onDidChange after debounce when session file is modified", function () {
       new SessionWatcher("/project", deps);
-      mockWatcher.onDidChange.fire({});
+      mockFileWatcher.onDidChange.fire({});
       clock.tick(300);
       expect(mockEmitter.fire.calledOnce).to.be.true;
     });
 
     it("should fire onDidChange after debounce when session file is deleted", function () {
       new SessionWatcher("/project", deps);
-      mockWatcher.onDidDelete.fire({});
+      mockFileWatcher.onDidDelete.fire({});
       clock.tick(300);
       expect(mockEmitter.fire.calledOnce).to.be.true;
     });
 
-    it("should debounce rapid successive signals from mixed event types into single event", function () {
+    it("should fire onDidChange after debounce when session directory is created", function () {
       new SessionWatcher("/project", deps);
-      mockWatcher.onDidCreate.fire({});
-      clock.tick(100);
-      mockWatcher.onDidChange.fire({});
-      clock.tick(100);
-      mockWatcher.onDidDelete.fire({});
+      mockDirWatcher.onDidCreate.fire({});
       clock.tick(300);
       expect(mockEmitter.fire.calledOnce).to.be.true;
     });
 
-    it("should reset debounce timer on each new signal", function () {
+    it("should fire onDidChange after debounce when session directory is deleted", function () {
       new SessionWatcher("/project", deps);
-      mockWatcher.onDidCreate.fire({});
+      mockDirWatcher.onDidDelete.fire({});
+      clock.tick(300);
+      expect(mockEmitter.fire.calledOnce).to.be.true;
+    });
+
+    it("should debounce rapid successive signals from both watchers into single event", function () {
+      new SessionWatcher("/project", deps);
+      mockFileWatcher.onDidCreate.fire({});
+      clock.tick(100);
+      mockDirWatcher.onDidCreate.fire({});
+      clock.tick(100);
+      mockFileWatcher.onDidChange.fire({});
+      clock.tick(300);
+      expect(mockEmitter.fire.calledOnce).to.be.true;
+    });
+
+    it("should reset debounce timer on each new signal from either watcher", function () {
+      new SessionWatcher("/project", deps);
+      mockFileWatcher.onDidCreate.fire({});
       clock.tick(200);
-      mockWatcher.onDidChange.fire({});
+      mockDirWatcher.onDidCreate.fire({});
       clock.tick(200);
-      mockWatcher.onDidDelete.fire({});
+      mockFileWatcher.onDidDelete.fire({});
       clock.tick(200);
       expect(mockEmitter.fire.called).to.be.false; // only 200ms since last
       clock.tick(100);
@@ -122,16 +154,17 @@ describe("SessionWatcher", function () {
   });
 
   describe("Resource Cleanup", function () {
-    it("should dispose file watcher and event emitter on dispose", function () {
+    it("should dispose both watchers and event emitter on dispose", function () {
       const instance = new SessionWatcher("/project", deps);
       instance.dispose();
-      expect(mockWatcher.dispose.calledOnce).to.be.true;
+      expect(mockFileWatcher.dispose.calledOnce).to.be.true;
+      expect(mockDirWatcher.dispose.calledOnce).to.be.true;
       expect(mockEmitter.dispose.calledOnce).to.be.true;
     });
 
     it("should cancel pending debounce timer on dispose", function () {
       const instance = new SessionWatcher("/project", deps);
-      mockWatcher.onDidCreate.fire({});
+      mockFileWatcher.onDidCreate.fire({});
       instance.dispose();
       clock.tick(300);
       expect(mockEmitter.fire.called).to.be.false;
@@ -140,7 +173,7 @@ describe("SessionWatcher", function () {
     it("should not fire onDidChange after dispose", function () {
       const instance = new SessionWatcher("/project", deps);
       instance.dispose();
-      mockWatcher.onDidCreate.fire({});
+      mockFileWatcher.onDidCreate.fire({});
       clock.tick(300);
       expect(mockEmitter.fire.called).to.be.false;
     });
@@ -158,20 +191,25 @@ describe("SessionWatcher", function () {
   });
 
   describe("Mock / Dependency Interaction", function () {
-    it("should subscribe to onDidCreate, onDidChange, and onDidDelete", function () {
+    it("should subscribe to onDidCreate, onDidChange, and onDidDelete on file watcher", function () {
       new SessionWatcher("/project", deps);
-      expect(mockWatcher.onDidCreate.listeners).to.have.lengthOf(1);
-      expect(mockWatcher.onDidChange.listeners).to.have.lengthOf(1);
-      expect(mockWatcher.onDidDelete.listeners).to.have.lengthOf(1);
+      expect(mockFileWatcher.onDidCreate.listeners).to.have.lengthOf(1);
+      expect(mockFileWatcher.onDidChange.listeners).to.have.lengthOf(1);
+      expect(mockFileWatcher.onDidDelete.listeners).to.have.lengthOf(1);
+    });
+
+    it("should subscribe to onDidCreate and onDidDelete on directory watcher", function () {
+      new SessionWatcher("/project", deps);
+      expect(mockDirWatcher.onDidCreate.listeners).to.have.lengthOf(1);
+      expect(mockDirWatcher.onDidDelete.listeners).to.have.lengthOf(1);
     });
 
     it("should not read or write any files", function () {
-      // The SessionWatcher only creates a file system watcher and emitter;
+      // The SessionWatcher only creates file system watchers and emitter;
       // it does not call any fs read/write/access methods.
       new SessionWatcher("/project", deps);
-      expect(
-        (deps.createFileSystemWatcher as sinon.SinonStub).calledOnce,
-      ).to.be.true;
+      expect((deps.createFileSystemWatcher as sinon.SinonStub).calledTwice).to
+        .be.true;
     });
   });
 });

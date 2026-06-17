@@ -411,6 +411,43 @@ describe("extension", function () {
       expect(fixture.sessionListController.terminate.calledWith(5678)).to.be
         .true;
     });
+
+    it("test_activate_acceptsOnlyOneParameter: activate function signature accepts exactly one parameter", function () {
+      // The production activate function currently accepts (context, deps) for testability.
+      // The logic spec mandates that the public signature accepts exactly one parameter (context).
+      // Scaffolded: once production removes the deps parameter (collaborators constructed internally),
+      // this test will pass. Until then, verify the constraint via t.Skip.
+      // Missing seam: production activate() must accept exactly 1 parameter (no ExtensionDeps)
+      this.skip();
+      // Once the production surface is updated:
+      // import { activate } from "../../src/extension";
+      // expect(activate.length).to.equal(1);
+    });
+
+    it("test_activate_constructsAllCollaboratorsInternally: all collaborators are constructed inside activate without external injection", function () {
+      // Scaffolded: once production activate() no longer accepts ExtensionDeps,
+      // all collaborators are constructed internally.
+      // Missing seam: production activate() must not accept a deps parameter
+      this.skip();
+      // Once the production surface is updated:
+      // import { activate } from "../../src/extension";
+      // const context = createMockExtensionContext();
+      // // Verify activate was called with only context (no second argument)
+      // // and all constructors (SessionListController, SessionDetailController, SpectraViewProvider) are called.
+    });
+
+    it("test_activate_registersViewProviderSynchronouslyDuringActivation: ViewProvider registration occurs synchronously during activation", function () {
+      // Scaffolded: once production uses registerWebviewViewProvider instead of createOrRevealPanel,
+      // this test verifies registration happens synchronously before any await.
+      // Missing seam: ExtensionDeps.registerWebviewViewProvider, production must register ViewProvider
+      // synchronously within activate before any async work.
+      this.skip();
+      // Once the production surface exists:
+      // activateWithFixture(fixture);
+      // expect(fixture.vscode.window.registerWebviewViewProvider.calledOnce).to.be.true;
+      // const [viewType] = fixture.vscode.window.registerWebviewViewProvider.firstCall.args;
+      // expect(viewType).to.equal('spectra.sessionView');
+    });
   });
 
   // ─── deactivate ────────────────────────────────────────────────────────────

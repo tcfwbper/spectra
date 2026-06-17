@@ -193,7 +193,7 @@ export interface SessionDetailControllerDeps {
   scanSessions: sinon.SinonStub;
   /** Static method: WorkflowDefinitionParser.parse(projectRoot, workflowName, logger) */
   parseWorkflowDefinition: sinon.SinonStub;
-  /** Static method: EventDispatcher.dispatch(eventType, sessionId, message, logger) */
+  /** Static method: EventDispatcher.dispatch(eventType, sessionId, message, projectRoot, logger) */
   dispatchEvent: sinon.SinonStub;
   /** Factory to construct a vscode.EventEmitter<SessionDetailState>. */
   createStateEmitter: sinon.SinonStub;
@@ -220,7 +220,9 @@ export function createSessionDetailControllerDeps(): {
     createEventWatcher: sinon.stub().returns(eventWatcher),
     scanEvents: sinon.stub().resolves([]),
     scanSessions: sinon.stub().resolves([]),
-    parseWorkflowDefinition: sinon.stub().resolves({ entryNode: "", eventTypes: [] }),
+    parseWorkflowDefinition: sinon
+      .stub()
+      .resolves({ entryNode: "", eventTypes: [] }),
     dispatchEvent: sinon.stub().resolves(),
     createStateEmitter: sinon.stub().returns(stateEmitter),
     createErrorEmitter: sinon.stub().returns(errorEmitter),
@@ -247,7 +249,7 @@ export interface SessionListControllerDeps {
   scanSessions: sinon.SinonStub;
   /** Static method: WorkflowScanner.scan(projectRoot, logger) */
   scanWorkflows: sinon.SinonStub;
-  /** Static method: SessionLauncher.launch(workflowName, logger) */
+  /** Static method: SessionLauncher.launch(workflowName, projectRoot, logger) */
   launch: sinon.SinonStub;
   /** Static method: SessionTerminator.terminate(pid, logger) */
   terminate: sinon.SinonStub;

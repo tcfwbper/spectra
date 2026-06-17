@@ -40,17 +40,38 @@ describe("EventDispatcher", function () {
 
   describe("Happy Path — dispatch", function () {
     it("should spawn spectra-agent with correct arguments", async function () {
-      await EventDispatcher.dispatch("ReviewNeeded", "abc-123", "hello world", logger, deps);
+      await EventDispatcher.dispatch(
+        "ReviewNeeded",
+        "abc-123",
+        "hello world",
+        "/workspace",
+        logger,
+        deps,
+      );
       expect(deps.execFile.calledOnce).to.be.true;
-      const [binary, args] = deps.execFile.firstCall.args;
+      const [binary, args, options] = deps.execFile.firstCall.args;
       expect(binary).to.equal("spectra-agent");
       expect(args).to.deep.equal([
-        "event", "emit", "ReviewNeeded", "--session-id", "abc-123", "--message", "hello world",
+        "event",
+        "emit",
+        "ReviewNeeded",
+        "--session-id",
+        "abc-123",
+        "--message",
+        "hello world",
       ]);
+      expect(options).to.have.property("cwd", "/workspace");
     });
 
     it("should log info message with event type and session id", async function () {
-      await EventDispatcher.dispatch("SessionStarted", "uuid-1", "started", logger, deps);
+      await EventDispatcher.dispatch(
+        "SessionStarted",
+        "uuid-1",
+        "started",
+        "/workspace",
+        logger,
+        deps,
+      );
       expect(logger.info.calledOnce).to.be.true;
       const infoMsg = logger.info.firstCall.args[0];
       expect(infoMsg).to.include("SessionStarted");
@@ -59,7 +80,14 @@ describe("EventDispatcher", function () {
 
     it("should resolve without waiting for child process exit", async function () {
       // The mock child process never emits 'exit' — promise must still resolve
-      const promise = EventDispatcher.dispatch("Ping", "s1", "m", logger, deps);
+      const promise = EventDispatcher.dispatch(
+        "Ping",
+        "s1",
+        "m",
+        "/workspace",
+        logger,
+        deps,
+      );
       await promise; // Should resolve without advancing timers
     });
   });
@@ -67,21 +95,45 @@ describe("EventDispatcher", function () {
   describe("Happy Path — configuration default", function () {
     it("should default to spectra-agent when config is undefined", async function () {
       const undefinedDeps = createEventDispatcherDeps(undefined, mockChild);
-      await EventDispatcher.dispatch("E", "s", "m", logger, undefinedDeps);
+      await EventDispatcher.dispatch(
+        "E",
+        "s",
+        "m",
+        "/workspace",
+        logger,
+        undefinedDeps,
+      );
       const [binary] = undefinedDeps.execFile.firstCall.args;
       expect(binary).to.equal("spectra-agent");
     });
 
     it("should default to spectra-agent when config is empty string", async function () {
       const emptyDeps = createEventDispatcherDeps("" as any, mockChild);
-      await EventDispatcher.dispatch("E", "s", "m", logger, emptyDeps);
+      await EventDispatcher.dispatch(
+        "E",
+        "s",
+        "m",
+        "/workspace",
+        logger,
+        emptyDeps,
+      );
       const [binary] = emptyDeps.execFile.firstCall.args;
       expect(binary).to.equal("spectra-agent");
     });
 
     it("should use custom binary path from configuration", async function () {
-      const customDeps = createEventDispatcherDeps("/opt/bin/spectra-agent", mockChild);
-      await EventDispatcher.dispatch("E", "s", "m", logger, customDeps);
+      const customDeps = createEventDispatcherDeps(
+        "/opt/bin/spectra-agent",
+        mockChild,
+      );
+      await EventDispatcher.dispatch(
+        "E",
+        "s",
+        "m",
+        "/workspace",
+        logger,
+        customDeps,
+      );
       const [binary] = customDeps.execFile.firstCall.args;
       expect(binary).to.equal("/opt/bin/spectra-agent");
     });
@@ -90,7 +142,10 @@ describe("EventDispatcher", function () {
   describe("Error Propagation", function () {
     it("should throw when spawn fails with ENOENT", async function () {
       const errorChild = createMockChildProcess();
-      const enoentDeps = createEventDispatcherDeps("/missing/spectra-agent", errorChild);
+      const enoentDeps = createEventDispatcherDeps(
+        "/missing/spectra-agent",
+        errorChild,
+      );
       // Simulate synchronous error event after spawn
       enoentDeps.execFile.callsFake(() => {
         const cp = createMockChildProcess();
@@ -102,7 +157,14 @@ describe("EventDispatcher", function () {
         return cp;
       });
       try {
-        await EventDispatcher.dispatch("E", "s", "m", logger, enoentDeps);
+        await EventDispatcher.dispatch(
+          "E",
+          "s",
+          "m",
+          "/workspace",
+          logger,
+          enoentDeps,
+        );
         expect.fail("should have thrown");
       } catch (err: any) {
         expect(err.message).to.include("/missing/spectra-agent");
@@ -110,7 +172,10 @@ describe("EventDispatcher", function () {
     });
 
     it("should throw when spawn fails with EACCES", async function () {
-      const eaccesDeps = createEventDispatcherDeps("/no-exec/spectra-agent", createMockChildProcess());
+      const eaccesDeps = createEventDispatcherDeps(
+        "/no-exec/spectra-agent",
+        createMockChildProcess(),
+      );
       eaccesDeps.execFile.callsFake(() => {
         const cp = createMockChildProcess();
         process.nextTick(() => {
@@ -121,7 +186,14 @@ describe("EventDispatcher", function () {
         return cp;
       });
       try {
-        await EventDispatcher.dispatch("E", "s", "m", logger, eaccesDeps);
+        await EventDispatcher.dispatch(
+          "E",
+          "s",
+          "m",
+          "/workspace",
+          logger,
+          eaccesDeps,
+        );
         expect.fail("should have thrown");
       } catch {
         // Expected rejection
@@ -131,7 +203,7 @@ describe("EventDispatcher", function () {
 
   describe("Mock / Dependency Interaction", function () {
     it("should not use shell for spawn", async function () {
-      await EventDispatcher.dispatch("E", "s", "m", logger, deps);
+      await EventDispatcher.dispatch("E", "s", "m", "/workspace", logger, deps);
       const callArgs = deps.execFile.firstCall.args;
       // execFile should be called without shell: true in options
       if (callArgs.length > 2 && typeof callArgs[2] === "object") {
@@ -139,8 +211,21 @@ describe("EventDispatcher", function () {
       }
     });
 
+    it("should set cwd to projectRoot in execFile options", async function () {
+      await EventDispatcher.dispatch(
+        "E",
+        "s",
+        "m",
+        "/my/project",
+        logger,
+        deps,
+      );
+      const callArgs = deps.execFile.firstCall.args;
+      expect(callArgs[2]).to.have.property("cwd", "/my/project");
+    });
+
     it("should log warning on non-zero exit code", async function () {
-      await EventDispatcher.dispatch("E", "s", "m", logger, deps);
+      await EventDispatcher.dispatch("E", "s", "m", "/workspace", logger, deps);
       // Simulate non-zero exit after promise resolved
       mockChild.emit("exit", 1);
       expect(logger.warn.calledOnce).to.be.true;
@@ -148,7 +233,14 @@ describe("EventDispatcher", function () {
     });
 
     it("should not throw on non-zero exit code", async function () {
-      const result = await EventDispatcher.dispatch("E", "s", "m", logger, deps);
+      const result = await EventDispatcher.dispatch(
+        "E",
+        "s",
+        "m",
+        "/workspace",
+        logger,
+        deps,
+      );
       expect(result).to.be.undefined;
       // Emit exit code 2 after resolution — should not cause unhandled rejection
       mockChild.emit("exit", 2);
@@ -156,14 +248,21 @@ describe("EventDispatcher", function () {
 
     it("should pass special characters in message without shell interpretation", async function () {
       const specialMsg = 'hello "world" \n $PATH';
-      await EventDispatcher.dispatch("E", "s", specialMsg, logger, deps);
+      await EventDispatcher.dispatch(
+        "E",
+        "s",
+        specialMsg,
+        "/workspace",
+        logger,
+        deps,
+      );
       const [, args] = deps.execFile.firstCall.args;
       expect(args[args.length - 1]).to.equal(specialMsg);
     });
 
     it("should read configuration on every invocation", async function () {
-      await EventDispatcher.dispatch("E", "s", "m", logger, deps);
-      await EventDispatcher.dispatch("E", "s", "m", logger, deps);
+      await EventDispatcher.dispatch("E", "s", "m", "/workspace", logger, deps);
+      await EventDispatcher.dispatch("E", "s", "m", "/workspace", logger, deps);
       expect(deps.getConfiguration.callCount).to.be.at.least(2);
     });
   });
