@@ -18,6 +18,14 @@
 | `should return joined path when projectRoot config is set` | `unit` | Joins the workspace path with the configured project root value. | Stub `vscode.workspace.workspaceFolders` to return `[{ uri: { fsPath: '/home/user/project' } }]`. Stub `vscode.workspace.getConfiguration('spectra').get('projectRoot')` to return `'sub/folder'`. | *(none — static method)* | Returns `'/home/user/project/sub/folder'` (result of `path.join`) |
 | `should normalize path segments with dot-dot in config value` | `unit` | Joins and normalizes when config contains `..` segments. | Stub `vscode.workspace.workspaceFolders` to return `[{ uri: { fsPath: '/home/user/project' } }]`. Stub `vscode.workspace.getConfiguration('spectra').get('projectRoot')` to return `'../sibling'`. | *(none — static method)* | Returns `'/home/user/sibling'` (result of `path.join('/home/user/project', '../sibling')`) |
 
+### Happy Path — isInitialized
+
+| Test ID | Category | Description | Setup | Input | Expected |
+|---|---|---|---|---|---|
+| `should return true when .spectra directory exists` | `unit` | Returns true if stat succeeds for the .spectra path. | Stub `vscode.workspace.fs.stat` to resolve successfully (no error). Stub `vscode.Uri.file` to return a mock URI. | `ProjectRootResolver.isInitialized('/workspace')` | Returns `true` |
+| `should return false when .spectra directory does not exist` | `unit` | Returns false if stat throws (directory missing). | Stub `vscode.workspace.fs.stat` to reject/throw an error (e.g., `FileNotFound`). Stub `vscode.Uri.file` to return a mock URI. | `ProjectRootResolver.isInitialized('/workspace')` | Returns `false` |
+| `should construct URI with path.join of projectRoot and .spectra` | `unit` | Constructs the correct path for the stat call. | Stub `vscode.workspace.fs.stat` to resolve successfully. Spy on `vscode.Uri.file`. | `ProjectRootResolver.isInitialized('/my/project')` | `vscode.Uri.file` called with the result of `path.join('/my/project', '.spectra')` (i.e., `'/my/project/.spectra'`) |
+
 ### Null / Empty Input
 
 | Test ID | Category | Description | Setup | Input | Expected |
@@ -34,4 +42,5 @@
 |---|---|---|---|---|---|
 | `should read only the first workspace folder` | `unit` | Uses only the first workspace folder when multiple are present. | Stub `vscode.workspace.workspaceFolders` to return `[{ uri: { fsPath: '/first' } }, { uri: { fsPath: '/second' } }]`. Stub `vscode.workspace.getConfiguration('spectra').get('projectRoot')` to return `undefined`. | *(none — static method)* | Returns `'/first'` |
 | `should call getConfiguration with spectra section` | `unit` | Reads configuration from the correct section and key. | Stub `vscode.workspace.workspaceFolders` to return `[{ uri: { fsPath: '/workspace' } }]`. Create a sinon spy on `vscode.workspace.getConfiguration`. Stub the returned config object's `get` method to return `'custom'`. | *(none — static method)* | `getConfiguration` called with `'spectra'`; `get` called with `'projectRoot'` |
-| `should not perform any file system operations` | `unit` | Method performs no I/O — purely computational. | Stub `vscode.workspace.workspaceFolders` to return `[{ uri: { fsPath: '/workspace' } }]`. Stub `vscode.workspace.getConfiguration('spectra').get('projectRoot')` to return `'sub'`. Spy on `fs` module methods (e.g., `existsSync`, `mkdirSync`). | *(none — static method)* | No `fs` methods are called; returns `'/workspace/sub'` |
+| `should not create or write any file or directory` | `unit` | Method performs no mutation I/O. | Stub `vscode.workspace.workspaceFolders` to return `[{ uri: { fsPath: '/workspace' } }]`. Stub `vscode.workspace.getConfiguration('spectra').get('projectRoot')` to return `'sub'`. Spy on `vscode.workspace.fs.createDirectory` and `vscode.workspace.fs.writeFile`. | *(none — static method)* | No `createDirectory` or `writeFile` methods are called; returns `'/workspace/sub'` |
+| `should call vscode.workspace.fs.stat in isInitialized` | `unit` | isInitialized delegates existence check to workspace.fs.stat. | Spy on `vscode.workspace.fs.stat`. Stub it to resolve successfully. Stub `vscode.Uri.file`. | `ProjectRootResolver.isInitialized('/workspace')` | `vscode.workspace.fs.stat` called exactly once with the URI for `'/workspace/.spectra'` |
