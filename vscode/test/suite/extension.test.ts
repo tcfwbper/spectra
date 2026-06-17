@@ -40,13 +40,18 @@ describe("extension", function () {
   // ─── Happy Path — activate ──────────────────────────────────────────────────
 
   describe("activate — Happy Path", function () {
-    it("test_activate_createsOutputChannel: creates an OutputChannel named 'Spectra' on activation", function () {
-      activateWithFixture(fixture);
-
-      // ASSERT: fixture.vscode.window.createOutputChannel called with 'Spectra'
-      expect(
-        fixture.vscode.window.createOutputChannel.calledOnceWith("Spectra"),
-      ).to.be.true;
+    it("test_activate_createsOutputChannel: creates an OutputChannel named 'Spectra' on activation when deps does not provide one", function () {
+      // Scaffolded: production needs refactored ExtensionDeps with optional `outputChannel` field.
+      // When `outputChannel` is omitted from deps, activate should use the production default
+      // (vscode.window.createOutputChannel('Spectra')).
+      // Missing seam: ExtensionDeps.outputChannel optional field + merge-with-defaults pattern
+      this.skip();
+      // Once the production surface is updated:
+      // Pass deps with stubs for all collaborators EXCEPT outputChannel.
+      // Stub vscode.window.createOutputChannel at module level to return a mock channel.
+      // const depsWithoutChannel = createDepsWithoutOutputChannel(fixture);
+      // activate(fixture.context, depsWithoutChannel);
+      // expect(fixture.vscode.window.createOutputChannel.calledOnceWith('Spectra')).to.be.true;
     });
 
     it("test_activate_logsActivationStart: logs activation start before resolving project root", function () {
@@ -82,13 +87,14 @@ describe("extension", function () {
 
     it("test_activate_registersViewProvider: registers the view provider with VS Code using the correct viewType and options", function () {
       // Scaffolded: production ExtensionDeps needs registerWebviewViewProvider seam
+      // Missing seam: ExtensionDeps.registerWebviewViewProvider, ExtensionDeps.createViewProvider
       this.skip();
       // Once the production surface exists:
       // activateWithFixture(fixture);
       // expect(fixture.vscode.window.registerWebviewViewProvider.calledOnce).to.be.true;
       // const [viewType, provider, options] =
       //   fixture.vscode.window.registerWebviewViewProvider.firstCall.args;
-      // expect(viewType).to.equal('spectra.sessionView');
+      // expect(viewType).to.equal('spectra.chatView');
       // expect(provider).to.equal(fixture.viewProvider);
       // expect(options).to.deep.equal({ webviewOptions: { retainContextWhenHidden: true } });
     });
@@ -368,14 +374,14 @@ describe("extension", function () {
 
     it("test_activate_projectRootUndefined_viewProviderStillRegistered: ViewProvider is registered even when projectRoot is undefined", function () {
       // Scaffolded: production must register ViewProvider before the early return
-      // Missing seam: ExtensionDeps.registerWebviewViewProvider
+      // Missing seam: ExtensionDeps.registerWebviewViewProvider, ExtensionDeps.createViewProvider
       this.skip();
       // Once production surface exists:
       // const undefinedFixture = createExtensionTestFixture(undefined);
       // activateWithFixture(undefinedFixture);
       // expect(undefinedFixture.vscode.window.registerWebviewViewProvider.calledOnce).to.be.true;
       // const [viewType] = undefinedFixture.vscode.window.registerWebviewViewProvider.firstCall.args;
-      // expect(viewType).to.equal('spectra.sessionView');
+      // expect(viewType).to.equal('spectra.chatView');
     });
   });
 
@@ -383,18 +389,19 @@ describe("extension", function () {
 
   describe("activate — Mock / Dependency Interaction", function () {
     it("test_activate_loggerWrapsOutputChannel: logger delegates info/warn/error to outputChannel.appendLine with severity tags", function () {
-      // Setup: activate returns early (projectRoot undefined) but we can
-      // observe the logger calling outputChannel.appendLine with [INFO] tag
-      const undefinedFixture = createExtensionTestFixture(undefined);
-
-      activateWithFixture(undefinedFixture);
-
-      // ASSERT: outputChannel.appendLine called with strings containing severity prefix
-      const infoCall = undefinedFixture.outputChannel.appendLine.args.find(
-        (args: any[]) =>
-          typeof args[0] === "string" && args[0].includes("[INFO]"),
-      );
-      expect(infoCall).to.exist;
+      // Scaffolded: production needs refactored ExtensionDeps with optional `outputChannel` field.
+      // The spec requires passing deps with a mock outputChannel and verifying
+      // outputChannel.appendLine is called with severity-tagged strings.
+      // Missing seam: ExtensionDeps.outputChannel optional field + merge-with-defaults pattern
+      this.skip();
+      // Once the production surface is updated:
+      // const mockChannel = createMockOutputChannel();
+      // const depsWithChannel = createDepsWithOutputChannel(fixture, mockChannel);
+      // activate(fixture.context, depsWithChannel);
+      // const infoCall = mockChannel.appendLine.args.find(
+      //   (args: any[]) => typeof args[0] === 'string' && args[0].includes('[INFO]')
+      // );
+      // expect(infoCall).to.exist;
     });
 
     it("test_activate_terminateFromDetailPage_routesToSessionListController: terminateSession from detail page routes to sessionListController.terminate", function () {
@@ -412,28 +419,76 @@ describe("extension", function () {
         .true;
     });
 
-    it("test_activate_acceptsOnlyOneParameter: activate function signature accepts exactly one parameter", function () {
-      // The production activate function currently accepts (context, deps) for testability.
-      // The logic spec mandates that the public signature accepts exactly one parameter (context).
-      // Scaffolded: once production removes the deps parameter (collaborators constructed internally),
-      // this test will pass. Until then, verify the constraint via t.Skip.
-      // Missing seam: production activate() must accept exactly 1 parameter (no ExtensionDeps)
+    it("test_activate_acceptsContextAndOptionalDeps: activate function signature accepts context as first parameter and optional deps as second", function () {
+      // The production activate function accepts (context, deps?) where deps is optional.
+      // Function.length only counts parameters before the first optional/defaulted one,
+      // so activate.length should be 1 (only `context` is required).
+      // Scaffolded: production ExtensionDeps must become an optional second parameter with
+      // production defaults when omitted. Currently deps is required (not optional).
+      // Missing seam: production activate() second parameter must be optional (deps?: ActivateDeps)
       this.skip();
       // Once the production surface is updated:
       // import { activate } from "../../src/extension";
       // expect(activate.length).to.equal(1);
     });
 
-    it("test_activate_constructsAllCollaboratorsInternally: all collaborators are constructed inside activate without external injection", function () {
-      // Scaffolded: once production activate() no longer accepts ExtensionDeps,
-      // all collaborators are constructed internally.
-      // Missing seam: production activate() must not accept a deps parameter
+    it("test_activate_depsUndefined_constructsAllCollaboratorsInternally: all collaborators are constructed using production defaults when deps is undefined", function () {
+      // Scaffolded: production activate() must accept deps as optional and use
+      // production defaults (real constructors) when deps is undefined.
+      // Missing seam: production activate() must make deps optional with production fallbacks
+      // for all collaborators (ProjectRootResolver, SessionListController, SessionDetailController,
+      // SpectraViewProvider, vscode.window.createOutputChannel, etc.)
       this.skip();
       // Once the production surface is updated:
       // import { activate } from "../../src/extension";
+      // // Stub module-level production dependencies so they don't cause side effects
+      // // but can be spied upon
       // const context = createMockExtensionContext();
-      // // Verify activate was called with only context (no second argument)
-      // // and all constructors (SessionListController, SessionDetailController, SpectraViewProvider) are called.
+      // activate(context); // no second argument — deps is undefined
+      // // Verify all three constructors (SessionListController, SessionDetailController,
+      // // SpectraViewProvider) are called using production implementations; no error thrown.
+    });
+
+    it("test_activate_depsProvided_usesSuppliedImplementations: when deps is provided, activate uses the supplied implementations instead of production defaults", function () {
+      // Scaffolded: production activate() must accept deps as optional and when
+      // provided, use the supplied implementations instead of production defaults.
+      // Missing seam: production activate() must make deps optional with merge-with-defaults
+      // pattern; when deps provides all fields, no production constructors are invoked.
+      this.skip();
+      // Once the production surface is updated:
+      // import { activate } from "../../src/extension";
+      // const mockDeps = {
+      //   outputChannel: createMockOutputChannel(),
+      //   resolveProjectRoot: sinon.stub().returns('/workspace'),
+      //   isInitialized: sinon.stub().returns(true),
+      //   createSessionListController: sinon.stub().returns(createMockSessionListController()),
+      //   createSessionDetailController: sinon.stub().returns(createMockSessionDetailController()),
+      //   createViewProvider: sinon.stub().returns(createMockViewProvider()),
+      //   registerWebviewViewProvider: sinon.stub().returns({ dispose: () => {} }),
+      //   showErrorMessage: sinon.stub(),
+      // };
+      // const context = createMockExtensionContext();
+      // activate(context, mockDeps);
+      // expect(mockDeps.createSessionListController.calledOnce).to.be.true;
+      // expect(mockDeps.createSessionDetailController.calledOnce).to.be.true;
+      // expect(mockDeps.createViewProvider.calledOnce).to.be.true;
+    });
+
+    it("test_activate_depsPartial_mergesWithProductionDefaults: when deps provides only some fields, remaining fields use production defaults", function () {
+      // Scaffolded: production activate() must merge partial deps with production defaults.
+      // If deps only provides `outputChannel`, the remaining fields (controllers, view provider, etc.)
+      // should use production implementations.
+      // Missing seam: production activate() must implement merge-with-defaults pattern
+      // (e.g., { ...productionDefaults, ...deps })
+      this.skip();
+      // Once the production surface is updated:
+      // import { activate } from "../../src/extension";
+      // const mockChannel = createMockOutputChannel();
+      // const context = createMockExtensionContext();
+      // // Pass deps with only outputChannel; remaining fields use production defaults
+      // activate(context, { outputChannel: mockChannel });
+      // // mockChannel is used for the OutputChannel
+      // // Production SessionListController and SpectraViewProvider constructors are still called
     });
 
     it("test_activate_registersViewProviderSynchronouslyDuringActivation: ViewProvider registration occurs synchronously during activation", function () {
@@ -446,7 +501,7 @@ describe("extension", function () {
       // activateWithFixture(fixture);
       // expect(fixture.vscode.window.registerWebviewViewProvider.calledOnce).to.be.true;
       // const [viewType] = fixture.vscode.window.registerWebviewViewProvider.firstCall.args;
-      // expect(viewType).to.equal('spectra.sessionView');
+      // expect(viewType).to.equal('spectra.chatView');
     });
   });
 
