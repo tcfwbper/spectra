@@ -2,20 +2,18 @@
  * Shared test helpers for extension.test.ts.
  *
  * Provides mock factories for all collaborators that the activate() function
- * orchestrates: vscode.window, ProjectRootResolver, SessionListController,
- * SessionDetailController, and SpectraViewProvider.
+ * orchestrates: OutputChannel, ViewProvider, SessionListController,
+ * SessionDetailController, and all deps fields.
  *
- * Updated: The new extension architecture uses SpectraViewProvider (registered
- * via vscode.window.registerWebviewViewProvider) instead of SpectraPanel.
- * It also uses ProjectRootResolver.isInitialized() to check if .spectra/ exists.
+ * Architecture: The production activate(context, deps?) uses an all-optional
+ * ActivateDeps interface. When a field is missing, production defaults are used.
+ * Tests inject stubs via the deps parameter to avoid requiring the vscode module.
  *
- * Scaffolded: The production extension.ts ExtensionDeps interface must be updated
- * to match the new logic spec (SpectraViewProvider, isInitialized, no openPanel command).
- * Tests using this fixture will compile and pass once the production surface is updated.
+ * Test spec: spec/test/vscode/src/extension.md
  */
 import * as sinon from "sinon";
 
-import { activate, type ExtensionDeps } from "../../../src/extension";
+import { activate, type ActivateDeps } from "../../../src/extension";
 
 // ─── Logger Mock ─────────────────────────────────────────────────────────────
 
@@ -141,63 +139,6 @@ export function createMockViewProvider(): MockViewProvider {
   };
 }
 
-// ─── Mock Panel (legacy — kept for backward compat during transition) ────────
-
-/**
- * Mock SpectraPanel instance with controllable event triggers.
- * @deprecated Use MockViewProvider for new tests.
- */
-export interface MockPanel {
-  showSessionList: sinon.SinonStub;
-  showSessionDetail: sinon.SinonStub;
-  dispose: sinon.SinonStub;
-  onDidReceiveMessage: (listener: Callback<any>) => { dispose: () => void };
-  onDidDispose: (listener: () => void) => { dispose: () => void };
-  /** Trigger the onDidReceiveMessage callback. */
-  triggerMessage: (msg: any) => void;
-  /** Trigger the onDidDispose callback. */
-  triggerDispose: () => void;
-  /** All message listeners (for test inspection). */
-  messageListeners: Array<Callback<any>>;
-  /** All dispose listeners (for test inspection). */
-  disposeListeners: Array<() => void>;
-}
-
-/**
- * Creates a mock SpectraPanel instance.
- * @deprecated Use createMockViewProvider for new tests.
- */
-export function createMockPanel(): MockPanel {
-  const messageListeners: Array<Callback<any>> = [];
-  const disposeListeners: Array<() => void> = [];
-
-  return {
-    showSessionList: sinon.stub(),
-    showSessionDetail: sinon.stub(),
-    dispose: sinon.stub(),
-    onDidReceiveMessage: (listener: Callback<any>) => {
-      messageListeners.push(listener);
-      return { dispose: () => {} };
-    },
-    onDidDispose: (listener: () => void) => {
-      disposeListeners.push(listener);
-      return { dispose: () => {} };
-    },
-    triggerMessage: (msg: any) => {
-      for (const l of [...messageListeners]) {
-        l(msg);
-      }
-    },
-    triggerDispose: () => {
-      for (const l of [...disposeListeners]) {
-        l();
-      }
-    },
-    messageListeners,
-    disposeListeners,
-  };
-}
-
 // ─── Mock SessionListController ──────────────────────────────────────────────
 
 /**
@@ -308,146 +249,107 @@ export function createMockSessionDetailController(): MockSessionDetailController
   };
 }
 
-// ─── Mock vscode namespace ───────────────────────────────────────────────────
-
-/**
- * Represents the mocked vscode.window and vscode.commands namespace
- * needed by extension.ts tests.
- */
-export interface MockVscodeNamespace {
-  window: {
-    createOutputChannel: sinon.SinonStub;
-    showErrorMessage: sinon.SinonStub;
-    registerWebviewViewProvider: sinon.SinonStub;
-  };
-  commands: {
-    registerCommand: sinon.SinonStub;
-  };
-}
-
-/**
- * Creates a mock vscode namespace with stubs for window and commands.
- */
-export function createMockVscodeNamespace(
-  outputChannel: MockOutputChannel,
-): MockVscodeNamespace {
-  return {
-    window: {
-      createOutputChannel: sinon.stub().returns(outputChannel),
-      showErrorMessage: sinon.stub(),
-      registerWebviewViewProvider: sinon.stub().returns({ dispose: () => {} }),
-    },
-    commands: {
-      registerCommand: sinon.stub().returns({ dispose: () => {} }),
-    },
-  };
-}
-
 // ─── Full Test Fixture ───────────────────────────────────────────────────────
 
 /**
  * A complete test fixture for extension.test.ts that assembles all mocks.
  *
- * Updated: Uses MockViewProvider instead of MockPanel. Includes
- * isInitializedStub for checking project initialization status.
+ * The fixture provides:
+ * - A pre-built deps object (ActivateDeps) ready to pass to activate().
+ * - Direct access to mock instances for assertion (viewProvider, controllers, etc).
+ * - Trigger methods on controllers and viewProvider for simulating events.
  */
 export interface ExtensionTestFixture {
   context: MockExtensionContext;
   outputChannel: MockOutputChannel;
-  vscode: MockVscodeNamespace;
   viewProvider: MockViewProvider;
   sessionListController: MockSessionListController;
   sessionDetailController: MockSessionDetailController;
-  projectRootResolveStub: sinon.SinonStub;
-  isInitializedStub: sinon.SinonStub;
-  viewProviderConstructorStub: sinon.SinonStub;
-  sessionListControllerConstructorStub: sinon.SinonStub;
-  sessionDetailControllerConstructorStub: sinon.SinonStub;
-  /** @deprecated Legacy field — use viewProvider */
-  panel: MockPanel;
-  /** @deprecated Legacy field */
-  spectraPanelCreateOrRevealStub: sinon.SinonStub;
+  /** The fully-assembled deps object. Modify individual fields before calling activate. */
+  deps: ActivateDeps;
+  /** Spies/stubs for verifying dep calls */
+  spies: {
+    resolveProjectRoot: sinon.SinonStub;
+    showErrorMessage: sinon.SinonStub;
+    registerCommand: sinon.SinonStub;
+    createViewProvider: sinon.SinonStub;
+    registerWebviewViewProvider: sinon.SinonStub;
+    createSessionListController: sinon.SinonStub;
+    createSessionDetailController: sinon.SinonStub;
+  };
 }
 
 /**
  * Creates a fully-assembled test fixture with default "happy path" wiring.
  *
- * @param projectRoot - The value ProjectRootResolver.resolve() will return.
- *   Pass `null` or `undefined` explicitly to simulate no workspace; the stub
- *   will return `undefined`. Omitting the argument defaults to "/workspace".
- * @param isInitialized - The value ProjectRootResolver.isInitialized() will return.
- *   Defaults to `true`.
+ * All deps fields are pre-wired so that activate(context, deps) succeeds.
+ * Tests can override individual deps fields before calling activateWithFixture.
+ *
+ * @param projectRoot - The value resolveProjectRoot() will return.
+ *   Pass `undefined` to simulate no workspace. Defaults to "/workspace".
  */
 export function createExtensionTestFixture(
-  ...args: [string | undefined | null, boolean?] | []
+  projectRoot: string | undefined = "/workspace",
 ): ExtensionTestFixture {
-  const projectRoot: string | undefined =
-    args.length === 0 ? "/workspace" : (args[0] ?? undefined);
-  const isInitialized: boolean =
-    args.length >= 2 ? (args[1] ?? true) : true;
-
   const context = createMockExtensionContext();
   const outputChannel = createMockOutputChannel();
-  const vscode = createMockVscodeNamespace(outputChannel);
   const viewProvider = createMockViewProvider();
-  const panel = createMockPanel();
   const sessionListController = createMockSessionListController();
   const sessionDetailController = createMockSessionDetailController();
 
-  const projectRootResolveStub = sinon.stub().returns(projectRoot);
-  const isInitializedStub = sinon.stub().returns(isInitialized);
-  const viewProviderConstructorStub = sinon.stub().returns(viewProvider);
-  const spectraPanelCreateOrRevealStub = sinon.stub().returns(panel);
-  const sessionListControllerConstructorStub = sinon
+  const resolveProjectRoot = sinon.stub().returns(projectRoot);
+  const showErrorMessage = sinon.stub();
+  const registerCommand = sinon.stub().returns({ dispose: () => {} });
+  const createViewProvider = sinon.stub().returns(viewProvider);
+  const registerWebviewViewProvider = sinon
+    .stub()
+    .returns({ dispose: () => {} });
+  const createSessionListController = sinon
     .stub()
     .returns(sessionListController);
-  const sessionDetailControllerConstructorStub = sinon
+  const createSessionDetailController = sinon
     .stub()
     .returns(sessionDetailController);
+
+  const deps: ActivateDeps = {
+    outputChannel,
+    showErrorMessage,
+    registerCommand,
+    resolveProjectRoot,
+    createViewProvider,
+    registerWebviewViewProvider,
+    createSessionListController,
+    createSessionDetailController,
+  };
 
   return {
     context,
     outputChannel,
-    vscode,
     viewProvider,
-    panel,
     sessionListController,
     sessionDetailController,
-    projectRootResolveStub,
-    isInitializedStub,
-    viewProviderConstructorStub,
-    spectraPanelCreateOrRevealStub,
-    sessionListControllerConstructorStub,
-    sessionDetailControllerConstructorStub,
+    deps,
+    spies: {
+      resolveProjectRoot,
+      showErrorMessage,
+      registerCommand,
+      createViewProvider,
+      registerWebviewViewProvider,
+      createSessionListController,
+      createSessionDetailController,
+    },
   };
 }
 
-// ─── Bridge: fixture → ExtensionDeps → activate() ────────────────────────────
+// ─── Bridge: fixture → activate() ────────────────────────────────────────────
 
 /**
- * Converts an ExtensionTestFixture into the ExtensionDeps interface
- * expected by the production activate() function, then calls activate().
+ * Calls activate(context, deps) using the fixture's assembled deps.
  *
- * NOTE: The production ExtensionDeps interface needs to be updated to support:
- *   - resolveProjectRoot() → string | undefined
- *   - isInitialized(projectRoot: string) → boolean
- *   - createViewProvider(extensionUri, logger) → IViewProvider
- *   - registerWebviewViewProvider(viewType, provider, options) → IDisposable
- *
- * Until the production interface is updated, this bridge provides the legacy
- * wiring. Tests that depend on the new behavior (isInitialized, ViewProvider)
- * are scaffolded with t.Skip() markers.
+ * The production activate() function accepts (context, deps?) where deps
+ * is an ActivateDeps object with all-optional fields. When a field is present,
+ * it is used instead of the production default.
  */
 export function activateWithFixture(fixture: ExtensionTestFixture): void {
-  const deps: ExtensionDeps = {
-    createOutputChannel: fixture.vscode.window.createOutputChannel,
-    showErrorMessage: fixture.vscode.window.showErrorMessage,
-    registerCommand: fixture.vscode.commands.registerCommand,
-    resolveProjectRoot: fixture.projectRootResolveStub,
-    createSessionListController: fixture.sessionListControllerConstructorStub,
-    createSessionDetailController: fixture.sessionDetailControllerConstructorStub,
-    createOrRevealPanel: fixture.spectraPanelCreateOrRevealStub,
-  };
-
-  activate(fixture.context, deps);
+  activate(fixture.context, fixture.deps);
 }
