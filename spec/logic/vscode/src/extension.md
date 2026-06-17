@@ -27,26 +27,27 @@ Activation entry point for the Spectra VS Code extension. Assembles all componen
 | `SessionListController` | Session list state owner | Constructor, `onDidUpdate`, `onDidError`, `launch()`, `terminate()`, `dispose()` | Must not call internal scan methods |
 | `SessionDetailController` | Session detail state owner | Constructor, `onDidUpdate`, `onDidError`, `open()`, `sendEvent()`, `dispose()` | Must not call internal scan methods |
 | `SpectraViewProvider` | Webview sidebar transport | Constructor, `onDidReceiveMessage`, `showSessionList()`, `showSessionDetail()`, `showNotInitialized()`, `dispose()` | Must not access `view.webview` directly |
-| `vscode.window.registerWebviewViewProvider` | View provider registration | Register with viewType `'spectra.sessionView'` | — |
+| `vscode.window.registerWebviewViewProvider` | View provider registration | Register with viewType `'spectra.chatView'` | — |
 | `vscode.window.showErrorMessage` | User-facing error display | Call with error message string | — |
 | Logger (constructed internally) | Diagnostic output | `info()`, `warn()`, `error()` | — |
 
 Construction constraints:
-- `activate(context)` is the single exported activation function. It accepts exactly one parameter (`vscode.ExtensionContext`) provided by VS Code. Must not accept additional parameters (no dependency injection pattern — VS Code only passes `context`).
+- `activate(context, deps?)` is the single exported activation function. It accepts `vscode.ExtensionContext` as the first parameter (provided by VS Code) and an optional `deps` parameter that defaults to production implementations when omitted. VS Code only passes `context`, so `deps` is `undefined` at runtime and production defaults are used. Tests may pass a mock `deps` object.
 - `deactivate()` is the single exported deactivation function.
 - No class instantiation for the entry point — module-level exported functions.
-- Must not use a wrapper, factory, or DI container to supply dependencies to `activate` — all collaborators are constructed internally.
+- When `deps` is `undefined` or omitted, `activate` must construct all collaborators internally using production implementations — must not throw or crash when called with only `context`.
 
 ## Behavior
 
-### activate(context)
+### activate(context, deps?)
 
-1. Creates an `OutputChannel` named `'Spectra'` via `vscode.window.createOutputChannel('Spectra')`.
+1. Merges `deps` with production defaults: any field not provided in `deps` (or if `deps` is `undefined`) uses the production implementation. This produces a resolved deps object used for all subsequent construction.
+1a. Creates an `OutputChannel` named `'Spectra'` via `vscode.window.createOutputChannel('Spectra')` (or uses `deps.outputChannel` if provided).
 2. Wraps the OutputChannel in a logger adapter object providing `{ info, warn, error }` methods. Each method prepends a severity tag and delegates to `outputChannel.appendLine`.
 3. Logs activation start via `logger.info`.
 4. Calls `ProjectRootResolver.resolve()` to obtain `projectRoot`.
 5. Creates a `SpectraViewProvider(context.extensionUri, logger)` instance.
-6. Registers the view provider via `vscode.window.registerWebviewViewProvider('spectra.sessionView', viewProvider, { webviewOptions: { retainContextWhenHidden: true } })`.
+6. Registers the view provider via `vscode.window.registerWebviewViewProvider('spectra.chatView', viewProvider, { webviewOptions: { retainContextWhenHidden: true } })`.
 7. If `projectRoot` is `undefined`, calls `viewProvider.showNotInitialized()` (ViewProvider stores this as a pending message if the view has not yet resolved), pushes OutputChannel and viewProvider registration to `context.subscriptions`, logs the error, and returns.
 8. Calls `ProjectRootResolver.isInitialized(projectRoot)` to check if `.spectra/` directory exists.
 9. If not initialized, calls `viewProvider.showNotInitialized()` (ViewProvider stores this as a pending message if the view has not yet resolved), pushes OutputChannel and viewProvider registration to `context.subscriptions`, logs, and returns.
@@ -81,6 +82,7 @@ Construction constraints:
 | Field | Type | Constraints | Required |
 |---|---|---|---|
 | context | `vscode.ExtensionContext` | Valid extension context provided by VS Code | Yes (activate) |
+| deps | `ActivateDeps \| undefined` | Optional object providing collaborator factories/instances for testing. When `undefined`, production defaults are used. | No (activate) |
 
 ## Outputs
 
@@ -90,9 +92,10 @@ Construction constraints:
 
 ## Invariants
 
-- `activate` must accept exactly one parameter (`context: vscode.ExtensionContext`) — must not accept a second `deps` or options parameter. VS Code calls `activate(context)` with no additional arguments; any extra parameters would be `undefined` at runtime.
-- Must construct all collaborators (logger, controllers, view provider) internally within `activate` — must not rely on external injection.
-- Must register `SpectraViewProvider` via `vscode.window.registerWebviewViewProvider('spectra.sessionView', ...)` synchronously during activation, before any async work. This ensures the sidebar view is always backed by a provider when the user opens it.
+- `activate` must accept `context: vscode.ExtensionContext` as its first parameter and an optional `deps?: ActivateDeps` as its second parameter. VS Code calls `activate(context)` with no additional arguments, so `deps` is `undefined` at runtime and production defaults are used. Must not crash when `deps` is `undefined`.
+- When `deps` is `undefined` or omitted, must construct all collaborators (logger, controllers, view provider) internally using production implementations. When `deps` is provided (test scenarios), must use the supplied implementations.
+- Must register `SpectraViewProvider` via `vscode.window.registerWebviewViewProvider('spectra.chatView', ...)` synchronously during activation, before any async work. This ensures the sidebar view is always backed by a provider when the user opens it.
+- The extension's `package.json` must declare `"activationEvents": ["onView:spectra.chatView"]` so that VS Code activates the extension when the user opens the sidebar view. Without this, clicking the sidebar icon will not trigger activation and the view will remain unresolved.
 - Must register all disposables with `context.subscriptions` — no manual cleanup in `deactivate()`.
 - Must always register SpectraViewProvider regardless of projectRoot or initialization state — the sidebar view must always appear.
 - Must not proceed past step 9 (creating controllers) if projectRoot is undefined or project is not initialized.

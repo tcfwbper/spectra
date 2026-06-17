@@ -27,7 +27,7 @@ Implements `vscode.WebviewViewProvider` to provide a WebviewView in the Activity
 
 Construction constraints:
 - Instantiated via `new SpectraViewProvider(extensionUri, logger)`.
-- Registered with `vscode.window.registerWebviewViewProvider('spectra.sessionView', provider, { webviewOptions: { retainContextWhenHidden: true } })`.
+- Registered with `vscode.window.registerWebviewViewProvider('spectra.chatView', provider, { webviewOptions: { retainContextWhenHidden: true } })`.
 - Implements `vscode.WebviewViewProvider` and `vscode.Disposable`.
 
 ## Behavior
