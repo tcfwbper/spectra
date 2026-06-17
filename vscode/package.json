@@ -1,0 +1,24 @@
+{
+  "name": "spectra-vscode",
+  "version": "0.0.1",
+  "description": "Spectra VS Code Extension",
+  "private": true,
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "scripts": {
+    "compile": "tsc -p .",
+    "test": "mocha --require ts-node/register 'test/suite/**/*.test.ts'"
+  },
+  "devDependencies": {
+    "@types/chai": "^4.3.0",
+    "@types/mocha": "^10.0.0",
+    "@types/node": "^18.0.0",
+    "@types/sinon": "^10.0.0",
+    "chai": "^4.3.0",
+    "mocha": "^10.0.0",
+    "sinon": "^15.0.0",
+    "ts-node": "^10.9.0",
+    "typescript": "^5.0.0"
+  }
+}
