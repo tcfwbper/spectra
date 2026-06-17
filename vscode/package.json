@@ -1,13 +1,68 @@
 {
   "name": "spectra-vscode",
-  "version": "0.0.1",
+  "displayName": "Spectra",
+  "version": "0.1.0",
   "description": "Spectra VS Code Extension",
-  "private": true,
+  "license": "Apache-2.0",
+  "publisher": "tsung-han-chang",
+  "icon": "resources/spectra.png",
   "engines": {
-    "node": ">=18.0.0"
+    "vscode": "^1.85.0",
+    "node": ">=20.0.0"
+  },
+  "activationEvents": [],
+  "main": "./out/src/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "spectra.openPanel",
+        "title": "Open Panel",
+        "category": "Spectra",
+        "icon": "$(comment-discussion)"
+      }
+    ],
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "spectra",
+          "title": "Spectra",
+          "icon": "resources/spectra.svg"
+        }
+      ]
+    },
+    "views": {
+      "spectra": [
+        {
+          "type": "webview",
+          "id": "spectra.chatView",
+          "name": "Chat"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "Spectra",
+      "properties": {
+        "spectra.binaryPath": {
+          "type": "string",
+          "default": "",
+          "description": "Path to the spectra binary. Defaults to 'spectra' on PATH if not set."
+        },
+        "spectra.agentBinaryPath": {
+          "type": "string",
+          "default": "",
+          "description": "Path to the spectra agent binary. Defaults to 'spectra-agent' on PATH if not set."
+        },
+        "spectra.projectRoot": {
+          "type": "string",
+          "default": "",
+          "description": "Root directory of the project. Defaults to the workspace folder if not set."
+        }
+      }
+    }
   },
   "scripts": {
     "compile": "tsc -p .",
+    "package": "vsce package",
     "test": "mocha --require ts-node/register 'test/suite/**/*.test.ts'"
   },
   "devDependencies": {
@@ -15,6 +70,8 @@
     "@types/mocha": "^10.0.0",
     "@types/node": "^18.0.0",
     "@types/sinon": "^10.0.0",
+    "@types/vscode": "^1.85.0",
+    "@vscode/vsce": "^3.0.0",
     "chai": "^4.3.0",
     "mocha": "^10.0.0",
     "sinon": "^15.0.0",
