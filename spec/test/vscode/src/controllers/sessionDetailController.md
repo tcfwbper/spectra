@@ -39,7 +39,7 @@
 
 | Test ID | Category | Description | Setup | Input | Expected |
 |---|---|---|---|---|---|
-| `should call EventDispatcher.dispatch with correct arguments` | `unit` | Successful event dispatch. | Let `open('s1','wf1')` complete. Stub `EventDispatcher.dispatch` to resolve. | `instance.sendEvent('submit', 'hello')` | `EventDispatcher.dispatch` called with `('submit', 's1', 'hello', mockLogger)` |
+| `should call EventDispatcher.dispatch with correct arguments` | `unit` | Successful event dispatch. | Let `open('s1','wf1')` complete. Stub `EventDispatcher.dispatch` to resolve. | `instance.sendEvent('submit', 'hello')` | `EventDispatcher.dispatch` called with `('submit', 's1', 'hello', '/project', mockLogger)` |
 
 ### Error Propagation
 

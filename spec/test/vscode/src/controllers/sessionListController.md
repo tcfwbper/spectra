@@ -31,7 +31,7 @@
 
 | Test ID | Category | Description | Setup | Input | Expected |
 |---|---|---|---|---|---|
-| `should call SessionLauncher.launch with workflowName and logger` | `unit` | Successful launch delegates to SessionLauncher. | Stub `SessionLauncher.launch` to resolve successfully. Stub watchers and scanners. | `instance.launch('my-workflow')` | `SessionLauncher.launch` called with `('my-workflow', mockLogger)` |
+| `should call SessionLauncher.launch with workflowName, projectRoot, and logger` | `unit` | Successful launch delegates to SessionLauncher. | Stub `SessionLauncher.launch` to resolve successfully. Stub watchers and scanners. | `instance.launch('my-workflow')` | `SessionLauncher.launch` called with `('my-workflow', '/project', mockLogger)` |
 
 ### Happy Path — terminate
 
