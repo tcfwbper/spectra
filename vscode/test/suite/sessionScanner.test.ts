@@ -3,10 +3,6 @@
  *
  * Test spec: spec/test/vscode/src/services/sessionScanner.md
  * Source under test: vscode/src/services/sessionScanner.ts
- *
- * Scaffolded: The production module `sessionScanner.ts` does not exist yet.
- * Tests are structured to be compile-ready once SessionScanner is implemented
- * and exports `SessionScanner` with a static `scanSessions` method.
  */
 import * as sinon from "sinon";
 import { expect } from "chai";
@@ -19,114 +15,18 @@ import {
   type FsStubs,
 } from "./helpers/fsStubs";
 
-/**
- * TODO: Replace with actual import once production module exists:
- *   import { SessionScanner } from "../../src/services/sessionScanner";
- *
- * Scaffolded interface matching the logic spec contract.
- * The static method signature is:
- *   static async scanSessions(projectRoot: string, logger: { warn(msg: string): void }): Promise<SessionSummary[]>
- */
-interface SessionSummary {
-  id: string;
-  workflowName: string;
-  createdAt: number;
-  pid: number;
-  status: string;
-  currentState: string;
-}
+import { SessionScanner, type SessionSummary } from "../../src/services/sessionScanner";
 
 /**
- * Scaffold: provides a placeholder `scanSessions` that exercises the fs stubs.
- * This will be replaced by the real import once the production file exists.
- *
- * Missing production symbol: SessionScanner (from ../../src/services/sessionScanner)
+ * Creates a bound scanSessions function that injects fs stubs into the
+ * production SessionScanner.scanSessions static method.
  */
 function createScanSessionsWithStubs(fsStubs: FsStubs) {
-  return async function scanSessions(
+  return function scanSessions(
     projectRoot: string,
     logger: { warn(msg: string): void },
-  ): Promise<SessionSummary[]> {
-    const sessionsDir = `${projectRoot}/.spectra/sessions`;
-
-    // Check if sessions directory exists
-    try {
-      await fsStubs.access(sessionsDir);
-    } catch {
-      logger.warn(`Sessions directory not found: ${sessionsDir}`);
-      return [];
-    }
-
-    // Read directory entries
-    let entries: Array<{
-      name: string;
-      isDirectory(): boolean;
-      isFile(): boolean;
-    }>;
-    try {
-      entries = await fsStubs.readdir(sessionsDir, { withFileTypes: true });
-    } catch {
-      logger.warn(`Cannot read sessions directory: ${sessionsDir}`);
-      return [];
-    }
-
-    // Process each subdirectory
-    const results: SessionSummary[] = [];
-    const requiredKeys = [
-      "id",
-      "workflowName",
-      "createdAt",
-      "pid",
-      "status",
-      "currentState",
-    ];
-
-    for (const entry of entries) {
-      if (!entry.isDirectory()) {
-        continue;
-      }
-
-      const sessionJsonPath = `${sessionsDir}/${entry.name}/session.json`;
-
-      let content: string;
-      try {
-        content = await fsStubs.readFile(sessionJsonPath, "utf-8");
-      } catch {
-        logger.warn(`Cannot read session.json: ${sessionJsonPath}`);
-        continue;
-      }
-
-      let parsed: any;
-      try {
-        parsed = JSON.parse(content);
-      } catch {
-        logger.warn(`Invalid JSON in session.json: ${sessionJsonPath}`);
-        continue;
-      }
-
-      // Validate required keys
-      const missing = requiredKeys.filter((k) => parsed[k] === undefined);
-      if (missing.length > 0) {
-        logger.warn(
-          `Missing required keys in session.json: ${missing.join(", ")}`,
-        );
-        continue;
-      }
-
-      results.push({
-        id: parsed.id,
-        workflowName: parsed.workflowName,
-        createdAt: parsed.createdAt,
-        pid: parsed.pid,
-        status: parsed.status,
-        currentState: parsed.currentState,
-      });
-    }
-
-    // Sort by createdAt descending
-    results.sort((a, b) => b.createdAt - a.createdAt);
-
-    return results;
+  ) {
+    return SessionScanner.scanSessions(projectRoot, logger, fsStubs);
   };
 }
 

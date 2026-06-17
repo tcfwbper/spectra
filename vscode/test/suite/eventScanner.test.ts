@@ -3,10 +3,6 @@
  *
  * Test spec: spec/test/vscode/src/services/eventScanner.md
  * Source under test: vscode/src/services/eventScanner.ts
- *
- * Scaffolded: The production module `eventScanner.ts` does not exist yet.
- * Tests are structured to be compile-ready once EventScanner is implemented
- * and exports `EventScanner` with a static `scanEvents` method.
  */
 import * as sinon from "sinon";
 import { expect } from "chai";
@@ -17,88 +13,19 @@ import {
   type FsStubs,
 } from "./helpers/fsStubs";
 
-/**
- * TODO: Replace with actual import once production module exists:
- *   import { EventScanner } from "../../src/services/eventScanner";
- *
- * Scaffolded interface matching the logic spec contract.
- * The static method signature is:
- *   static async scanEvents(projectRoot: string, sessionId: string, logger: { warn(msg: string): void }): Promise<EventSummary[]>
- */
-interface EventSummary {
-  Type: string;
-  EmittedBy: string;
-  Message: string;
-}
+import { EventScanner } from "../../src/services/eventScanner";
 
 /**
- * Scaffold: provides a placeholder `scanEvents` that exercises the fs stubs.
- * This will be replaced by the real import once the production file exists.
- *
- * Missing production symbol: EventScanner (from ../../src/services/eventScanner)
+ * Creates a bound scanEvents function that injects fs stubs into the
+ * production EventScanner.scanEvents static method.
  */
 function createScanEventsWithStubs(fsStubs: FsStubs) {
-  return async function scanEvents(
+  return function scanEvents(
     projectRoot: string,
     sessionId: string,
     logger: { warn(msg: string): void },
-  ): Promise<EventSummary[]> {
-    const path = `${projectRoot}/.spectra/sessions/${sessionId}/events.jsonl`;
-
-    // Check file existence
-    try {
-      await fsStubs.access(path);
-    } catch {
-      logger.warn(`Events file not found: ${path}`);
-      return [];
-    }
-
-    // Read file content
-    let content: string;
-    try {
-      content = await fsStubs.readFile(path, "utf-8");
-    } catch {
-      logger.warn(`Cannot read events file: ${path}`);
-      return [];
-    }
-
-    // Parse lines
-    const lines = content.split("\n");
-    const results: EventSummary[] = [];
-
-    for (const line of lines) {
-      const trimmed = line.trim();
-      if (trimmed === "") {
-        continue;
-      }
-
-      let parsed: any;
-      try {
-        parsed = JSON.parse(trimmed);
-      } catch {
-        logger.warn(`Invalid JSON in events file: ${trimmed}`);
-        continue;
-      }
-
-      if (!parsed.Type || !parsed.EmittedBy || !parsed.Message) {
-        if (
-          parsed.Type === undefined ||
-          parsed.EmittedBy === undefined ||
-          parsed.Message === undefined
-        ) {
-          logger.warn(`Missing required key in event line`);
-          continue;
-        }
-      }
-
-      results.push({
-        Type: parsed.Type,
-        EmittedBy: parsed.EmittedBy,
-        Message: parsed.Message,
-      });
-    }
-
-    return results;
+  ) {
+    return EventScanner.scanEvents(projectRoot, sessionId, logger, fsStubs);
   };
 }
 

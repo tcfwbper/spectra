@@ -3,10 +3,6 @@
  *
  * Test spec: spec/test/vscode/src/services/workflowScanner.md
  * Source under test: vscode/src/services/workflowScanner.ts
- *
- * Scaffolded: The production module `workflowScanner.ts` does not exist yet.
- * Tests are structured to be compile-ready once WorkflowScanner is implemented
- * and exports `WorkflowScanner` with a static `scanWorkflows` method.
  */
 import * as sinon from "sinon";
 import { expect } from "chai";
@@ -19,54 +15,18 @@ import {
   type FsStubs,
 } from "./helpers/fsStubs";
 
+import { WorkflowScanner } from "../../src/services/workflowScanner";
+
 /**
- * TODO: Replace with actual import once production module exists:
- *   import { WorkflowScanner } from "../../src/services/workflowScanner";
- *
- * Scaffolded interface matching the logic spec contract.
- * The static method signature is:
- *   static async scanWorkflows(projectRoot: string, logger: { warn(msg: string): void }): Promise<string[]>
- *
- * Missing production symbol: WorkflowScanner (from ../../src/services/workflowScanner)
+ * Creates a bound scanWorkflows function that injects fs stubs into the
+ * production WorkflowScanner.scanWorkflows static method.
  */
 function createScanWorkflowsWithStubs(fsStubs: FsStubs) {
-  return async function scanWorkflows(
+  return function scanWorkflows(
     projectRoot: string,
     logger: { warn(msg: string): void },
-  ): Promise<string[]> {
-    const workflowsDir = `${projectRoot}/.spectra/workflows`;
-
-    // Read directory entries
-    let entries: Array<{
-      name: string;
-      isDirectory(): boolean;
-      isFile(): boolean;
-    }>;
-    try {
-      entries = await fsStubs.readdir(workflowsDir, { withFileTypes: true });
-    } catch {
-      logger.warn(`Workflows directory not found: ${workflowsDir}`);
-      return [];
-    }
-
-    // Filter to .yaml files only (regular files only)
-    const results: string[] = [];
-    for (const entry of entries) {
-      if (!entry.isFile()) {
-        continue;
-      }
-
-      const name = entry.name;
-      if (!name.endsWith(".yaml")) {
-        continue;
-      }
-
-      // Strip .yaml extension
-      const baseName = name.slice(0, -5);
-      results.push(baseName);
-    }
-
-    return results;
+  ) {
+    return WorkflowScanner.scanWorkflows(projectRoot, logger, fsStubs);
   };
 }
 
