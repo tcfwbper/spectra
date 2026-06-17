@@ -4,13 +4,10 @@
  * Provides mock factories for all collaborators that the activate() function
  * orchestrates: vscode.window, vscode.commands, ProjectRootResolver,
  * SessionListController, SessionDetailController, and SpectraPanel.
- *
- * Scaffolded: The production extension.ts file does not yet exist. These
- * helpers are designed around the interfaces defined in the logic spec
- * (spec/logic/vscode/src/extension.md) so that tests compile and provide
- * structural coverage once the production surface is created.
  */
 import * as sinon from "sinon";
+
+import { activate, type ExtensionDeps } from "../../../src/extension";
 
 // ─── Logger Mock ─────────────────────────────────────────────────────────────
 
@@ -315,10 +312,14 @@ export interface ExtensionTestFixture {
  * Creates a fully-assembled test fixture with default "happy path" wiring.
  *
  * @param projectRoot - The value ProjectRootResolver.resolve() will return.
+ *   Pass `null` or `undefined` explicitly to simulate no workspace; the stub
+ *   will return `undefined`. Omitting the argument defaults to "/workspace".
  */
 export function createExtensionTestFixture(
-  projectRoot: string | undefined = "/workspace",
+  ...args: [string | undefined | null] | []
 ): ExtensionTestFixture {
+  const projectRoot: string | undefined =
+    args.length === 0 ? "/workspace" : (args[0] ?? undefined);
   const context = createMockExtensionContext();
   const outputChannel = createMockOutputChannel();
   const vscode = createMockVscodeNamespace(outputChannel);
@@ -347,4 +348,28 @@ export function createExtensionTestFixture(
     sessionListControllerConstructorStub,
     sessionDetailControllerConstructorStub,
   };
+}
+
+// ─── Bridge: fixture → ExtensionDeps → activate() ────────────────────────────
+
+/**
+ * Converts an ExtensionTestFixture into the ExtensionDeps interface
+ * expected by the production activate() function, then calls activate().
+ *
+ * This is the "staged scaffold replacement" wiring — tests call this helper
+ * instead of importing activate() directly so that the fixture's mocks
+ * are properly injected through the DI interface.
+ */
+export function activateWithFixture(fixture: ExtensionTestFixture): void {
+  const deps: ExtensionDeps = {
+    createOutputChannel: fixture.vscode.window.createOutputChannel,
+    showErrorMessage: fixture.vscode.window.showErrorMessage,
+    registerCommand: fixture.vscode.commands.registerCommand,
+    resolveProjectRoot: fixture.projectRootResolveStub,
+    createSessionListController: fixture.sessionListControllerConstructorStub,
+    createSessionDetailController: fixture.sessionDetailControllerConstructorStub,
+    createOrRevealPanel: fixture.spectraPanelCreateOrRevealStub,
+  };
+
+  activate(fixture.context, deps);
 }
