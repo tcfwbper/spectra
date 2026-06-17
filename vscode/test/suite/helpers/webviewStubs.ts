@@ -205,6 +205,7 @@ export function extractNonceFromScriptTag(html: string): string | null {
  * All element IDs expected in the webview content, per the test spec.
  */
 export const EXPECTED_ELEMENT_IDS = [
+  "page-not-initialized",
   "page-sessions",
   "page-detail",
   "btn-run",
@@ -216,3 +217,98 @@ export const EXPECTED_ELEMENT_IDS = [
   "event-type-select",
   "event-message-input",
 ] as const;
+
+// ─── Stub WebviewView (for SpectraViewProvider tests) ───────────────────────
+
+/**
+ * Callback type for WebviewView event listeners.
+ */
+type ViewDisposableListener<T> = (e: T) => void;
+
+/**
+ * Minimal stub of vscode.WebviewView for SpectraViewProvider tests.
+ */
+export interface StubWebviewView {
+  webview: StubWebview;
+  onDidDispose: (listener: () => void) => { dispose: () => void };
+  /** Test utility: trigger the onDidDispose callback. */
+  triggerDispose: () => void;
+  /** Test utility: trigger onDidReceiveMessage callback with a message. */
+  triggerMessage: (msg: any) => void;
+  /** All registered dispose listeners (test inspection). */
+  disposeListeners: Array<() => void>;
+  /** All registered message listeners (test inspection). */
+  messageListeners: Array<ViewDisposableListener<any>>;
+}
+
+/**
+ * Creates a stub WebviewView with controllable event triggers.
+ */
+export function createStubWebviewView(
+  cspSource = "https://test.csp",
+): StubWebviewView {
+  const disposeListeners: Array<() => void> = [];
+  const messageListeners: Array<ViewDisposableListener<any>> = [];
+
+  const webview = createStubWebview(cspSource);
+
+  // Wire onDidReceiveMessage to register listeners
+  webview.onDidReceiveMessage = sinon
+    .stub()
+    .callsFake((listener: ViewDisposableListener<any>) => {
+      messageListeners.push(listener);
+      return { dispose: () => {} };
+    });
+
+  return {
+    webview,
+    onDidDispose: (listener: () => void) => {
+      disposeListeners.push(listener);
+      return { dispose: () => {} };
+    },
+    triggerDispose: () => {
+      for (const l of [...disposeListeners]) {
+        l();
+      }
+    },
+    triggerMessage: (msg: any) => {
+      for (const l of [...messageListeners]) {
+        l(msg);
+      }
+    },
+    disposeListeners,
+    messageListeners,
+  };
+}
+
+/**
+ * Minimal stub of vscode.WebviewViewResolveContext.
+ */
+export interface StubWebviewViewResolveContext {
+  state: any;
+}
+
+/**
+ * Creates a stub WebviewViewResolveContext.
+ */
+export function createStubWebviewViewResolveContext(): StubWebviewViewResolveContext {
+  return { state: undefined };
+}
+
+/**
+ * Minimal stub of vscode.CancellationToken.
+ */
+export interface StubCancellationToken {
+  isCancellationRequested: boolean;
+  onCancellationRequested: sinon.SinonStub;
+}
+
+/**
+ * Creates a stub CancellationToken.
+ */
+export function createStubCancellationToken(): StubCancellationToken {
+  return {
+    isCancellationRequested: false,
+    onCancellationRequested: sinon.stub(),
+  };
+}

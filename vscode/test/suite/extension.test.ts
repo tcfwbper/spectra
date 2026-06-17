@@ -7,6 +7,10 @@
  * The test structure, mocks, fixtures, and assertion intent are all in place.
  * Tests use the `activateWithFixture` bridge to inject mocked dependencies
  * through the production activate() function's ExtensionDeps DI interface.
+ *
+ * Scaffolded rows: The production extension.ts needs to be refactored from
+ * SpectraPanel to SpectraViewProvider architecture. Tests marked with t.Skip()
+ * name the exact missing production surface.
  */
 import * as sinon from "sinon";
 import { expect } from "chai";
@@ -66,6 +70,29 @@ describe("extension", function () {
       expect(fixture.projectRootResolveStub.calledOnce).to.be.true;
     });
 
+    it("test_activate_createsViewProvider: constructs SpectraViewProvider with extensionUri and logger", function () {
+      // Scaffolded: production ExtensionDeps needs createViewProvider(extensionUri, logger) seam
+      this.skip();
+      // Once the production surface exists:
+      // activateWithFixture(fixture);
+      // expect(fixture.viewProviderConstructorStub.calledOnce).to.be.true;
+      // const [uri] = fixture.viewProviderConstructorStub.firstCall.args;
+      // expect(uri).to.equal(fixture.context.extensionUri);
+    });
+
+    it("test_activate_registersViewProvider: registers the view provider with VS Code using the correct viewType and options", function () {
+      // Scaffolded: production ExtensionDeps needs registerWebviewViewProvider seam
+      this.skip();
+      // Once the production surface exists:
+      // activateWithFixture(fixture);
+      // expect(fixture.vscode.window.registerWebviewViewProvider.calledOnce).to.be.true;
+      // const [viewType, provider, options] =
+      //   fixture.vscode.window.registerWebviewViewProvider.firstCall.args;
+      // expect(viewType).to.equal('spectra.sessionView');
+      // expect(provider).to.equal(fixture.viewProvider);
+      // expect(options).to.deep.equal({ webviewOptions: { retainContextWhenHidden: true } });
+    });
+
     it("test_activate_createsSessionListController: constructs SessionListController with projectRoot and logger", function () {
       activateWithFixture(fixture);
 
@@ -88,33 +115,13 @@ describe("extension", function () {
       expect(projectRoot).to.equal("/workspace");
     });
 
-    it("test_activate_callsCreateOrReveal: calls SpectraPanel.createOrReveal with context, extensionUri, and logger", function () {
-      activateWithFixture(fixture);
-
-      // ASSERT: SpectraPanel.createOrReveal called with context, context.extensionUri, logger
-      expect(fixture.spectraPanelCreateOrRevealStub.calledOnce).to.be.true;
-      const [ctx, uri] = fixture.spectraPanelCreateOrRevealStub.firstCall.args;
-      expect(ctx).to.equal(fixture.context);
-      expect(uri).to.equal(fixture.context.extensionUri);
-    });
-
-    it("test_activate_registersOpenPanelCommand: registers the spectra.openPanel command", function () {
-      activateWithFixture(fixture);
-
-      // ASSERT: vscode.commands.registerCommand called with 'spectra.openPanel' and a handler
-      expect(fixture.vscode.commands.registerCommand.called).to.be.true;
-      const registerCall = fixture.vscode.commands.registerCommand.args.find(
-        (args: any[]) => args[0] === "spectra.openPanel",
-      );
-      expect(registerCall).to.exist;
-      expect(registerCall![1]).to.be.a("function");
-    });
-
     it("test_activate_pushesAllDisposablesToSubscriptions: pushes all disposables to context.subscriptions", function () {
       activateWithFixture(fixture);
 
       // ASSERT: context.subscriptions contains at least:
-      //   OutputChannel, sessionListController, sessionDetailController, panel, command disposable
+      //   OutputChannel, sessionListController, sessionDetailController, viewProvider,
+      //   view provider registration disposable
+      // Current production pushes 11 items in happy path; after refactor should push at least 5
       expect(fixture.context.subscriptions.length).to.be.at.least(5);
     });
 
@@ -130,12 +137,23 @@ describe("extension", function () {
       );
       expect(projectRootLog).to.exist;
     });
+
+    it("test_activate_checksProjectInitialization: calls ProjectRootResolver.isInitialized with projectRoot after resolving", function () {
+      // Scaffolded: production ExtensionDeps needs isInitialized(projectRoot) seam
+      this.skip();
+      // Once the production surface exists:
+      // activateWithFixture(fixture);
+      // expect(fixture.isInitializedStub.calledOnce).to.be.true;
+      // expect(fixture.isInitializedStub.calledWith('/workspace')).to.be.true;
+    });
   });
 
   // ─── Happy Path — onDidUpdate subscriptions ────────────────────────────────
 
   describe("activate — onDidUpdate subscriptions", function () {
-    it("test_activate_sessionListOnDidUpdate_cachesStateAndShowsList: caches state and calls panel.showSessionList", function () {
+    it("test_activate_sessionListOnDidUpdate_cachesStateAndShowsList: caches state and calls viewProvider.showSessionList", function () {
+      // Scaffolded: once production uses viewProvider instead of panel
+      // Currently tests via the legacy panel mock
       activateWithFixture(fixture);
 
       // Then trigger sessionListController.onDidUpdate with a fake state
@@ -143,13 +161,15 @@ describe("extension", function () {
       fixture.sessionListController.triggerUpdate(fakeState);
 
       // ASSERT: panel.showSessionList called with fakeState
+      // (will become viewProvider.showSessionList after refactor)
       expect(fixture.panel.showSessionList.calledOnce).to.be.true;
       expect(fixture.panel.showSessionList.firstCall.args[0]).to.deep.equal(
         fakeState,
       );
     });
 
-    it("test_activate_sessionDetailOnDidUpdate_showsDetail: calls panel.showSessionDetail on controller update", function () {
+    it("test_activate_sessionDetailOnDidUpdate_showsDetail: calls viewProvider.showSessionDetail on controller update", function () {
+      // Scaffolded: once production uses viewProvider instead of panel
       activateWithFixture(fixture);
 
       // Then trigger sessionDetailController.onDidUpdate with a fake detail state
@@ -166,6 +186,7 @@ describe("extension", function () {
       fixture.sessionDetailController.triggerUpdate(fakeDetailState);
 
       // ASSERT: panel.showSessionDetail called with fakeDetailState
+      // (will become viewProvider.showSessionDetail after refactor)
       expect(fixture.panel.showSessionDetail.calledOnce).to.be.true;
       expect(fixture.panel.showSessionDetail.firstCall.args[0]).to.deep.equal(
         fakeDetailState,
@@ -201,16 +222,6 @@ describe("extension", function () {
         fixture.vscode.window.showErrorMessage.calledOnceWith("detail error"),
       ).to.be.true;
     });
-
-    it("test_activate_createOrRevealThrows_propagatesError: error propagates when SpectraPanel.createOrReveal throws", function () {
-      // Setup: SpectraPanel.createOrReveal throws
-      fixture.spectraPanelCreateOrRevealStub.throws(
-        new Error("internal error"),
-      );
-
-      // ASSERT: activate throws/rejects with 'internal error'
-      expect(() => activateWithFixture(fixture)).to.throw("internal error");
-    });
   });
 
   // ─── Happy Path — onDidReceiveMessage routing ──────────────────────────────
@@ -219,7 +230,8 @@ describe("extension", function () {
     it("test_activate_messageRouting_navigateToDetail: routes navigateToDetail to sessionDetailController.open", function () {
       activateWithFixture(fixture);
 
-      // Then trigger panel.onDidReceiveMessage with navigateToDetail
+      // Then trigger viewProvider.onDidReceiveMessage with navigateToDetail
+      // (currently wired through panel mock)
       fixture.panel.triggerMessage({
         command: "navigateToDetail",
         sessionId: "s1",
@@ -232,7 +244,7 @@ describe("extension", function () {
         .true;
     });
 
-    it("test_activate_messageRouting_navigateToList_withCache: routes navigateToList to panel.showSessionList with cached state", function () {
+    it("test_activate_messageRouting_navigateToList_withCache: routes navigateToList to viewProvider.showSessionList with cached state", function () {
       activateWithFixture(fixture);
 
       // First trigger onDidUpdate to populate cache
@@ -244,6 +256,7 @@ describe("extension", function () {
       fixture.panel.triggerMessage({ command: "navigateToList" });
 
       // ASSERT: panel.showSessionList called with cachedState
+      // (will become viewProvider.showSessionList after refactor)
       expect(fixture.panel.showSessionList.calledOnce).to.be.true;
       expect(fixture.panel.showSessionList.firstCall.args[0]).to.deep.equal(
         cachedState,
@@ -326,74 +339,43 @@ describe("extension", function () {
     });
   });
 
-  // ─── Happy Path — onDidDispose ─────────────────────────────────────────────
-
-  describe("activate — onDidDispose", function () {
-    it("test_activate_panelOnDidDispose_disposesBothControllers: disposes both controllers when panel is disposed", function () {
-      activateWithFixture(fixture);
-
-      // Trigger panel.onDidDispose
-      fixture.panel.triggerDispose();
-
-      // ASSERT: both controllers disposed
-      expect(fixture.sessionListController.dispose.calledOnce).to.be.true;
-      expect(fixture.sessionDetailController.dispose.calledOnce).to.be.true;
-    });
-  });
-
-  // ─── Happy Path — spectra.openPanel command ────────────────────────────────
-
-  describe("activate — spectra.openPanel command", function () {
-    it("test_activate_openPanelCommand_callsCreateOrReveal: command handler calls SpectraPanel.createOrReveal", function () {
-      activateWithFixture(fixture);
-
-      // Capture the handler registered with registerCommand for 'spectra.openPanel'
-      const registerCall = fixture.vscode.commands.registerCommand.args.find(
-        (args: any[]) => args[0] === "spectra.openPanel",
-      );
-      expect(registerCall).to.exist;
-
-      const handler = registerCall![1];
-
-      // Reset createOrReveal call history
-      fixture.spectraPanelCreateOrRevealStub.resetHistory();
-
-      // Invoke the command handler
-      handler();
-
-      // ASSERT: SpectraPanel.createOrReveal called with context, extensionUri, logger
-      expect(fixture.spectraPanelCreateOrRevealStub.calledOnce).to.be.true;
-      const [ctx, uri] = fixture.spectraPanelCreateOrRevealStub.firstCall.args;
-      expect(ctx).to.equal(fixture.context);
-      expect(uri).to.equal(fixture.context.extensionUri);
-    });
-  });
-
   // ─── Null / Empty Input ────────────────────────────────────────────────────
 
   describe("activate — Null / Empty Input", function () {
-    it("test_activate_projectRootUndefined_showsErrorAndReturnsEarly: shows error and returns early when projectRoot is undefined", function () {
-      // Setup: ProjectRootResolver.resolve() returns undefined
-      const undefinedFixture = createExtensionTestFixture(undefined);
+    it("test_activate_projectRootUndefined_showsNotInitializedAndReturnsEarly: shows not-initialized and returns early when projectRoot is undefined", function () {
+      // Scaffolded: production must call viewProvider.showNotInitialized() instead of showErrorMessage
+      // Missing seam: ExtensionDeps.createViewProvider, ExtensionDeps.registerWebviewViewProvider
+      this.skip();
+      // Once production surface exists:
+      // const undefinedFixture = createExtensionTestFixture(undefined);
+      // activateWithFixture(undefinedFixture);
+      // expect(undefinedFixture.viewProvider.showNotInitialized.calledOnce).to.be.true;
+      // expect(undefinedFixture.sessionListControllerConstructorStub.called).to.be.false;
+      // expect(undefinedFixture.sessionDetailControllerConstructorStub.called).to.be.false;
+    });
 
-      activateWithFixture(undefinedFixture);
+    it("test_activate_projectNotInitialized_showsNotInitializedAndReturnsEarly: shows not-initialized when .spectra/ missing", function () {
+      // Scaffolded: production must call isInitialized(projectRoot) and viewProvider.showNotInitialized()
+      // Missing seam: ExtensionDeps.isInitialized, ExtensionDeps.createViewProvider
+      this.skip();
+      // Once production surface exists:
+      // const notInitFixture = createExtensionTestFixture('/workspace', false);
+      // activateWithFixture(notInitFixture);
+      // expect(notInitFixture.viewProvider.showNotInitialized.calledOnce).to.be.true;
+      // expect(notInitFixture.sessionListControllerConstructorStub.called).to.be.false;
+      // expect(notInitFixture.sessionDetailControllerConstructorStub.called).to.be.false;
+    });
 
-      // ASSERT: vscode.window.showErrorMessage called with a descriptive message
-      expect(undefinedFixture.vscode.window.showErrorMessage.calledOnce).to.be
-        .true;
-
-      // ASSERT: no commands registered
-      expect(undefinedFixture.vscode.commands.registerCommand.called).to.be
-        .false;
-
-      // ASSERT: no controllers created
-      expect(undefinedFixture.sessionListControllerConstructorStub.called).to.be
-        .false;
-      expect(undefinedFixture.sessionDetailControllerConstructorStub.called).to
-        .be.false;
-
-      // ASSERT: only OutputChannel pushed to subscriptions
-      expect(undefinedFixture.context.subscriptions.length).to.equal(1);
+    it("test_activate_projectRootUndefined_viewProviderStillRegistered: ViewProvider is registered even when projectRoot is undefined", function () {
+      // Scaffolded: production must register ViewProvider before the early return
+      // Missing seam: ExtensionDeps.registerWebviewViewProvider
+      this.skip();
+      // Once production surface exists:
+      // const undefinedFixture = createExtensionTestFixture(undefined);
+      // activateWithFixture(undefinedFixture);
+      // expect(undefinedFixture.vscode.window.registerWebviewViewProvider.calledOnce).to.be.true;
+      // const [viewType] = undefinedFixture.vscode.window.registerWebviewViewProvider.firstCall.args;
+      // expect(viewType).to.equal('spectra.sessionView');
     });
   });
 
