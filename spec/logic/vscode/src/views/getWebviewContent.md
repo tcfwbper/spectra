@@ -2,13 +2,13 @@
 
 ## Overview
 
-Generates the complete HTML string for the SpectraPanel webview. Produces a self-contained document with inline CSS and JavaScript that renders two pages (sessions list and session detail), handles client-side page routing via `window.addEventListener('message', ...)`, and communicates with the extension host via `vscode.postMessage(...)`. Does not perform any I/O beyond what the VS Code webview API provides.
+Generates the complete HTML string for the Spectra sidebar webview. Produces a self-contained document with inline CSS and JavaScript that renders three pages (not-initialized notice, sessions list, and session detail), handles client-side page routing via `window.addEventListener('message', ...)`, and communicates with the extension host via `vscode.postMessage(...)`. Does not perform any I/O beyond what the VS Code webview API provides.
 
 ## Boundaries
 
-- Owns: generating a CSP-compliant HTML document, embedding inline styles and scripts, rendering the DOM structure for both pages, implementing client-side message handling and page switching, implementing button cooldown (2-second lock) logic, implementing the send-button guard (entryNode + running), and wiring all `vscode.postMessage` calls.
+- Owns: generating a CSP-compliant HTML document, embedding inline styles and scripts, rendering the DOM structure for all three pages (not-initialized, sessions list, session detail), implementing client-side message handling and page switching, implementing button cooldown (2-second lock) logic, implementing the send-button guard (entryNode + running), and wiring all `vscode.postMessage` calls.
 - Delegates: actual state data provision to the extension host (received via `postMessage`).
-- Delegates: panel lifecycle management to SpectraPanel.
+- Delegates: view lifecycle management to SpectraViewProvider.
 - Must not: perform any filesystem I/O.
 - Must not: fetch external resources (all content is inline).
 - Must not: inject raw user data into HTML strings (all dynamic content is rendered via DOM manipulation in the embedded JS, not via string interpolation).
@@ -32,6 +32,12 @@ Construction constraint: This is a standalone exported function, not a class. Si
 2. Produces `<!DOCTYPE html>` with a `<meta>` CSP tag: `default-src 'none'; style-src 'nonce-${nonce}'; script-src 'nonce-${nonce}';`.
 3. Embeds a single `<style nonce="${nonce}">` block with all CSS.
 4. Embeds a single `<script nonce="${nonce}">` block with all client-side JavaScript.
+
+### Not Initialized Page DOM (id: `page-not-initialized`)
+
+5a. A centered container displaying the text: "Please run `spectra init` to initialize the project."
+5b. The text uses a muted/secondary color consistent with VS Code's sidebar theme.
+5c. This page is hidden by default; shown only when a `showNotInitialized` message is received.
 
 ### Sessions List Page DOM (id: `page-sessions`)
 
@@ -65,13 +71,15 @@ Construction constraint: This is a standalone exported function, not a class. Si
 
 11. Acquires VS Code API via `const vscode = acquireVsCodeApi()`.
 12. Registers `window.addEventListener('message', handler)` to receive messages from the extension host.
+13a. On receiving `{ type: 'showNotInitialized' }`:
+    - Hides `page-sessions` and `page-detail`, shows `page-not-initialized`.
 13. On receiving `{ type: 'showSessions', state }`:
-    - Hides `page-detail`, shows `page-sessions`.
+    - Hides `page-detail` and `page-not-initialized`, shows `page-sessions`.
     - Populates the `workflow-select` dropdown with `state.workflows`.
     - Clears and rebuilds the `session-list` container from `state.sessions`.
     - Re-evaluates stop button visibility (only for `status === 'running'` sessions).
 14. On receiving `{ type: 'showDetail', state }`:
-    - Hides `page-sessions`, shows `page-detail`.
+    - Hides `page-sessions` and `page-not-initialized`, shows `page-detail`.
     - Stores `state.entryNode`, `state.currentState`, and `state.status` in module-level variables for the send-button guard.
     - Populates the `event-type-select` dropdown with `state.eventTypes`.
     - Clears and rebuilds the `event-list` container from `state.events`.
@@ -96,7 +104,7 @@ Construction constraint: This is a standalone exported function, not a class. Si
 
 | Field | Type | Constraints | Required |
 |---|---|---|---|
-| webview | `vscode.Webview` | Valid webview instance from the panel | Yes |
+| webview | `vscode.Webview` | Valid webview instance from the sidebar view | Yes |
 | extensionUri | `vscode.Uri` | Extension root URI | Yes |
 
 ## Outputs
@@ -112,7 +120,7 @@ Construction constraint: This is a standalone exported function, not a class. Si
 - Must not use inline event handlers (`onclick`, `onsubmit`, etc.) — all event binding is in the script block.
 - Must produce valid HTML5 (`<!DOCTYPE html>`).
 - The nonce must be cryptographically random and unique per invocation.
-- Both pages exist in the DOM simultaneously; visibility is toggled via CSS (`display: none` / `display: block`).
+- All three pages exist in the DOM simultaneously; visibility is toggled via CSS (`display: none` / `display: block`).
 - All buttons with cooldown must show a visual disabled state (grey/light-grey color) while locked.
 - The send button must be disabled (grey) whenever `currentState !== entryNode` OR `status !== 'running'`, regardless of cooldown state.
 
@@ -156,6 +164,6 @@ Construction constraint: This is a standalone exported function, not a class. Si
 
 ## Related
 
-- [SpectraPanel](./spectraPanel.md) — Calls this function to set `webview.html` at panel creation time.
+- [SpectraViewProvider](./spectraViewProvider.md) — Calls this function to set `webview.html` during `resolveWebviewView`.
 - [SessionListController](../controllers/sessionListController.md) — Defines `SessionListState` shape pushed to the sessions page.
 - [SessionDetailController](../controllers/sessionDetailController.md) — Defines `SessionDetailState` shape pushed to the detail page.
