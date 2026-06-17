@@ -32,9 +32,10 @@ Activation entry point for the Spectra VS Code extension. Assembles all componen
 | Logger (constructed internally) | Diagnostic output | `info()`, `warn()`, `error()` | — |
 
 Construction constraints:
-- `activate(context)` is the single exported activation function.
+- `activate(context)` is the single exported activation function. It accepts exactly one parameter (`vscode.ExtensionContext`) provided by VS Code. Must not accept additional parameters (no dependency injection pattern — VS Code only passes `context`).
 - `deactivate()` is the single exported deactivation function.
 - No class instantiation for the entry point — module-level exported functions.
+- Must not use a wrapper, factory, or DI container to supply dependencies to `activate` — all collaborators are constructed internally.
 
 ## Behavior
 
@@ -89,6 +90,9 @@ Construction constraints:
 
 ## Invariants
 
+- `activate` must accept exactly one parameter (`context: vscode.ExtensionContext`) — must not accept a second `deps` or options parameter. VS Code calls `activate(context)` with no additional arguments; any extra parameters would be `undefined` at runtime.
+- Must construct all collaborators (logger, controllers, view provider) internally within `activate` — must not rely on external injection.
+- Must register `SpectraViewProvider` via `vscode.window.registerWebviewViewProvider('spectra.sessionView', ...)` synchronously during activation, before any async work. This ensures the sidebar view is always backed by a provider when the user opens it.
 - Must register all disposables with `context.subscriptions` — no manual cleanup in `deactivate()`.
 - Must always register SpectraViewProvider regardless of projectRoot or initialization state — the sidebar view must always appear.
 - Must not proceed past step 9 (creating controllers) if projectRoot is undefined or project is not initialized.

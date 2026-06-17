@@ -6,7 +6,7 @@ Provides a static method that launches a new Spectra workflow session by spawnin
 
 ## Boundaries
 
-- Owns: resolving `spectra.binaryPath` configuration, generating a UUIDv4 session identifier, spawning a detached child process with `unref()`, detecting spawn-level failures.
+- Owns: resolving `spectra.binaryPath` configuration, generating a UUIDv4 session identifier, spawning a detached child process with `cwd: projectRoot` and `unref()`, detecting spawn-level failures.
 - Delegates: session lifecycle tracking (status, state, pid) to SessionWatcher and SessionScanner via the runtime-written `session.json`.
 - Delegates: user-facing error display to the caller (command/controller layer).
 - Must not: wait for the child process to exit or monitor its health after spawn.
@@ -31,7 +31,7 @@ Construction constraint: SessionLauncher is a class with a single static async m
 1. Reads `spectra.binaryPath` from VS Code configuration. If the value is falsy, defaults to `"spectra"`.
 2. Generates a new UUIDv4 via `crypto.randomUUID()`.
 3. Constructs the argument list: `["run", "--workflow", workflowName, "--session-id", generatedUUID]`.
-4. Spawns the binary using `spawn` with options: `{ detached: true, stdio: 'ignore' }`.
+4. Spawns the binary using `spawn` with options: `{ detached: true, stdio: 'ignore', cwd: projectRoot }`.
 5. Calls `unref()` on the child process to ensure the VS Code extension host does not wait for it.
 6. Registers an `error` event handler on the child process. If the spawn fails (e.g., `ENOENT`), throws an error with a descriptive message including the binary path.
 7. Logs an info message via `logger.info` recording the workflow name and generated session ID.
@@ -42,6 +42,7 @@ Construction constraint: SessionLauncher is a class with a single static async m
 | Field | Type | Constraints | Required |
 |---|---|---|---|
 | workflowName | string | Non-empty | Yes |
+| projectRoot | string | Non-empty, absolute path | Yes |
 | logger | `{ info, warn, error }` | Must provide info, warn, error methods | Yes |
 
 ## Outputs
@@ -55,6 +56,7 @@ Construction constraint: SessionLauncher is a class with a single static async m
 - Must read `spectra.binaryPath` on every invocation (never cache).
 - Must default to `"spectra"` when the configuration value is falsy.
 - Must spawn with `detached: true` and call `unref()` — the child process must outlive the extension host.
+- Must set `cwd: projectRoot` in spawn options — the spectra CLI resolves `.spectra/` relative to its working directory.
 - Must use `stdio: 'ignore'` — no pipe connection to the extension host process.
 - Must throw on spawn failure (ENOENT, EACCES, etc.) — these indicate configuration errors.
 - Must be a static async method (no instance state required).

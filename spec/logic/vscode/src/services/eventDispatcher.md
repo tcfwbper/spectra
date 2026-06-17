@@ -6,7 +6,7 @@ Provides a static method that dispatches an event to the Spectra runtime by spaw
 
 ## Boundaries
 
-- Owns: resolving `spectra.agentBinaryPath` configuration, constructing the CLI argument list, spawning the child process, detecting spawn-level failures.
+- Owns: resolving `spectra.agentBinaryPath` configuration, constructing the CLI argument list, spawning the child process with `cwd: projectRoot`, detecting spawn-level failures.
 - Delegates: session lifecycle management to the Spectra runtime.
 - Delegates: user-facing error display to the caller (command/controller layer).
 - Must not: wait for the child process to exit or capture its output on the happy path.
@@ -29,7 +29,7 @@ Construction constraint: EventDispatcher is a class with a single static async m
 
 1. Reads `spectra.agentBinaryPath` from VS Code configuration. If the value is falsy, defaults to `"spectra-agent"`.
 2. Constructs the argument list: `["event", "emit", eventType, "--session-id", sessionId, "--message", message]`.
-3. Spawns the binary using `execFile` (no shell) with the constructed arguments.
+3. Spawns the binary using `execFile` (no shell) with the constructed arguments and option `{ cwd: projectRoot }`.
 4. Logs an info message via `logger.info` recording the dispatched event type and session ID.
 5. Registers an `error` event handler on the child process. If the spawn fails (e.g., `ENOENT` — binary not found), throws an error with a descriptive message including the binary path.
 6. Does not await the child process exit. On the happy path, the method resolves as soon as spawn succeeds.
@@ -42,6 +42,7 @@ Construction constraint: EventDispatcher is a class with a single static async m
 | eventType | string | Non-empty | Yes |
 | sessionId | string | Non-empty | Yes |
 | message | string | Non-empty | Yes |
+| projectRoot | string | Non-empty, absolute path | Yes |
 | logger | `{ info, warn, error }` | Must provide info, warn, error methods | Yes |
 
 ## Outputs
@@ -55,6 +56,7 @@ Construction constraint: EventDispatcher is a class with a single static async m
 - Must read `spectra.agentBinaryPath` on every invocation (never cache).
 - Must default to `"spectra-agent"` when the configuration value is falsy.
 - Must not use a shell to spawn the process (prevents shell injection).
+- Must set `cwd: projectRoot` in execFile options — the spectra-agent CLI resolves `.spectra/` relative to its working directory.
 - Must throw on spawn failure (ENOENT, EACCES, etc.) — these indicate configuration errors.
 - Must not throw on non-zero exit code from the child process — only log a warning.
 - Must be a static async method (no instance state required).

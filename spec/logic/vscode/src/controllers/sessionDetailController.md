@@ -26,7 +26,7 @@ Manages state and interactions for a single Session detail view. Orchestrates Ev
 | `EventScanner` | Event data reader | `EventScanner.scan(projectRoot, sessionId, logger)` | Must not instantiate |
 | `SessionScanner` | Session metadata reader | `SessionScanner.scan(projectRoot, logger)` | Must not instantiate |
 | `WorkflowDefinitionParser` | Workflow definition reader | `WorkflowDefinitionParser.parse(projectRoot, workflowName, logger)` | Must not instantiate |
-| `EventDispatcher` | Event CLI dispatcher | `EventDispatcher.dispatch(eventType, sessionId, message, logger)` | Must not instantiate or retain references |
+| `EventDispatcher` | Event CLI dispatcher | `EventDispatcher.dispatch(eventType, sessionId, message, projectRoot, logger)` | Must not instantiate or retain references |
 | `vscode.EventEmitter<SessionDetailState>` | State push channel | `new EventEmitter()`, `fire()`, `event`, `dispose()` | — |
 | `vscode.EventEmitter<Error>` | Error push channel | `new EventEmitter()`, `fire()`, `event`, `dispose()` | — |
 | Logger (`{ info, warn, error }`) | Diagnostic output | `info()`, `warn()`, `error()` | — |
@@ -82,7 +82,7 @@ Construction constraints:
 ### sendEvent(eventType, message)
 
 32. If disposed, returns immediately (no-op).
-33. Calls `EventDispatcher.dispatch(eventType, currentSessionId, message, logger)`.
+33. Calls `EventDispatcher.dispatch(eventType, currentSessionId, message, projectRoot, logger)`.
 34. If the call throws (spawn failure — ENOENT, EACCES), catches the error, logs via `logger.error`, and fires `onDidError` with the caught error.
 35. If the call succeeds, no immediate action (the EventWatcher will detect the resulting file change and trigger a re-scan).
 

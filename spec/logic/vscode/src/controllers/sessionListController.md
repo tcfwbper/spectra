@@ -26,7 +26,7 @@ Manages all state and actions for the Sessions list view. Orchestrates SessionWa
 | `WorkflowWatcher` | Workflow file change notification | Constructor, `onDidChange`, `dispose()` | Must not call scan or read files through it |
 | `SessionScanner` | Session data reader | `SessionScanner.scan(projectRoot, logger)` | Must not instantiate |
 | `WorkflowScanner` | Workflow data reader | `WorkflowScanner.scan(projectRoot, logger)` | Must not instantiate |
-| `SessionLauncher` | Process spawner | `SessionLauncher.launch(workflowName, logger)` | Must not instantiate or retain references |
+| `SessionLauncher` | Process spawner | `SessionLauncher.launch(workflowName, projectRoot, logger)` | Must not instantiate or retain references |
 | `SessionTerminator` | Process terminator | `SessionTerminator.terminate(pid, logger)` | Must not instantiate or send signals directly |
 | `vscode.EventEmitter<SessionListState>` | State push channel | `new EventEmitter()`, `fire()`, `event`, `dispose()` | — |
 | `vscode.EventEmitter<Error>` | Error push channel | `new EventEmitter()`, `fire()`, `event`, `dispose()` | — |
@@ -72,7 +72,7 @@ Construction constraints:
 
 ### launch(workflowName)
 
-22. Calls `SessionLauncher.launch(workflowName, logger)`.
+22. Calls `SessionLauncher.launch(workflowName, projectRoot, logger)`.
 23. If the call throws, logs the error via `logger.error` and fires `onDidError` with the caught error.
 24. If the call succeeds, no immediate action is needed (the watcher will detect the new session.json).
 
