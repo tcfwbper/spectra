@@ -10,7 +10,9 @@
     "vscode": "^1.85.0",
     "node": ">=20.0.0"
   },
-  "activationEvents": [],
+  "activationEvents": [
+    "onView:spectra.chatView"
+  ],
   "main": "./out/src/extension.js",
   "contributes": {
     "commands": [
@@ -64,6 +66,9 @@
     "compile": "tsc -p .",
     "package": "vsce package",
     "test": "mocha --require ts-node/register 'test/suite/**/*.test.ts'"
+  },
+  "dependencies": {
+    "js-yaml": "^4.1.0"
   },
   "devDependencies": {
     "@types/chai": "^4.3.0",
