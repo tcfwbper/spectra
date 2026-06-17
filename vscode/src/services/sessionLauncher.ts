@@ -32,11 +32,13 @@ export class SessionLauncher {
    * Launches a new workflow session.
    *
    * @param workflowName - The workflow to run
+   * @param projectRoot - The project root directory (used as cwd)
    * @param logger - Logger for diagnostic output
    * @param deps - Injectable dependencies (for testing)
    */
   static async launch(
     workflowName: string,
+    projectRoot: string,
     logger: SessionLauncherLogger,
     deps: SessionLauncherDeps,
   ): Promise<void> {
@@ -56,6 +58,7 @@ export class SessionLauncher {
     const child = deps.spawn(binaryPath, args, {
       detached: true,
       stdio: "ignore",
+      cwd: projectRoot,
     });
 
     child.unref();

@@ -71,8 +71,8 @@ export interface SessionListControllerDeps {
   scanSessions(projectRoot: string, logger: SessionListControllerLogger): Promise<any[]>;
   /** WorkflowScanner.scan(projectRoot, logger) */
   scanWorkflows(projectRoot: string, logger: SessionListControllerLogger): Promise<string[]>;
-  /** SessionLauncher.launch(workflowName, logger) */
-  launch(workflowName: string, logger: SessionListControllerLogger): Promise<void>;
+  /** SessionLauncher.launch(workflowName, projectRoot, logger) */
+  launch(workflowName: string, projectRoot: string, logger: SessionListControllerLogger): Promise<void>;
   /** SessionTerminator.terminate(pid, logger) */
   terminate(pid: number, logger: SessionListControllerLogger): Promise<TerminationResult>;
   /** Factory to construct a vscode.EventEmitter<SessionListState>. */
@@ -152,7 +152,7 @@ export class SessionListController implements Disposable {
    */
   async launch(workflowName: string): Promise<void> {
     try {
-      await this._deps.launch(workflowName, this._logger);
+      await this._deps.launch(workflowName, this._projectRoot, this._logger);
     } catch (err: any) {
       if (!this._disposed) {
         this._logger.error(err.message);

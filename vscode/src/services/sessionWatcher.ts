@@ -22,16 +22,18 @@ export interface SessionWatcherDeps {
 
 /**
  * Monitors all session.json files under projectRoot/.spectra/sessions/
- * for creation, modification, and deletion. Emits a debounced notification.
+ * for creation, modification, and deletion. Also monitors session directory
+ * creation and deletion. Emits a debounced notification.
  *
- * - Owns: FileSystemWatcher lifecycle, debounce logic, EventEmitter lifecycle.
+ * - Owns: FileSystemWatcher lifecycle (two watchers), debounce logic, EventEmitter lifecycle.
  * - Delegates: session data reading to SessionScanner.
  * - Must not: read, write, create, or delete any file.
  */
 export class SessionWatcher implements Disposable {
   private readonly _projectRoot: string;
   private readonly _emitter: IEventEmitter<void>;
-  private readonly _watcher: IFileSystemWatcher;
+  private readonly _fileWatcher: IFileSystemWatcher;
+  private readonly _dirWatcher: IFileSystemWatcher;
   private _debounceTimer: ReturnType<typeof setTimeout> | null = null;
   private _disposed = false;
 
@@ -45,21 +47,34 @@ export class SessionWatcher implements Disposable {
 
     if (deps) {
       this._emitter = deps.createEventEmitter<void>();
-      const pattern = deps.createRelativePattern(
+
+      // File watcher: session.json files
+      const filePattern = deps.createRelativePattern(
         projectRoot,
         `.spectra/sessions/*/session.json`,
       );
-      this._watcher = deps.createFileSystemWatcher(pattern);
+      this._fileWatcher = deps.createFileSystemWatcher(filePattern);
+
+      // Directory watcher: session directories
+      const dirPattern = deps.createRelativePattern(
+        projectRoot,
+        `.spectra/sessions/*`,
+      );
+      this._dirWatcher = deps.createFileSystemWatcher(dirPattern);
     } else {
       throw new Error("SessionWatcher requires deps parameter");
     }
 
     this.onDidChange = this._emitter.event;
 
-    // Subscribe to all three event types
-    this._watcher.onDidCreate(() => this._handleFileChange());
-    this._watcher.onDidChange(() => this._handleFileChange());
-    this._watcher.onDidDelete(() => this._handleFileChange());
+    // Subscribe to file watcher events (create, change, delete)
+    this._fileWatcher.onDidCreate(() => this._handleFileChange());
+    this._fileWatcher.onDidChange(() => this._handleFileChange());
+    this._fileWatcher.onDidDelete(() => this._handleFileChange());
+
+    // Subscribe to directory watcher events (create, delete)
+    this._dirWatcher.onDidCreate(() => this._handleFileChange());
+    this._dirWatcher.onDidDelete(() => this._handleFileChange());
   }
 
   private _handleFileChange(): void {
@@ -91,7 +106,8 @@ export class SessionWatcher implements Disposable {
       this._debounceTimer = null;
     }
 
-    this._watcher.dispose();
+    this._fileWatcher.dispose();
+    this._dirWatcher.dispose();
     this._emitter.dispose();
   }
 }

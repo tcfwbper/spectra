@@ -69,8 +69,8 @@ export interface SessionDetailControllerDeps {
   scanSessions(projectRoot: string, logger: SessionDetailControllerLogger): Promise<any[]>;
   /** WorkflowDefinitionParser.parse(projectRoot, workflowName, logger) */
   parseWorkflowDefinition(projectRoot: string, workflowName: string, logger: SessionDetailControllerLogger): Promise<{ entryNode: string; eventTypes: string[] }>;
-  /** EventDispatcher.dispatch(eventType, sessionId, message, logger) */
-  dispatchEvent(eventType: string, sessionId: string, message: string, logger: SessionDetailControllerLogger): Promise<void>;
+  /** EventDispatcher.dispatch(eventType, sessionId, message, projectRoot, logger) */
+  dispatchEvent(eventType: string, sessionId: string, message: string, projectRoot: string, logger: SessionDetailControllerLogger): Promise<void>;
   /** Factory to construct a vscode.EventEmitter<SessionDetailState>. */
   createStateEmitter(): IEventEmitter<SessionDetailState>;
   /** Factory to construct a vscode.EventEmitter<Error>. */
@@ -209,7 +209,7 @@ export class SessionDetailController implements Disposable {
     }
 
     try {
-      await this._deps.dispatchEvent(eventType, this._currentSessionId!, message, this._logger);
+      await this._deps.dispatchEvent(eventType, this._currentSessionId!, message, this._projectRoot, this._logger);
     } catch (err: any) {
       if (!this._disposed) {
         this._logger.error(err.message);

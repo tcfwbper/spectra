@@ -19,7 +19,7 @@ export interface EventDispatcherLogger {
  */
 export interface EventDispatcherDeps {
   getConfiguration: () => { get(key: string): string | undefined };
-  execFile: (binary: string, args: string[]) => any;
+  execFile: (binary: string, args: string[], options?: any) => any;
 }
 
 /**
@@ -34,6 +34,7 @@ export class EventDispatcher {
    * @param eventType - The event type to dispatch
    * @param sessionId - The session identifier
    * @param message - The event message
+   * @param projectRoot - The project root directory (used as cwd)
    * @param logger - Logger for diagnostic output
    * @param deps - Injectable dependencies (for testing)
    */
@@ -41,6 +42,7 @@ export class EventDispatcher {
     eventType: string,
     sessionId: string,
     message: string,
+    projectRoot: string,
     logger: EventDispatcherLogger,
     deps: EventDispatcherDeps,
   ): Promise<void> {
@@ -57,7 +59,7 @@ export class EventDispatcher {
       message,
     ];
 
-    const child = deps.execFile(binaryPath, args);
+    const child = deps.execFile(binaryPath, args, { cwd: projectRoot });
 
     logger.info(
       `Dispatching event "${eventType}" for session ${sessionId}`,
