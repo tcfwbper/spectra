@@ -27,9 +27,7 @@ import {
   type MockListWatcherInstance,
 } from "./helpers/controllerStubs";
 
-// Scaffolded: Uncomment when the production module exists.
-// import { SessionListController } from "../../src/controllers/sessionListController";
-// import type { SessionListControllerDeps } from "../../src/controllers/sessionListController";
+import { SessionListController } from "../../src/controllers/sessionListController";
 
 describe("SessionListController", function () {
   let sandbox: sinon.SinonSandbox;
@@ -56,11 +54,8 @@ describe("SessionListController", function () {
   });
 
   // ─── Helper: construct instance ───────────────────────────────────────────
-  // Scaffolded: replace with actual constructor call when production file exists.
-  // Expected signature: new SessionListController('/project', logger, deps)
-  function createInstance(): any {
-    // return new SessionListController('/project', logger, deps);
-    return undefined;
+  function createInstance(): SessionListController {
+    return new SessionListController('/project', logger, deps);
   }
 
   /**
@@ -76,8 +71,6 @@ describe("SessionListController", function () {
 
   describe("Happy Path — Construction", function () {
     it("should create SessionWatcher and WorkflowWatcher during construction", function () {
-      // Scaffolded: SessionListController class not yet implemented
-      this.skip();
       createInstance();
 
       expect(deps.createSessionWatcher.calledOnce).to.be.true;
@@ -90,16 +83,12 @@ describe("SessionListController", function () {
     });
 
     it("should expose onDidUpdate and onDidError events", function () {
-      // Scaffolded: SessionListController class not yet implemented
-      this.skip();
       const instance = createInstance();
       expect(instance.onDidUpdate).to.be.a("function");
       expect(instance.onDidError).to.be.a("function");
     });
 
     it("should kick off initial scan asynchronously without blocking construction", function () {
-      // Scaffolded: SessionListController class not yet implemented
-      this.skip();
       const sessionScanDeferred = createDeferred<any[]>();
       const workflowScanDeferred = createDeferred<string[]>();
       deps.scanSessions.returns(sessionScanDeferred.promise);
@@ -119,8 +108,6 @@ describe("SessionListController", function () {
 
   describe("Happy Path — onDidUpdate", function () {
     it("should fire onDidUpdate with sessions and workflows after initial scan completes", async function () {
-      // Scaffolded: SessionListController class not yet implemented
-      this.skip();
       deps.scanSessions.resolves([{ id: "s1", createdAt: 100 }]);
       deps.scanWorkflows.resolves(["wf1"]);
 
@@ -134,8 +121,6 @@ describe("SessionListController", function () {
     });
 
     it("should fire onDidUpdate when SessionWatcher triggers onDidChange", async function () {
-      // Scaffolded: SessionListController class not yet implemented
-      this.skip();
       deps.scanSessions.resolves([{ id: "s1", createdAt: 100 }]);
       deps.scanWorkflows.resolves(["wf1"]);
 
@@ -154,8 +139,6 @@ describe("SessionListController", function () {
     });
 
     it("should fire onDidUpdate when WorkflowWatcher triggers onDidChange", async function () {
-      // Scaffolded: SessionListController class not yet implemented
-      this.skip();
       deps.scanSessions.resolves([{ id: "s1", createdAt: 100 }]);
       deps.scanWorkflows.resolves(["wf1"]);
 
@@ -174,8 +157,6 @@ describe("SessionListController", function () {
     });
 
     it("should push full composite state even when only sessions changed", async function () {
-      // Scaffolded: SessionListController class not yet implemented
-      this.skip();
       deps.scanSessions.resolves([{ id: "s1" }]);
       deps.scanWorkflows.resolves(["wf1"]);
 
@@ -199,8 +180,6 @@ describe("SessionListController", function () {
 
   describe("Happy Path — launch", function () {
     it("should call SessionLauncher.launch with workflowName and logger", async function () {
-      // Scaffolded: SessionListController class not yet implemented
-      this.skip();
       deps.scanSessions.resolves([]);
       deps.scanWorkflows.resolves([]);
 
@@ -219,8 +198,6 @@ describe("SessionListController", function () {
 
   describe("Happy Path — terminate", function () {
     it("should call SessionTerminator.terminate with pid and logger", async function () {
-      // Scaffolded: SessionListController class not yet implemented
-      this.skip();
       deps.scanSessions.resolves([]);
       deps.scanWorkflows.resolves([]);
 
@@ -235,8 +212,6 @@ describe("SessionListController", function () {
     });
 
     it("should treat already_dead as success without firing onDidError", async function () {
-      // Scaffolded: SessionListController class not yet implemented
-      this.skip();
       deps.scanSessions.resolves([]);
       deps.scanWorkflows.resolves([]);
       deps.terminate.resolves({ method: "already_dead", terminated: true });
@@ -249,8 +224,6 @@ describe("SessionListController", function () {
     });
 
     it("should treat sigterm terminated as success without firing onDidError", async function () {
-      // Scaffolded: SessionListController class not yet implemented
-      this.skip();
       deps.scanSessions.resolves([]);
       deps.scanWorkflows.resolves([]);
       deps.terminate.resolves({ method: "sigterm", terminated: true });
@@ -263,8 +236,6 @@ describe("SessionListController", function () {
     });
 
     it("should treat sigkill terminated as success without firing onDidError", async function () {
-      // Scaffolded: SessionListController class not yet implemented
-      this.skip();
       deps.scanSessions.resolves([]);
       deps.scanWorkflows.resolves([]);
       deps.terminate.resolves({ method: "sigkill", terminated: true });
@@ -281,8 +252,6 @@ describe("SessionListController", function () {
 
   describe("Error Propagation", function () {
     it("should fire onDidError and log when launch throws", async function () {
-      // Scaffolded: SessionListController class not yet implemented
-      this.skip();
       deps.scanSessions.resolves([]);
       deps.scanWorkflows.resolves([]);
       deps.launch.rejects(new Error("ENOENT"));
@@ -298,8 +267,6 @@ describe("SessionListController", function () {
     });
 
     it("should fire onDidError and log when terminate returns not_spectra", async function () {
-      // Scaffolded: SessionListController class not yet implemented
-      this.skip();
       deps.scanSessions.resolves([]);
       deps.scanWorkflows.resolves([]);
       deps.terminate.resolves({ method: "not_spectra", terminated: false });
@@ -314,8 +281,6 @@ describe("SessionListController", function () {
     });
 
     it("should fire onDidError and log when terminate returns EPERM", async function () {
-      // Scaffolded: SessionListController class not yet implemented
-      this.skip();
       deps.scanSessions.resolves([]);
       deps.scanWorkflows.resolves([]);
       deps.terminate.resolves({ method: "sigterm", terminated: false, error: new Error("EPERM") });
@@ -334,8 +299,6 @@ describe("SessionListController", function () {
 
   describe("Concurrent Behaviour", function () {
     it("should coalesce overlapping session scans via dirty flag", async function () {
-      // Scaffolded: SessionListController class not yet implemented
-      this.skip();
       deps.scanSessions.resolves([]);
       deps.scanWorkflows.resolves([]);
 
@@ -362,8 +325,6 @@ describe("SessionListController", function () {
     });
 
     it("should coalesce overlapping workflow scans independently", async function () {
-      // Scaffolded: SessionListController class not yet implemented
-      this.skip();
       deps.scanSessions.resolves([]);
       deps.scanWorkflows.resolves([]);
 
@@ -388,8 +349,6 @@ describe("SessionListController", function () {
     });
 
     it("should run session and workflow scans concurrently", async function () {
-      // Scaffolded: SessionListController class not yet implemented
-      this.skip();
       deps.scanSessions.resolves([]);
       deps.scanWorkflows.resolves([]);
 
@@ -423,8 +382,6 @@ describe("SessionListController", function () {
 
   describe("Resource Cleanup", function () {
     it("should dispose watchers and emitters on dispose", async function () {
-      // Scaffolded: SessionListController class not yet implemented
-      this.skip();
       deps.scanSessions.resolves([]);
       deps.scanWorkflows.resolves([]);
 
@@ -439,8 +396,6 @@ describe("SessionListController", function () {
     });
 
     it("should suppress onDidUpdate after dispose", async function () {
-      // Scaffolded: SessionListController class not yet implemented
-      this.skip();
       deps.scanSessions.resolves([]);
       deps.scanWorkflows.resolves([]);
 
@@ -462,8 +417,6 @@ describe("SessionListController", function () {
     });
 
     it("should suppress onDidError from launch after dispose", async function () {
-      // Scaffolded: SessionListController class not yet implemented
-      this.skip();
       deps.scanSessions.resolves([]);
       deps.scanWorkflows.resolves([]);
       deps.launch.rejects(new Error("ENOENT"));
@@ -478,8 +431,6 @@ describe("SessionListController", function () {
     });
 
     it("should suppress onDidError from terminate after dispose", async function () {
-      // Scaffolded: SessionListController class not yet implemented
-      this.skip();
       deps.scanSessions.resolves([]);
       deps.scanWorkflows.resolves([]);
       deps.terminate.resolves({ method: "not_spectra", terminated: false });
@@ -498,8 +449,6 @@ describe("SessionListController", function () {
 
   describe("Idempotency", function () {
     it("should handle multiple dispose calls without error", async function () {
-      // Scaffolded: SessionListController class not yet implemented
-      this.skip();
       deps.scanSessions.resolves([]);
       deps.scanWorkflows.resolves([]);
 
@@ -518,8 +467,6 @@ describe("SessionListController", function () {
 
   describe("Mock / Dependency Interaction", function () {
     it("should not read or write any files directly", async function () {
-      // Scaffolded: SessionListController class not yet implemented
-      this.skip();
       // Verified by DI design: the controller has no fs dependency.
       deps.scanSessions.resolves([{ id: "s1", createdAt: 100 }]);
       deps.scanWorkflows.resolves(["wf1"]);
@@ -539,8 +486,6 @@ describe("SessionListController", function () {
     });
 
     it("should not spawn processes directly", async function () {
-      // Scaffolded: SessionListController class not yet implemented
-      this.skip();
       // Verified by DI: the controller has no child_process dependency.
       deps.scanSessions.resolves([]);
       deps.scanWorkflows.resolves([]);
@@ -558,8 +503,6 @@ describe("SessionListController", function () {
     });
 
     it("should not send signals directly", async function () {
-      // Scaffolded: SessionListController class not yet implemented
-      this.skip();
       // Verified by DI: the controller has no process.kill dependency.
       deps.scanSessions.resolves([]);
       deps.scanWorkflows.resolves([]);

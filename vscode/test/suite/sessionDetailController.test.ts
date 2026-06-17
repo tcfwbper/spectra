@@ -28,9 +28,7 @@ import {
   type MockEventWatcherInstance,
 } from "./helpers/controllerStubs";
 
-// Scaffolded: Uncomment when the production module exists.
-// import { SessionDetailController } from "../../src/controllers/sessionDetailController";
-// import type { SessionDetailControllerDeps } from "../../src/controllers/sessionDetailController";
+import { SessionDetailController } from "../../src/controllers/sessionDetailController";
 
 describe("SessionDetailController", function () {
   let sandbox: sinon.SinonSandbox;
@@ -55,41 +53,30 @@ describe("SessionDetailController", function () {
   });
 
   // ─── Helper: construct instance ───────────────────────────────────────────
-  // Scaffolded: replace with actual constructor call when production file exists.
-  // Expected signature: new SessionDetailController('/project', logger, deps)
-  function createInstance(): any {
-    // return new SessionDetailController('/project', logger, deps);
-    return undefined;
+  function createInstance(): SessionDetailController {
+    return new SessionDetailController('/project', logger, deps);
   }
 
   // ─── Happy Path — Construction ────────────────────────────────────────────
 
   describe("Happy Path — Construction", function () {
     it("should store projectRoot and logger", function () {
-      // Scaffolded: SessionDetailController class not yet implemented
-      this.skip();
       const instance = createInstance();
       expect(instance).to.exist;
     });
 
     it("should expose onDidUpdate and onDidError events", function () {
-      // Scaffolded: SessionDetailController class not yet implemented
-      this.skip();
       const instance = createInstance();
       expect(instance.onDidUpdate).to.be.a("function");
       expect(instance.onDidError).to.be.a("function");
     });
 
     it("should not create EventWatcher during construction", function () {
-      // Scaffolded: SessionDetailController class not yet implemented
-      this.skip();
       createInstance();
       expect(deps.createEventWatcher.called).to.be.false;
     });
 
     it("should initialize with null currentSessionId and zero generation", function () {
-      // Scaffolded: SessionDetailController class not yet implemented
-      this.skip();
       createInstance();
       // No onDidUpdate fired during construction
       expect(stateEmitter.fire.called).to.be.false;
@@ -100,8 +87,6 @@ describe("SessionDetailController", function () {
 
   describe("Happy Path — open", function () {
     it("should create EventWatcher and fire onDidUpdate with assembled state", async function () {
-      // Scaffolded: SessionDetailController class not yet implemented
-      this.skip();
       deps.parseWorkflowDefinition.resolves({ entryNode: "start", eventTypes: ["submit"] });
       deps.scanEvents.resolves([{ type: "submit", ts: 100 }]);
       deps.scanSessions.resolves([{ id: "s1", currentState: "running", status: "running", pid: 42 }]);
@@ -126,8 +111,6 @@ describe("SessionDetailController", function () {
     });
 
     it("should pass correct arguments to EventWatcher constructor", async function () {
-      // Scaffolded: SessionDetailController class not yet implemented
-      this.skip();
       const instance = createInstance();
       await instance.open("sess-abc", "wf1");
 
@@ -138,8 +121,6 @@ describe("SessionDetailController", function () {
     });
 
     it("should pass correct arguments to WorkflowDefinitionParser.parse", async function () {
-      // Scaffolded: SessionDetailController class not yet implemented
-      this.skip();
       const instance = createInstance();
       await instance.open("s1", "my-workflow");
 
@@ -151,8 +132,6 @@ describe("SessionDetailController", function () {
     });
 
     it("should subscribe to EventWatcher.onDidChange", async function () {
-      // Scaffolded: SessionDetailController class not yet implemented
-      this.skip();
       const instance = createInstance();
       await instance.open("s1", "wf1");
 
@@ -165,8 +144,6 @@ describe("SessionDetailController", function () {
 
   describe("Happy Path — internal scan routine", function () {
     it("should re-scan and fire onDidUpdate when onDidChange fires", async function () {
-      // Scaffolded: SessionDetailController class not yet implemented
-      this.skip();
       deps.parseWorkflowDefinition.resolves({ entryNode: "start", eventTypes: ["submit"] });
       deps.scanEvents.resolves([{ type: "submit", ts: 100 }]);
       deps.scanSessions.resolves([{ id: "s1", currentState: "running", status: "running", pid: 42 }]);
@@ -189,8 +166,6 @@ describe("SessionDetailController", function () {
     });
 
     it("should include previously stored entryNode and eventTypes in re-scan state", async function () {
-      // Scaffolded: SessionDetailController class not yet implemented
-      this.skip();
       deps.parseWorkflowDefinition.resolves({ entryNode: "start", eventTypes: ["go"] });
       deps.scanEvents.resolves([]);
       deps.scanSessions.resolves([{ id: "s1", currentState: "start", status: "running", pid: 1 }]);
@@ -214,8 +189,6 @@ describe("SessionDetailController", function () {
 
   describe("Happy Path — sendEvent", function () {
     it("should call EventDispatcher.dispatch with correct arguments", async function () {
-      // Scaffolded: SessionDetailController class not yet implemented
-      this.skip();
       deps.parseWorkflowDefinition.resolves({ entryNode: "start", eventTypes: ["submit"] });
       deps.scanEvents.resolves([]);
       deps.scanSessions.resolves([{ id: "s1", currentState: "start", status: "running", pid: 1 }]);
@@ -237,8 +210,6 @@ describe("SessionDetailController", function () {
 
   describe("Error Propagation", function () {
     it("should propagate EventWatcher construction error to caller", async function () {
-      // Scaffolded: SessionDetailController class not yet implemented
-      this.skip();
       const error = new Error("ENOENT");
       deps.createEventWatcher.throws(error);
 
@@ -252,8 +223,6 @@ describe("SessionDetailController", function () {
     });
 
     it("should fire onDidError and log when sendEvent dispatch fails with ENOENT", async function () {
-      // Scaffolded: SessionDetailController class not yet implemented
-      this.skip();
       deps.parseWorkflowDefinition.resolves({ entryNode: "start", eventTypes: ["submit"] });
       deps.scanEvents.resolves([]);
       deps.scanSessions.resolves([{ id: "s1", currentState: "start", status: "running", pid: 1 }]);
@@ -270,8 +239,6 @@ describe("SessionDetailController", function () {
     });
 
     it("should fire onDidError and log when sendEvent dispatch fails with EACCES", async function () {
-      // Scaffolded: SessionDetailController class not yet implemented
-      this.skip();
       deps.parseWorkflowDefinition.resolves({ entryNode: "start", eventTypes: ["submit"] });
       deps.scanEvents.resolves([]);
       deps.scanSessions.resolves([{ id: "s1", currentState: "start", status: "running", pid: 1 }]);
@@ -292,8 +259,6 @@ describe("SessionDetailController", function () {
 
   describe("Concurrent Behaviour", function () {
     it("should discard stale scan results when open is called again", async function () {
-      // Scaffolded: SessionDetailController class not yet implemented
-      this.skip();
       const deferred1 = createDeferred<any[]>();
       deps.scanEvents.onFirstCall().returns(deferred1.promise);
       deps.scanEvents.onSecondCall().resolves([{ type: "new", ts: 500 }]);
@@ -322,8 +287,6 @@ describe("SessionDetailController", function () {
     });
 
     it("should dispose previous watcher when open is called again", async function () {
-      // Scaffolded: SessionDetailController class not yet implemented
-      this.skip();
       deps.parseWorkflowDefinition.resolves({ entryNode: "start", eventTypes: [] });
       deps.scanEvents.resolves([]);
       deps.scanSessions.resolves([{ id: "s1", currentState: "start", status: "running", pid: 1 }]);
@@ -343,8 +306,6 @@ describe("SessionDetailController", function () {
     });
 
     it("should coalesce overlapping scans via dirty flag", async function () {
-      // Scaffolded: SessionDetailController class not yet implemented
-      this.skip();
       deps.parseWorkflowDefinition.resolves({ entryNode: "start", eventTypes: [] });
       deps.scanEvents.resolves([]);
       deps.scanSessions.resolves([{ id: "s1", currentState: "start", status: "running", pid: 1 }]);
@@ -372,8 +333,6 @@ describe("SessionDetailController", function () {
     });
 
     it("should discard scan result when generation changes mid-scan", async function () {
-      // Scaffolded: SessionDetailController class not yet implemented
-      this.skip();
       deps.parseWorkflowDefinition.resolves({ entryNode: "start", eventTypes: [] });
       deps.scanEvents.resolves([]);
       deps.scanSessions.resolves([{ id: "s1", currentState: "start", status: "running", pid: 1 }]);
@@ -411,8 +370,6 @@ describe("SessionDetailController", function () {
 
   describe("Resource Cleanup", function () {
     it("should dispose watcher and emitters on dispose", async function () {
-      // Scaffolded: SessionDetailController class not yet implemented
-      this.skip();
       deps.parseWorkflowDefinition.resolves({ entryNode: "start", eventTypes: [] });
       deps.scanEvents.resolves([]);
       deps.scanSessions.resolves([{ id: "s1", currentState: "start", status: "running", pid: 1 }]);
@@ -427,8 +384,6 @@ describe("SessionDetailController", function () {
     });
 
     it("should suppress onDidUpdate after dispose", async function () {
-      // Scaffolded: SessionDetailController class not yet implemented
-      this.skip();
       deps.parseWorkflowDefinition.resolves({ entryNode: "start", eventTypes: [] });
       deps.scanEvents.resolves([]);
       deps.scanSessions.resolves([{ id: "s1", currentState: "start", status: "running", pid: 1 }]);
@@ -451,8 +406,6 @@ describe("SessionDetailController", function () {
     });
 
     it("should no-op on open after dispose", function () {
-      // Scaffolded: SessionDetailController class not yet implemented
-      this.skip();
       const instance = createInstance();
       instance.dispose();
 
@@ -463,8 +416,6 @@ describe("SessionDetailController", function () {
     });
 
     it("should no-op on sendEvent after dispose", async function () {
-      // Scaffolded: SessionDetailController class not yet implemented
-      this.skip();
       const instance = createInstance();
       instance.dispose();
 
@@ -474,8 +425,6 @@ describe("SessionDetailController", function () {
     });
 
     it("should set watcher to null after dispose", async function () {
-      // Scaffolded: SessionDetailController class not yet implemented
-      this.skip();
       deps.parseWorkflowDefinition.resolves({ entryNode: "start", eventTypes: [] });
       deps.scanEvents.resolves([]);
       deps.scanSessions.resolves([{ id: "s1", currentState: "start", status: "running", pid: 1 }]);
@@ -493,8 +442,6 @@ describe("SessionDetailController", function () {
 
   describe("Idempotency", function () {
     it("should handle multiple dispose calls without error", async function () {
-      // Scaffolded: SessionDetailController class not yet implemented
-      this.skip();
       deps.parseWorkflowDefinition.resolves({ entryNode: "start", eventTypes: [] });
       deps.scanEvents.resolves([]);
       deps.scanSessions.resolves([{ id: "s1", currentState: "start", status: "running", pid: 1 }]);
@@ -514,8 +461,6 @@ describe("SessionDetailController", function () {
 
   describe("Null / Empty Input", function () {
     it("should push empty events array when EventScanner returns empty", async function () {
-      // Scaffolded: SessionDetailController class not yet implemented
-      this.skip();
       deps.parseWorkflowDefinition.resolves({ entryNode: "start", eventTypes: ["go"] });
       deps.scanEvents.resolves([]);
       deps.scanSessions.resolves([{ id: "s1", currentState: "start", status: "running", pid: 1 }]);
@@ -529,8 +474,6 @@ describe("SessionDetailController", function () {
     });
 
     it("should push empty eventTypes when WorkflowDefinitionParser returns empty", async function () {
-      // Scaffolded: SessionDetailController class not yet implemented
-      this.skip();
       deps.parseWorkflowDefinition.resolves({ entryNode: "", eventTypes: [] });
       deps.scanEvents.resolves([]);
       deps.scanSessions.resolves([{ id: "s1", currentState: "", status: "initializing", pid: 0 }]);
@@ -545,8 +488,6 @@ describe("SessionDetailController", function () {
     });
 
     it("should default session fields when SessionScanner has no matching session", async function () {
-      // Scaffolded: SessionDetailController class not yet implemented
-      this.skip();
       deps.parseWorkflowDefinition.resolves({ entryNode: "start", eventTypes: ["go"] });
       deps.scanEvents.resolves([]);
       deps.scanSessions.resolves([{ id: "other", currentState: "done", status: "completed", pid: 99 }]);
@@ -566,8 +507,6 @@ describe("SessionDetailController", function () {
 
   describe("Mock / Dependency Interaction", function () {
     it("should not read or write any files directly", async function () {
-      // Scaffolded: SessionDetailController class not yet implemented
-      this.skip();
       // Verified by the DI design: the controller has no fs dependency.
       // All file I/O is delegated to scanners/watchers via injected stubs.
       deps.parseWorkflowDefinition.resolves({ entryNode: "start", eventTypes: ["submit"] });
@@ -588,8 +527,6 @@ describe("SessionDetailController", function () {
     });
 
     it("should not spawn processes directly", async function () {
-      // Scaffolded: SessionDetailController class not yet implemented
-      this.skip();
       // Verified by DI: the controller has no child_process dependency.
       deps.parseWorkflowDefinition.resolves({ entryNode: "start", eventTypes: ["submit"] });
       deps.scanEvents.resolves([]);
