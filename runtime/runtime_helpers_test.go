@@ -352,6 +352,18 @@ func assertLoggerHasInfoMsg(t *testing.T, l *mockLogger, msg string) {
 	t.Errorf("expected Logger.Info with msg=%q, got: %+v", msg, l.infoCalls)
 }
 
+// assertLoggerHasInfoMsgContaining checks that mockLogger.infoCalls has a message
+// containing the given substring.
+func assertLoggerHasInfoMsgContaining(t *testing.T, l *mockLogger, substr string) {
+	t.Helper()
+	for _, call := range l.infoCalls {
+		if contains(call.msg, substr) {
+			return
+		}
+	}
+	t.Errorf("expected Logger.Info with msg containing %q, got: %+v", substr, l.infoCalls)
+}
+
 // assertLoggerHasWarnMsg checks that mockLogger.warnCalls contains a message.
 func assertLoggerHasWarnMsg(t *testing.T, l *mockLogger, msg string) {
 	t.Helper()

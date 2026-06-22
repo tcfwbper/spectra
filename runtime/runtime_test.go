@@ -665,10 +665,16 @@ func TestRun_MessageRouterPassedToListen(t *testing.T) {
 // --- State Transitions ---
 
 func TestRun_OSSignalSIGINT(t *testing.T) {
-	// Setup
+	// Scaffolded: Production Run() does not yet call PersistentSession.Fail() on OS signal.
+	// Missing seam: Run() signal handler must construct RuntimeError and call ps.Fail()
+	// when session status is non-terminal (logic spec step 26, case signalCh).
+	t.Skip("scaffolded: Run() does not yet call PersistentSession.Fail() on OS signal — awaiting production implementation of signal-triggered Fail path")
+
+	// Setup: Session is non-terminal ("running"), SIGINT received.
 	f := newRuntimeTestFixture(t)
+	f.Session.id = "uuid-123"
 	f.Session.getStatusResult = "running"
-	f.Session.getCurrentStateResult = testEntryNode
+	f.Session.getCurrentStateResult = "node-a"
 
 	listenerDoneCh := make(chan struct{})
 	f.SocketManager.listenDoneCh = listenerDoneCh
@@ -679,7 +685,6 @@ func TestRun_OSSignalSIGINT(t *testing.T) {
 
 	f.SessionInitializer.initializeFunc = func(workflowName string, sessionID string, terminationNotifier chan<- struct{}) InitResult {
 		ps := newTestPersistentSession(t, f.Session)
-		// Send SIGINT after a short delay.
 		go func() { f.SignalSource.Send(syscall.SIGINT) }()
 		return InitResult{
 			PersistentSession:  ps,
@@ -692,18 +697,31 @@ func TestRun_OSSignalSIGINT(t *testing.T) {
 	// Action
 	exitCode, err := Run("wf", "", f.Logger)
 
-	// Assert
-	assertFailNotCalled(t, f.Session)
+	// Assert: PersistentSession.Fail() called with RuntimeError fields.
+	assert.Equal(t, 1, f.Session.failCalled, "expected Fail() to be called once")
+	assertFailCalledWithRuntimeErrorFull(t, f.Session, "Runtime", "terminated by signal interrupt", "uuid-123", "node-a")
+	// Assert: Detail is nil.
+	rtErr := f.Session.failInputErr.(*entities.RuntimeError)
+	assert.Nil(t, rtErr.Detail())
+	// Assert: Logger logs graceful shutdown.
+	assertLoggerHasInfoMsgContaining(t, f.Logger, "received signal interrupt, initiating graceful shutdown")
+	// Assert: Returns (1, error) with signal message.
 	require.Error(t, err)
 	assert.Equal(t, "session terminated by signal interrupt", err.Error())
 	assert.Equal(t, 1, exitCode)
 }
 
 func TestRun_OSSignalSIGTERM(t *testing.T) {
-	// Setup
+	// Scaffolded: Production Run() does not yet call PersistentSession.Fail() on OS signal.
+	// Missing seam: Run() signal handler must construct RuntimeError and call ps.Fail()
+	// when session status is non-terminal (logic spec step 26, case signalCh).
+	t.Skip("scaffolded: Run() does not yet call PersistentSession.Fail() on OS signal — awaiting production implementation of signal-triggered Fail path")
+
+	// Setup: Session is non-terminal ("running"), SIGTERM received.
 	f := newRuntimeTestFixture(t)
+	f.Session.id = "uuid-456"
 	f.Session.getStatusResult = "running"
-	f.Session.getCurrentStateResult = testEntryNode
+	f.Session.getCurrentStateResult = "node-b"
 
 	listenerDoneCh := make(chan struct{})
 	f.SocketManager.listenDoneCh = listenerDoneCh
@@ -726,11 +744,143 @@ func TestRun_OSSignalSIGTERM(t *testing.T) {
 	// Action
 	exitCode, err := Run("wf", "", f.Logger)
 
-	// Assert
-	assertFailNotCalled(t, f.Session)
+	// Assert: PersistentSession.Fail() called with RuntimeError fields.
+	assert.Equal(t, 1, f.Session.failCalled, "expected Fail() to be called once")
+	assertFailCalledWithRuntimeErrorFull(t, f.Session, "Runtime", "terminated by signal terminated", "uuid-456", "node-b")
+	// Assert: Detail is nil.
+	rtErr := f.Session.failInputErr.(*entities.RuntimeError)
+	assert.Nil(t, rtErr.Detail())
+	// Assert: Logger logs graceful shutdown.
+	assertLoggerHasInfoMsgContaining(t, f.Logger, "received signal terminated, initiating graceful shutdown")
+	// Assert: Returns (1, error) with signal message.
 	require.Error(t, err)
 	assert.Equal(t, "session terminated by signal terminated", err.Error())
 	assert.Equal(t, 1, exitCode)
+}
+
+func TestRun_OSSignalSkipsFailWhenSessionAlreadyCompleted(t *testing.T) {
+	// Scaffolded: Production Run() does not yet implement the signal-triggered Fail
+	// path with status check. The logic spec (step 26, case signalCh) says:
+	// if status is already terminal ("completed"/"failed"), skip Fail.
+	// Additionally, exit code must always be 1 when signal received (step 39).
+	t.Skip("scaffolded: Run() does not yet implement signal-triggered Fail with status guard — awaiting production implementation")
+
+	// Setup: Session already completed, SIGINT received (race condition).
+	f := newRuntimeTestFixture(t)
+	f.Session.getStatusResult = "completed"
+
+	listenerDoneCh := make(chan struct{})
+	f.SocketManager.listenDoneCh = listenerDoneCh
+	f.SocketManager.listenErrCh = make(chan error, 1)
+	f.SocketManager.deleteSocketFunc = func() {
+		close(listenerDoneCh)
+	}
+
+	// SessionFinalizer returns 0 (session completed successfully).
+	f.SessionFinalizer.result = 0
+
+	f.SessionInitializer.initializeFunc = func(workflowName string, sessionID string, terminationNotifier chan<- struct{}) InitResult {
+		ps := newTestPersistentSession(t, f.Session)
+		go func() { f.SignalSource.Send(syscall.SIGINT) }()
+		return InitResult{
+			PersistentSession:  ps,
+			WorkflowDefinition: mustNewWorkflowDefinition(t),
+			Error:              nil,
+		}
+	}
+	wireFixtureToSeams(t, f)
+
+	// Action
+	exitCode, err := Run("wf", "", f.Logger)
+
+	// Assert: Fail() NOT called (session already terminal).
+	assertFailNotCalled(t, f.Session)
+	// Assert: Exit code is always 1 when signal received, regardless of SessionFinalizer.
+	require.Error(t, err)
+	assert.Equal(t, "session terminated by signal interrupt", err.Error())
+	assert.Equal(t, 1, exitCode)
+}
+
+func TestRun_OSSignalDuringInitializingStatus(t *testing.T) {
+	// Scaffolded: Production Run() does not yet implement the signal-triggered Fail
+	// path. The logic spec (step 26) says: if status is non-terminal (including
+	// "initializing"), construct RuntimeError and call Fail.
+	t.Skip("scaffolded: Run() does not yet implement signal-triggered Fail path — awaiting production implementation")
+
+	// Setup: Session exists but status is "initializing" (SessionInitializer returned
+	// InitResult with Error != nil and PersistentSession != nil). Signal arrives
+	// during cleanup path.
+	f := newRuntimeTestFixture(t)
+	f.Session.getStatusResult = "initializing"
+	f.Session.getCurrentStateResult = "" // GetCurrentStateSafe() returns empty during init
+
+	listenerDoneCh := make(chan struct{})
+	close(listenerDoneCh)
+	f.SocketManager.listenDoneCh = listenerDoneCh
+	f.SocketManager.listenErrCh = make(chan error, 1)
+
+	f.SessionInitializer.initializeFunc = func(workflowName string, sessionID string, terminationNotifier chan<- struct{}) InitResult {
+		ps := newTestPersistentSession(t, f.Session)
+		// Send SIGINT to simulate signal during initialization cleanup.
+		go func() { f.SignalSource.Send(syscall.SIGINT) }()
+		return InitResult{
+			PersistentSession:  ps,
+			WorkflowDefinition: mustNewWorkflowDefinition(t),
+			Error:              nil,
+		}
+	}
+	wireFixtureToSeams(t, f)
+
+	// Action
+	exitCode, err := Run("wf", "", f.Logger)
+
+	// Assert: Fail() called with RuntimeError having FailingState="" (from GetCurrentStateSafe()).
+	assert.Equal(t, 1, f.Session.failCalled, "expected Fail() to be called once")
+	rtErr, ok := f.Session.failInputErr.(*entities.RuntimeError)
+	require.True(t, ok, "expected Fail() called with *entities.RuntimeError")
+	assert.Equal(t, "terminated by signal interrupt", rtErr.Message())
+	assert.Equal(t, "", rtErr.FailingState())
+	// Assert: Returns (1, error).
+	require.Error(t, err)
+	assert.Equal(t, "session terminated by signal interrupt", err.Error())
+	assert.Equal(t, 1, exitCode)
+}
+
+func TestRun_OSSignalFailReturnsError(t *testing.T) {
+	// Scaffolded: Production Run() does not yet implement the signal-triggered Fail
+	// path. The logic spec (step 26) says: if Fail returns error (race with completion),
+	// log warning: "attempted to fail session on signal but session already in terminal state: <error>".
+	t.Skip("scaffolded: Run() does not yet implement signal-triggered Fail path — awaiting production implementation")
+
+	// Setup: Session is "running" but Fail() returns error (race condition).
+	f := newRuntimeTestFixture(t)
+	f.Session.getStatusResult = "running"
+	f.Session.getCurrentStateResult = "node-a"
+	f.Session.failErr = errors.New("session already in terminal state")
+
+	listenerDoneCh := make(chan struct{})
+	f.SocketManager.listenDoneCh = listenerDoneCh
+	f.SocketManager.listenErrCh = make(chan error, 1)
+	f.SocketManager.deleteSocketFunc = func() {
+		close(listenerDoneCh)
+	}
+
+	f.SessionInitializer.initializeFunc = func(workflowName string, sessionID string, terminationNotifier chan<- struct{}) InitResult {
+		ps := newTestPersistentSession(t, f.Session)
+		go func() { f.SignalSource.Send(syscall.SIGINT) }()
+		return InitResult{
+			PersistentSession:  ps,
+			WorkflowDefinition: mustNewWorkflowDefinition(t),
+			Error:              nil,
+		}
+	}
+	wireFixtureToSeams(t, f)
+
+	// Action
+	_, _ = Run("wf", "", f.Logger)
+
+	// Assert: Logger.Warn called with message about session already in terminal state.
+	assertLoggerHasWarnMsgContaining(t, f.Logger, "attempted to fail session on signal but session already in terminal state")
 }
 
 func TestRun_SecondSignalForcesExit(t *testing.T) {
@@ -935,6 +1085,19 @@ func assertFailCalledWithRuntimeErrorAndState(t *testing.T, sess *mockSession, e
 	t.Helper()
 	assertFailCalledWithRuntimeError(t, sess, expectedIssuer, expectedMessage)
 	rtErr := sess.failInputErr.(*entities.RuntimeError)
+	assert.Equal(t, expectedState, rtErr.FailingState())
+}
+
+// assertFailCalledWithRuntimeErrorFull checks Fail() was called with RuntimeError
+// having specific Issuer, Message, SessionID, and FailingState.
+func assertFailCalledWithRuntimeErrorFull(t *testing.T, sess *mockSession, expectedIssuer, expectedMessage, expectedSessionID, expectedState string) {
+	t.Helper()
+	require.Greater(t, sess.failCalled, 0, "expected Fail() to be called at least once")
+	rtErr, ok := sess.failInputErr.(*entities.RuntimeError)
+	require.True(t, ok, "expected Fail() to be called with *entities.RuntimeError, got: %T", sess.failInputErr)
+	assert.Equal(t, expectedIssuer, rtErr.Issuer())
+	assert.Equal(t, expectedMessage, rtErr.Message())
+	assert.Equal(t, expectedSessionID, rtErr.SessionID())
 	assert.Equal(t, expectedState, rtErr.FailingState())
 }
 
