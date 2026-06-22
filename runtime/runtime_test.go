@@ -665,14 +665,9 @@ func TestRun_MessageRouterPassedToListen(t *testing.T) {
 // --- State Transitions ---
 
 func TestRun_OSSignalSIGINT(t *testing.T) {
-	// Scaffolded: Production Run() does not yet call PersistentSession.Fail() on OS signal.
-	// Missing seam: Run() signal handler must construct RuntimeError and call ps.Fail()
-	// when session status is non-terminal (logic spec step 26, case signalCh).
-	t.Skip("scaffolded: Run() does not yet call PersistentSession.Fail() on OS signal — awaiting production implementation of signal-triggered Fail path")
-
 	// Setup: Session is non-terminal ("running"), SIGINT received.
 	f := newRuntimeTestFixture(t)
-	f.Session.id = "uuid-123"
+	f.Session.id = "11111111-1111-1111-1111-111111111111"
 	f.Session.getStatusResult = "running"
 	f.Session.getCurrentStateResult = "node-a"
 
@@ -699,7 +694,7 @@ func TestRun_OSSignalSIGINT(t *testing.T) {
 
 	// Assert: PersistentSession.Fail() called with RuntimeError fields.
 	assert.Equal(t, 1, f.Session.failCalled, "expected Fail() to be called once")
-	assertFailCalledWithRuntimeErrorFull(t, f.Session, "Runtime", "terminated by signal interrupt", "uuid-123", "node-a")
+	assertFailCalledWithRuntimeErrorFull(t, f.Session, "Runtime", "terminated by signal interrupt", "11111111-1111-1111-1111-111111111111", "node-a")
 	// Assert: Detail is nil.
 	rtErr := f.Session.failInputErr.(*entities.RuntimeError)
 	assert.Nil(t, rtErr.Detail())
@@ -712,14 +707,9 @@ func TestRun_OSSignalSIGINT(t *testing.T) {
 }
 
 func TestRun_OSSignalSIGTERM(t *testing.T) {
-	// Scaffolded: Production Run() does not yet call PersistentSession.Fail() on OS signal.
-	// Missing seam: Run() signal handler must construct RuntimeError and call ps.Fail()
-	// when session status is non-terminal (logic spec step 26, case signalCh).
-	t.Skip("scaffolded: Run() does not yet call PersistentSession.Fail() on OS signal — awaiting production implementation of signal-triggered Fail path")
-
 	// Setup: Session is non-terminal ("running"), SIGTERM received.
 	f := newRuntimeTestFixture(t)
-	f.Session.id = "uuid-456"
+	f.Session.id = "22222222-2222-2222-2222-222222222222"
 	f.Session.getStatusResult = "running"
 	f.Session.getCurrentStateResult = "node-b"
 
@@ -746,7 +736,7 @@ func TestRun_OSSignalSIGTERM(t *testing.T) {
 
 	// Assert: PersistentSession.Fail() called with RuntimeError fields.
 	assert.Equal(t, 1, f.Session.failCalled, "expected Fail() to be called once")
-	assertFailCalledWithRuntimeErrorFull(t, f.Session, "Runtime", "terminated by signal terminated", "uuid-456", "node-b")
+	assertFailCalledWithRuntimeErrorFull(t, f.Session, "Runtime", "terminated by signal terminated", "22222222-2222-2222-2222-222222222222", "node-b")
 	// Assert: Detail is nil.
 	rtErr := f.Session.failInputErr.(*entities.RuntimeError)
 	assert.Nil(t, rtErr.Detail())
@@ -759,12 +749,6 @@ func TestRun_OSSignalSIGTERM(t *testing.T) {
 }
 
 func TestRun_OSSignalSkipsFailWhenSessionAlreadyCompleted(t *testing.T) {
-	// Scaffolded: Production Run() does not yet implement the signal-triggered Fail
-	// path with status check. The logic spec (step 26, case signalCh) says:
-	// if status is already terminal ("completed"/"failed"), skip Fail.
-	// Additionally, exit code must always be 1 when signal received (step 39).
-	t.Skip("scaffolded: Run() does not yet implement signal-triggered Fail with status guard — awaiting production implementation")
-
 	// Setup: Session already completed, SIGINT received (race condition).
 	f := newRuntimeTestFixture(t)
 	f.Session.getStatusResult = "completed"
@@ -802,10 +786,10 @@ func TestRun_OSSignalSkipsFailWhenSessionAlreadyCompleted(t *testing.T) {
 }
 
 func TestRun_OSSignalDuringInitializingStatus(t *testing.T) {
-	// Scaffolded: Production Run() does not yet implement the signal-triggered Fail
-	// path. The logic spec (step 26) says: if status is non-terminal (including
-	// "initializing"), construct RuntimeError and call Fail.
-	t.Skip("scaffolded: Run() does not yet implement signal-triggered Fail path — awaiting production implementation")
+	// Spec contradiction: The test asserts FailingState="" but entities.NewRuntimeError
+	// requires failingState to be non-empty. The runtime spec (step 26) says to use
+	// GetCurrentStateSafe() which can return "" during init, but the entity rejects it.
+	t.Skip("spec contradiction: entities.RuntimeError requires non-empty failingState but runtime spec uses GetCurrentStateSafe() which can be empty during init")
 
 	// Setup: Session exists but status is "initializing" (SessionInitializer returned
 	// InitResult with Error != nil and PersistentSession != nil). Signal arrives
@@ -847,11 +831,6 @@ func TestRun_OSSignalDuringInitializingStatus(t *testing.T) {
 }
 
 func TestRun_OSSignalFailReturnsError(t *testing.T) {
-	// Scaffolded: Production Run() does not yet implement the signal-triggered Fail
-	// path. The logic spec (step 26) says: if Fail returns error (race with completion),
-	// log warning: "attempted to fail session on signal but session already in terminal state: <error>".
-	t.Skip("scaffolded: Run() does not yet implement signal-triggered Fail path — awaiting production implementation")
-
 	// Setup: Session is "running" but Fail() returns error (race condition).
 	f := newRuntimeTestFixture(t)
 	f.Session.getStatusResult = "running"

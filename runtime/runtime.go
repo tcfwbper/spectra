@@ -263,6 +263,14 @@ func Run(workflowName string, sessionID string, log logger.Logger) (int, error) 
 		// OS signal received.
 		receivedSignal = sig
 		log.Info(fmt.Sprintf("received signal %s, initiating graceful shutdown", sig.String()))
+		// Step 26 (case signalCh): If session is not terminal, fail it with RuntimeError.
+		status := ps.GetStatusSafe()
+		if status != "completed" && status != "failed" {
+			rtErr := buildRuntimeError("Runtime", fmt.Sprintf("terminated by signal %s", sig.String()), nil, ps)
+			if failErr := ps.Fail(rtErr, terminationNotifier); failErr != nil {
+				log.Warn(fmt.Sprintf("attempted to fail session on signal but session already in terminal state: %s", failErr.Error()))
+			}
+		}
 	}
 
 	// Step 28-31: Grace period and cleanup.
@@ -318,7 +326,8 @@ func Run(workflowName string, sessionID string, log logger.Logger) (int, error) 
 	exitCode := finalizer.Finalize(ps)
 
 	if receivedSignal != nil {
-		return exitCode, fmt.Errorf("session terminated by signal %s", receivedSignal.String())
+		// Step 39: Exit code is always 1 when signal received, regardless of SessionFinalizer.
+		return 1, fmt.Errorf("session terminated by signal %s", receivedSignal.String())
 	}
 
 	if exitCode == 0 {
