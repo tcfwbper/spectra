@@ -40,14 +40,16 @@
 | Test ID | Category | Description | Setup | Input | Expected |
 |---|---|---|---|---|---|
 | `should call EventDispatcher.dispatch with correct arguments` | `unit` | Successful event dispatch. | Let `open('s1','wf1')` complete. Stub `EventDispatcher.dispatch` to resolve. | `instance.sendEvent('submit', 'hello')` | `EventDispatcher.dispatch` called with `('submit', 's1', 'hello', '/project', mockLogger)` |
+| `should return true when dispatch succeeds` | `unit` | Successful dispatch returns true. | Let `open('s1','wf1')` complete. Stub `EventDispatcher.dispatch` to resolve successfully. | `instance.sendEvent('submit', 'hello')` | Returned promise resolves to `true` |
+| `should return false when disposed` | `unit` | Disposed controller returns false without dispatching. | Construct instance, call `instance.dispose()`. Spy on `EventDispatcher.dispatch`. | `instance.sendEvent('submit', 'msg')` | Returned promise resolves to `false`; `EventDispatcher.dispatch` is not called |
 
 ### Error Propagation
 
 | Test ID | Category | Description | Setup | Input | Expected |
 |---|---|---|---|---|---|
 | `should propagate EventWatcher construction error to caller` | `unit` | EventWatcher constructor throw propagates. | Stub `EventWatcher` constructor to throw `new Error('ENOENT')`. | `instance.open('s1', 'wf1')` | The call throws/rejects with the `ENOENT` error |
-| `should fire onDidError and log when sendEvent dispatch fails with ENOENT` | `unit` | Spawn failure fires error event. | Let `open('s1','wf1')` complete. Stub `EventDispatcher.dispatch` to throw `new Error('ENOENT')`. Register spy on `onDidError`. Spy on `mockLogger.error`. | `instance.sendEvent('submit', 'msg')` | `onDidError` fires with the error; `mockLogger.error` is called |
-| `should fire onDidError and log when sendEvent dispatch fails with EACCES` | `unit` | Permission failure fires error event. | Let `open('s1','wf1')` complete. Stub `EventDispatcher.dispatch` to throw `new Error('EACCES')`. Register spy on `onDidError`. Spy on `mockLogger.error`. | `instance.sendEvent('submit', 'msg')` | `onDidError` fires with the error; `mockLogger.error` is called |
+| `should fire onDidError and log when sendEvent dispatch fails with ENOENT` | `unit` | Spawn failure fires error event and returns false. | Let `open('s1','wf1')` complete. Stub `EventDispatcher.dispatch` to throw `new Error('ENOENT')`. Register spy on `onDidError`. Spy on `mockLogger.error`. | `instance.sendEvent('submit', 'msg')` | `onDidError` fires with the error; `mockLogger.error` is called; returned promise resolves to `false` |
+| `should fire onDidError and log when sendEvent dispatch fails with EACCES` | `unit` | Permission failure fires error event and returns false. | Let `open('s1','wf1')` complete. Stub `EventDispatcher.dispatch` to throw `new Error('EACCES')`. Register spy on `onDidError`. Spy on `mockLogger.error`. | `instance.sendEvent('submit', 'msg')` | `onDidError` fires with the error; `mockLogger.error` is called; returned promise resolves to `false` |
 
 ### Concurrent Behaviour
 
@@ -65,7 +67,7 @@
 | `should dispose watcher and emitters on dispose` | `unit` | Dispose releases all resources. | Let `open('s1','wf1')` complete. Stub watcher with `dispose` spy. | Call `instance.dispose()` | Watcher's `dispose()` and both event emitter `dispose()` methods are called |
 | `should suppress onDidUpdate after dispose` | `unit` | No state events after disposal. | Let `open('s1','wf1')` complete. Stub `EventScanner.scan` with deferred promise. Trigger `onDidChange`. Register spy on `onDidUpdate`. | Call `instance.dispose()`, then resolve the pending scan | `onDidUpdate` is not fired |
 | `should no-op on open after dispose` | `unit` | Open after disposal does nothing. | Construct instance, call `instance.dispose()`. Spy on `EventWatcher` constructor. | Call `instance.open('s1','wf1')` | `EventWatcher` constructor is not called; no error thrown |
-| `should no-op on sendEvent after dispose` | `unit` | sendEvent after disposal does nothing. | Construct instance, call `instance.dispose()`. Spy on `EventDispatcher.dispatch`. | Call `instance.sendEvent('submit','msg')` | `EventDispatcher.dispatch` is not called; no error thrown |
+| `should return false on sendEvent after dispose` | `unit` | sendEvent after disposal returns false without dispatching. | Construct instance, call `instance.dispose()`. Spy on `EventDispatcher.dispatch`. | Call `instance.sendEvent('submit','msg')` | `EventDispatcher.dispatch` is not called; returned promise resolves to `false` |
 | `should set watcher to null after dispose` | `unit` | Watcher reference cleared. | Let `open('s1','wf1')` complete. | Call `instance.dispose()` | Subsequent `open` after un-disposed re-construction would not double-dispose |
 
 ### Idempotency

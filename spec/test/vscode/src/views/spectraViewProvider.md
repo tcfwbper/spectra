@@ -52,6 +52,14 @@
 | `should post showNotInitialized message to webview` | `unit` | Message is posted with correct type. | Create instance. Call `resolveWebviewView` with mock view. Spy on `view.webview.postMessage`. | `instance.showNotInitialized()` | `webview.postMessage` called with `{ type: 'showNotInitialized' }` |
 | `should store as pendingMessage when view is null` | `unit` | Message queued when view not resolved. | Create instance (do not call resolveWebviewView). | `instance.showNotInitialized()` | No error thrown; subsequent `resolveWebviewView` delivers the message |
 
+### Happy Path — postSendResult
+
+| Test ID | Category | Description | Setup | Input | Expected |
+|---|---|---|---|---|---|
+| `should post sendResult message with success true to webview` | `unit` | Posts sendResult true when view is resolved. | Create instance. Call `resolveWebviewView` with mock view. Spy on `view.webview.postMessage`. | `instance.postSendResult(true)` | `webview.postMessage` called with `{ type: 'sendResult', success: true }` |
+| `should post sendResult message with success false to webview` | `unit` | Posts sendResult false when view is resolved. | Create instance. Call `resolveWebviewView` with mock view. Spy on `view.webview.postMessage`. | `instance.postSendResult(false)` | `webview.postMessage` called with `{ type: 'sendResult', success: false }` |
+| `should do nothing when view is null` | `unit` | Ephemeral result is dropped when view is not available. | Create instance (do not call resolveWebviewView). | `instance.postSendResult(true)` | No error thrown; no `pendingMessage` stored (subsequent `resolveWebviewView` does not deliver a sendResult message) |
+
 ### Idempotency
 
 | Test ID | Category | Description | Setup | Input | Expected |
