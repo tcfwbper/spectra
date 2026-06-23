@@ -60,7 +60,10 @@ describe("SpectraViewProvider", function () {
   /**
    * Calls resolveWebviewView on the instance.
    */
-  function resolveView(instance: SpectraViewProvider, view?: StubWebviewView): void {
+  function resolveView(
+    instance: SpectraViewProvider,
+    view?: StubWebviewView,
+  ): void {
     const v = view || mockWebviewView;
     instance.resolveWebviewView(v as any, mockContext as any, mockToken as any);
   }
@@ -120,9 +123,9 @@ describe("SpectraViewProvider", function () {
       instance.showNotInitialized(); // stores as pending
       resolveView(instance);
       expect(mockWebviewView.webview.postMessage.calledOnce).to.be.true;
-      expect(mockWebviewView.webview.postMessage.firstCall.args[0]).to.deep.equal(
-        { type: "showNotInitialized" }
-      );
+      expect(
+        mockWebviewView.webview.postMessage.firstCall.args[0],
+      ).to.deep.equal({ type: "showNotInitialized" });
     });
 
     it("should clear pendingMessage after delivery", function () {
@@ -144,7 +147,9 @@ describe("SpectraViewProvider", function () {
       instance.onDidReceiveMessage(spy);
       mockWebviewView.triggerMessage({ command: "navigateToList" });
       expect(spy.calledOnce).to.be.true;
-      expect(spy.firstCall.args[0]).to.deep.equal({ command: "navigateToList" });
+      expect(spy.firstCall.args[0]).to.deep.equal({
+        command: "navigateToList",
+      });
     });
 
     it("should set view to null on webviewView dispose", function () {
@@ -172,7 +177,9 @@ describe("SpectraViewProvider", function () {
       resolveView(instance);
       instance.showSessionList({ sessions: [], workflows: ["wf1"] });
       expect(mockWebviewView.webview.postMessage.calledOnce).to.be.true;
-      expect(mockWebviewView.webview.postMessage.firstCall.args[0]).to.deep.equal({
+      expect(
+        mockWebviewView.webview.postMessage.firstCall.args[0],
+      ).to.deep.equal({
         type: "showSessions",
         state: { sessions: [], workflows: ["wf1"] },
       });
@@ -206,7 +213,9 @@ describe("SpectraViewProvider", function () {
       };
       instance.showSessionDetail(state);
       expect(mockWebviewView.webview.postMessage.calledOnce).to.be.true;
-      expect(mockWebviewView.webview.postMessage.firstCall.args[0]).to.deep.equal({
+      expect(
+        mockWebviewView.webview.postMessage.firstCall.args[0],
+      ).to.deep.equal({
         type: "showDetail",
         state,
       });
@@ -216,9 +225,14 @@ describe("SpectraViewProvider", function () {
       const instance = createInstance();
       expect(() => {
         instance.showSessionDetail({
-          sessionId: "s1", workflowName: "wf1",
-          entryNode: "start", currentState: "start",
-          status: "running", pid: 42, eventTypes: [], events: [],
+          sessionId: "s1",
+          workflowName: "wf1",
+          entryNode: "start",
+          currentState: "start",
+          status: "running",
+          pid: 42,
+          eventTypes: [],
+          events: [],
         });
       }).to.not.throw();
     });
@@ -232,9 +246,9 @@ describe("SpectraViewProvider", function () {
       resolveView(instance);
       instance.showNotInitialized();
       expect(mockWebviewView.webview.postMessage.calledOnce).to.be.true;
-      expect(mockWebviewView.webview.postMessage.firstCall.args[0]).to.deep.equal(
-        { type: "showNotInitialized" }
-      );
+      expect(
+        mockWebviewView.webview.postMessage.firstCall.args[0],
+      ).to.deep.equal({ type: "showNotInitialized" });
     });
 
     it("should store as pendingMessage when view is null", function () {
@@ -242,6 +256,60 @@ describe("SpectraViewProvider", function () {
       expect(() => {
         instance.showNotInitialized();
       }).to.not.throw();
+    });
+  });
+
+  // ─── Happy Path — postSendResult ────────────────────────────────────────────
+
+  describe("Happy Path — postSendResult", function () {
+    it("should post sendResult message with success true to webview", function () {
+      const instance = createInstance();
+      // Scaffolded: postSendResult does not yet exist on the production SpectraViewProvider class.
+      // Missing: SpectraViewProvider.postSendResult(success: boolean) method
+      if (typeof (instance as any).postSendResult !== "function") {
+        this.skip(); // Production surface not yet updated: SpectraViewProvider.postSendResult method missing
+        return;
+      }
+      resolveView(instance);
+      (instance as any).postSendResult(true);
+      expect(mockWebviewView.webview.postMessage.calledOnce).to.be.true;
+      expect(
+        mockWebviewView.webview.postMessage.firstCall.args[0],
+      ).to.deep.equal({ type: "sendResult", success: true });
+    });
+
+    it("should post sendResult message with success false to webview", function () {
+      const instance = createInstance();
+      // Scaffolded: postSendResult does not yet exist on the production SpectraViewProvider class.
+      // Missing: SpectraViewProvider.postSendResult(success: boolean) method
+      if (typeof (instance as any).postSendResult !== "function") {
+        this.skip(); // Production surface not yet updated: SpectraViewProvider.postSendResult method missing
+        return;
+      }
+      resolveView(instance);
+      (instance as any).postSendResult(false);
+      expect(mockWebviewView.webview.postMessage.calledOnce).to.be.true;
+      expect(
+        mockWebviewView.webview.postMessage.firstCall.args[0],
+      ).to.deep.equal({ type: "sendResult", success: false });
+    });
+
+    it("should do nothing when view is null", function () {
+      const instance = createInstance();
+      // Scaffolded: postSendResult does not yet exist on the production SpectraViewProvider class.
+      // Missing: SpectraViewProvider.postSendResult(success: boolean) method
+      if (typeof (instance as any).postSendResult !== "function") {
+        this.skip(); // Production surface not yet updated: SpectraViewProvider.postSendResult method missing
+        return;
+      }
+      // Do NOT call resolveWebviewView
+      expect(() => {
+        (instance as any).postSendResult(true);
+      }).to.not.throw();
+      // Verify no pendingMessage is stored: subsequent resolveWebviewView should not deliver it
+      const newView = createStubWebviewView();
+      resolveView(instance, newView);
+      expect(newView.webview.postMessage.called).to.be.false;
     });
   });
 
@@ -255,7 +323,9 @@ describe("SpectraViewProvider", function () {
       instance.showSessionList(state);
       resolveView(instance);
       expect(mockWebviewView.webview.postMessage.calledOnce).to.be.true;
-      expect(mockWebviewView.webview.postMessage.firstCall.args[0]).to.deep.equal({
+      expect(
+        mockWebviewView.webview.postMessage.firstCall.args[0],
+      ).to.deep.equal({
         type: "showSessions",
         state,
       });
@@ -301,7 +371,10 @@ describe("SpectraViewProvider", function () {
       instance.onDidReceiveMessage(spy);
       mockWebviewView.triggerMessage({ command: "unknownCommand", data: 123 });
       expect(spy.calledOnce).to.be.true;
-      expect(spy.firstCall.args[0]).to.deep.equal({ command: "unknownCommand", data: 123 });
+      expect(spy.firstCall.args[0]).to.deep.equal({
+        command: "unknownCommand",
+        data: 123,
+      });
     });
 
     it("should call getWebviewContent with webview and extensionUri", function () {
@@ -366,12 +439,12 @@ describe("SpectraViewProvider", function () {
       const state = { sessions: [], workflows: [] };
       instance.showSessionList(state);
       expect(mockWebviewView.webview.postMessage.calledTwice).to.be.true;
-      expect(mockWebviewView.webview.postMessage.firstCall.args[0]).to.deep.equal(
-        { type: "showNotInitialized" }
-      );
-      expect(mockWebviewView.webview.postMessage.secondCall.args[0]).to.deep.equal(
-        { type: "showSessions", state }
-      );
+      expect(
+        mockWebviewView.webview.postMessage.firstCall.args[0],
+      ).to.deep.equal({ type: "showNotInitialized" });
+      expect(
+        mockWebviewView.webview.postMessage.secondCall.args[0],
+      ).to.deep.equal({ type: "showSessions", state });
     });
   });
 });

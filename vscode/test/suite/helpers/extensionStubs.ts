@@ -107,6 +107,7 @@ export interface MockViewProvider {
   showSessionList: sinon.SinonStub;
   showSessionDetail: sinon.SinonStub;
   showNotInitialized: sinon.SinonStub;
+  postSendResult: sinon.SinonStub;
   dispose: sinon.SinonStub;
   onDidReceiveMessage: (listener: Callback<any>) => { dispose: () => void };
   /** Trigger the onDidReceiveMessage callback. */
@@ -125,6 +126,7 @@ export function createMockViewProvider(): MockViewProvider {
     showSessionList: sinon.stub(),
     showSessionDetail: sinon.stub(),
     showNotInitialized: sinon.stub(),
+    postSendResult: sinon.stub(),
     dispose: sinon.stub(),
     onDidReceiveMessage: (listener: Callback<any>) => {
       messageListeners.push(listener);
@@ -293,7 +295,8 @@ export function createExtensionTestFixture(
 ): ExtensionTestFixture {
   // Use "/workspace" only when no argument is provided (arguments.length === 0).
   // Explicit `undefined` must be preserved to test the "no workspace" path.
-  const resolvedProjectRoot = arguments.length === 0 ? "/workspace" : projectRoot;
+  const resolvedProjectRoot =
+    arguments.length === 0 ? "/workspace" : projectRoot;
   const context = createMockExtensionContext();
   const outputChannel = createMockOutputChannel();
   const viewProvider = createMockViewProvider();
