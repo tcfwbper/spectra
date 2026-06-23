@@ -57,20 +57,48 @@ Construction constraint: This is a standalone exported function, not a class. Si
        - The session label uses `flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;` (truncates with "..." when space is insufficient).
        - The stop button uses `flex-shrink: 0;` (never compressed, always visible and clickable).
      - Line 2 (subtitle): the session's `status` value.
-   - The stop button is rendered as a codicon icon button: a square, transparent-background button displaying the `codicon-close` icon (or `codicon-debug-stop`). On hover: a subtle light-grey background appears (`var(--vscode-toolbar-hoverBackground)`). No text label.
+   - The stop button is rendered as a circular icon button with a pulsing animation to convey "running" state:
+     - Shape: a small circle (20×20px) with a semi-transparent accent background (`var(--vscode-progressBar-background)` at 20% opacity).
+     - Inner icon: a centered 8×8px square (solid `var(--vscode-progressBar-background)` color) representing the stop symbol.
+     - Pulse animation: a CSS `@keyframes pulse` animation that smoothly scales the circle between 1.0 and 1.15 (period: 2s, infinite loop, ease-in-out). Conveys that the session is actively running.
+     - On hover: the circle background opacity increases to 40%, and the pulse animation pauses (providing a clear "clickable" affordance).
+     - On click: the pulse animation stops, the button enters cooldown.
+     - No text label, no codicon dependency for this button.
    - The stop button triggers `terminateSession` with the session's `pid`.
-   - The stop button has a 2-second cooldown after each click (disabled state: icon becomes faded/grey, hover background suppressed).
+   - The stop button has a 2-second cooldown after each click (disabled state: pulse animation stops, circle and inner square become grey/faded, hover effect suppressed).
    - The stop button is only rendered for sessions with `status === 'running'`.
    - Clicking anywhere on the row (except the stop button) triggers `navigateToDetail` with `sessionId` and `workflowName`.
 
 ### Session Detail Page DOM (id: `page-detail`)
 
-8. A back button (id: `btn-back`) in the top-left corner that triggers `navigateToList`.
-9. Below the back button: an event history container (id: `event-list`) displaying event entries.
-   - Each entry shows: `[Type] EmittedBy: Message`.
-10. Below the event history: a row containing an event-type `<select>` dropdown (id: `event-type-select`), a text input (id: `event-message-input`), and a "Send" button (id: `btn-send`).
+The detail page uses a full-height flex column layout (`display: flex; flex-direction: column; height: 100%;`). The event history fills all available vertical space, and the input controls are pinned to the bottom.
+
+8. A back button (id: `btn-back`) at the top-left, rendered as an icon-only button displaying the `codicon-chevron-left` glyph. No text label. On hover: subtle background highlight (`var(--vscode-toolbar-hoverBackground)`). Triggers `navigateToList`.
+
+9. Below the back button: an event history container (id: `event-list`) styled as a chat-style conversation view.
+   - The container uses `flex: 1; overflow-y: auto;` (fills remaining vertical space, scrolls when content overflows).
+   - Each event entry is rendered as a chat bubble:
+     - Alignment: events where `emittedBy` matches a human role are right-aligned (user's own messages); all other events (agent-emitted) are left-aligned.
+     - Above the bubble: a small label displaying the event `Type` in muted/secondary color (`var(--vscode-descriptionForeground)`), font-size 11px.
+     - Bubble styling: rounded corners (border-radius: 12px), padding 8px 12px, max-width 80% of container width.
+     - Left-aligned bubbles use `var(--vscode-editorWidget-background)` background.
+     - Right-aligned bubbles use `var(--vscode-button-background)` at 20% opacity (or a distinguishable secondary color).
+     - Message text inside the bubble uses `word-wrap: break-word; white-space: pre-wrap; overflow-wrap: break-word;` to ensure long text wraps correctly and preserves line breaks.
+     - Text color: `var(--vscode-editor-foreground)` for readability.
+     - Bubbles have vertical spacing (margin-bottom: 8px) between each entry.
+   - The container auto-scrolls to the bottom when new events arrive (on each `showDetail` re-render).
+
+10. Below the event history (pinned to bottom): a vertical stack containing the event controls.
+    - First row: a flex row (`display: flex; align-items: center; gap: 8px;`) containing:
+      - An event-type `<select>` dropdown (id: `event-type-select`) using `flex: 1; min-width: 0;` (fills remaining horizontal space, shrinks gracefully).
+      - A "Send" button (id: `btn-send`) with fixed width (`flex-shrink: 0; width: auto; padding: 4px 12px;`), right-aligned by flex layout.
+      - The entire row adapts to sidebar width: dropdown stretches/shrinks, Send button stays fixed.
+    - Second row (below the first row, margin-top: 8px): a `<textarea>` (id: `event-message-input`) for multi-line message input.
+      - Height: 3 rows (approximately 72px, set via `rows="3"` attribute and matching CSS `height`).
+      - Width: 100% of the container.
+      - CSS: `resize: vertical;` (user may drag to enlarge vertically), `white-space: pre-wrap; word-wrap: break-word;`.
     - The dropdown is populated dynamically when `showDetail` state arrives (from `eventTypes`).
-    - The "Send" button triggers `sendEvent` with the selected `eventType` and the input text.
+    - The "Send" button triggers `sendEvent` with the selected `eventType` and the textarea text.
     - The "Send" button has a 2-second cooldown after each click (disabled + grey styling during cooldown).
     - The "Send" button has an additional guard: it is enabled only when `currentState === entryNode` AND `status === 'running'`. Otherwise it is disabled with grey styling.
     - Both guards must pass simultaneously for the button to be clickable: no active cooldown AND the state condition is met.
@@ -90,7 +118,11 @@ Construction constraint: This is a standalone exported function, not a class. Si
     - Hides `page-sessions` and `page-not-initialized`, shows `page-detail`.
     - Stores `state.entryNode`, `state.currentState`, and `state.status` in module-level variables for the send-button guard.
     - Populates the `event-type-select` dropdown with `state.eventTypes`.
-    - Clears and rebuilds the `event-list` container from `state.events`.
+    - Clears and rebuilds the `event-list` container from `state.events` as chat bubbles:
+      - For each event: creates a wrapper div with appropriate alignment class (right for human-emitted, left for others).
+      - Renders the Type label above the bubble using `textContent` (never innerHTML).
+      - Renders the Message text inside the bubble using `textContent` (preserves text safely; CSS `white-space: pre-wrap` handles line breaks).
+      - After rebuilding, scrolls the `event-list` container to the bottom (`scrollTop = scrollHeight`).
     - Re-evaluates the send button's enabled/disabled state based on the guard condition.
 15. Button cooldown implementation:
     - On button click: immediately sets `button.disabled = true` and applies the disabled CSS class.
@@ -131,6 +163,9 @@ Construction constraint: This is a standalone exported function, not a class. Si
 - All three pages exist in the DOM simultaneously; visibility is toggled via CSS (`display: none` / `display: block`).
 - All buttons with cooldown must show a visual disabled state (grey/light-grey color) while locked.
 - The send button must be disabled (grey) whenever `currentState !== entryNode` OR `status !== 'running'`, regardless of cooldown state.
+- Event history bubbles must use `textContent` for rendering message text — never `innerHTML` — to prevent XSS and ensure all characters display correctly.
+- Event history bubbles must apply `word-wrap: break-word; white-space: pre-wrap; overflow-wrap: break-word;` to ensure long unbroken strings wrap and line breaks are preserved.
+- The stop button pulse animation must use CSS `@keyframes` (not JavaScript timers) for performance and battery efficiency.
 
 ## Edge Cases
 
@@ -175,6 +210,18 @@ Construction constraint: This is a standalone exported function, not a class. Si
 
 - Condition: The sidebar is narrowed such that the workflow dropdown row has minimal space.
   Expected: The dropdown shrinks (respecting `min-width: 0`) while the Run button maintains its fixed size. The dropdown text may be clipped by the browser's native select rendering.
+
+- Condition: An event message contains very long text without spaces (e.g., a URL or file path).
+  Expected: The chat bubble wraps the text using `overflow-wrap: break-word`. The bubble does not overflow its max-width or the container boundary.
+
+- Condition: An event message contains newline characters.
+  Expected: Line breaks are preserved and rendered visually due to `white-space: pre-wrap`. No manual `<br>` injection is needed.
+
+- Condition: The event history has many messages that exceed the visible area.
+  Expected: The container scrolls vertically. On each `showDetail` re-render, the container auto-scrolls to the bottom to show the most recent message.
+
+- Condition: The sidebar is narrowed such that the event-type dropdown and Send button row has minimal space.
+  Expected: The event-type dropdown shrinks (respecting `flex: 1; min-width: 0;`) while the Send button maintains its fixed width. The row does not overflow.
 
 ## Related
 
