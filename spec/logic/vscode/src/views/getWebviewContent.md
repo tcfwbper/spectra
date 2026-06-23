@@ -10,7 +10,7 @@ Generates the complete HTML string for the Spectra sidebar webview. Produces a s
 - Delegates: actual state data provision to the extension host (received via `postMessage`).
 - Delegates: view lifecycle management to SpectraViewProvider.
 - Must not: perform any filesystem I/O.
-- Must not: fetch external resources (all content is inline).
+- Must not: fetch external resources (all content is inline; codicon font is loaded from the extension's local assets, not from an external URL).
 - Must not: inject raw user data into HTML strings (all dynamic content is rendered via DOM manipulation in the embedded JS, not via string interpolation).
 - Must not: use `eval()` or inline event handlers (`onclick` attributes) — all event binding is done in the `<script>` block.
 
@@ -18,9 +18,10 @@ Generates the complete HTML string for the Spectra sidebar webview. Produces a s
 
 | Collaborator | Role | Allowed Interaction | Forbidden Interaction |
 |---|---|---|---|
-| `vscode.Webview` | Webview reference | `webview.cspSource` (for CSP header) | Must not call `postMessage` or subscribe to events |
-| `vscode.Uri` | Extension URI | Used to derive `localResourceRoots` context (passed through, not directly used in HTML generation) | — |
+| `vscode.Webview` | Webview reference | `webview.cspSource` (for CSP header and font-src) | Must not call `postMessage` or subscribe to events |
+| `vscode.Uri` | Extension URI | Used to derive codicon font URI and `localResourceRoots` context | — |
 | `crypto` (Node.js) | Nonce generation | `randomBytes` or equivalent for CSP nonce | — |
+| Codicon font (`@vscode/codicons`) | Icon glyphs | Referenced via CSS `@font-face` or `<link>` with a URI derived from `extensionUri` | Must not fetch from external CDN |
 
 Construction constraint: This is a standalone exported function, not a class. Signature: `getWebviewContent(webview: vscode.Webview, extensionUri: vscode.Uri): string`.
 
@@ -29,8 +30,9 @@ Construction constraint: This is a standalone exported function, not a class. Si
 ### HTML Structure
 
 1. Generates a random nonce (16+ bytes, hex-encoded) for the Content Security Policy.
-2. Produces `<!DOCTYPE html>` with a `<meta>` CSP tag: `default-src 'none'; style-src 'nonce-${nonce}'; script-src 'nonce-${nonce}';`.
+2. Produces `<!DOCTYPE html>` with a `<meta>` CSP tag: `default-src 'none'; style-src 'nonce-${nonce}'; script-src 'nonce-${nonce}'; font-src ${webview.cspSource};`.
 3. Embeds a single `<style nonce="${nonce}">` block with all CSS.
+3a. Embeds a `<link>` or `<style>` reference to the VS Code codicon font (from the extension's `node_modules/@vscode/codicons` or bundled asset), gated by the same nonce.
 4. Embeds a single `<script nonce="${nonce}">` block with all client-side JavaScript.
 
 ### Not Initialized Page DOM (id: `page-not-initialized`)
@@ -42,16 +44,22 @@ Construction constraint: This is a standalone exported function, not a class. Si
 ### Sessions List Page DOM (id: `page-sessions`)
 
 5. A header element displaying the text "Spectra" (top-left aligned).
-6. Below the header: a row containing a `<select>` dropdown (id: `workflow-select`) and a "Run" button (id: `btn-run`).
+6. Below the header: a flex row containing a `<select>` dropdown (id: `workflow-select`) and a "Run" button (id: `btn-run`).
+   - The row uses `display: flex; align-items: center; gap: 8px;`.
+   - The dropdown uses `flex: 1; min-width: 0;` (fills remaining space, shrinks gracefully).
+   - The "Run" button uses `flex-shrink: 0;` (fixed size, right-aligned by flex layout).
    - The dropdown is populated dynamically when `showSessions` state arrives.
    - The "Run" button triggers `launchSession` with the selected workflow name.
    - The "Run" button has a 2-second cooldown after each click (disabled + grey styling during cooldown).
 7. Below the dropdown row: a container (id: `session-list`) displaying session rows.
-   - Each session row is a clickable block with two lines:
-     - Line 1: `<WorkflowName>-<first 8 chars of session ID>`. On the far right of this line: a stop button (per-session).
+   - Each session row is a clickable flex block with two lines:
+     - Line 1: a flex row with the session label (`<WorkflowName>-<first 8 chars of session ID>`) on the left and a stop button on the far right.
+       - The session label uses `flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;` (truncates with "..." when space is insufficient).
+       - The stop button uses `flex-shrink: 0;` (never compressed, always visible and clickable).
      - Line 2 (subtitle): the session's `status` value.
+   - The stop button is rendered as a codicon icon button: a square, transparent-background button displaying the `codicon-close` icon (or `codicon-debug-stop`). On hover: a subtle light-grey background appears (`var(--vscode-toolbar-hoverBackground)`). No text label.
    - The stop button triggers `terminateSession` with the session's `pid`.
-   - The stop button has a 2-second cooldown after each click (disabled + grey styling during cooldown).
+   - The stop button has a 2-second cooldown after each click (disabled state: icon becomes faded/grey, hover background suppressed).
    - The stop button is only rendered for sessions with `status === 'running'`.
    - Clicking anywhere on the row (except the stop button) triggers `navigateToDetail` with `sessionId` and `workflowName`.
 
@@ -115,7 +123,7 @@ Construction constraint: This is a standalone exported function, not a class. Si
 
 ## Invariants
 
-- Must include a Content Security Policy meta tag with `default-src 'none'` and nonce-gated `style-src` and `script-src`.
+- Must include a Content Security Policy meta tag with `default-src 'none'`, nonce-gated `style-src` and `script-src`, and `font-src ${webview.cspSource}` (for codicon font loading from extension local assets).
 - Must never inject dynamic data (user content, session IDs, messages) via string interpolation into the HTML template — all dynamic rendering happens via DOM manipulation in the embedded JS after `message` events.
 - Must not use inline event handlers (`onclick`, `onsubmit`, etc.) — all event binding is in the script block.
 - Must produce valid HTML5 (`<!DOCTYPE html>`).
@@ -161,6 +169,12 @@ Construction constraint: This is a standalone exported function, not a class. Si
 
 - Condition: A session row has `status === 'initializing'`.
   Expected: No stop button is rendered (only `'running'` shows the stop button).
+
+- Condition: The sidebar is narrowed such that the session label text cannot fit alongside the stop button.
+  Expected: The session label text truncates with an ellipsis ("..."). The stop button remains fully visible and clickable at its fixed size. No content overflows or overlaps the row boundary.
+
+- Condition: The sidebar is narrowed such that the workflow dropdown row has minimal space.
+  Expected: The dropdown shrinks (respecting `min-width: 0`) while the Run button maintains its fixed size. The dropdown text may be clipped by the browser's native select rendering.
 
 ## Related
 
