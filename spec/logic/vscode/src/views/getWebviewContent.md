@@ -10,7 +10,7 @@ Generates the complete HTML string for the Spectra sidebar webview. Produces a s
 - Delegates: actual state data provision to the extension host (received via `postMessage`).
 - Delegates: view lifecycle management to SpectraViewProvider.
 - Must not: perform any filesystem I/O.
-- Must not: fetch external resources (all content is inline; codicon font is loaded from the extension's local assets, not from an external URL).
+- Must not: fetch external resources (all content is inline; no external fonts or CDN resources).
 - Must not: inject raw user data into HTML strings (all dynamic content is rendered via DOM manipulation in the embedded JS, not via string interpolation).
 - Must not: use `eval()` or inline event handlers (`onclick` attributes) — all event binding is done in the `<script>` block.
 
@@ -18,10 +18,9 @@ Generates the complete HTML string for the Spectra sidebar webview. Produces a s
 
 | Collaborator | Role | Allowed Interaction | Forbidden Interaction |
 |---|---|---|---|
-| `vscode.Webview` | Webview reference | `webview.cspSource` (for CSP header and font-src) | Must not call `postMessage` or subscribe to events |
-| `vscode.Uri` | Extension URI | Used to derive codicon font URI and `localResourceRoots` context | — |
+| `vscode.Webview` | Webview reference | `webview.cspSource` (for CSP header) | Must not call `postMessage` or subscribe to events |
+| `vscode.Uri` | Extension URI | Used for `localResourceRoots` context | — |
 | `crypto` (Node.js) | Nonce generation | `randomBytes` or equivalent for CSP nonce | — |
-| Codicon font (`@vscode/codicons`) | Icon glyphs | Referenced via CSS `@font-face` or `<link>` with a URI derived from `extensionUri` | Must not fetch from external CDN |
 
 Construction constraint: This is a standalone exported function, not a class. Signature: `getWebviewContent(webview: vscode.Webview, extensionUri: vscode.Uri): string`.
 
@@ -30,9 +29,8 @@ Construction constraint: This is a standalone exported function, not a class. Si
 ### HTML Structure
 
 1. Generates a random nonce (16+ bytes, hex-encoded) for the Content Security Policy.
-2. Produces `<!DOCTYPE html>` with a `<meta>` CSP tag: `default-src 'none'; style-src 'nonce-${nonce}'; script-src 'nonce-${nonce}'; font-src ${webview.cspSource};`.
+2. Produces `<!DOCTYPE html>` with a `<meta>` CSP tag: `default-src 'none'; style-src 'nonce-${nonce}'; script-src 'nonce-${nonce}';`.
 3. Embeds a single `<style nonce="${nonce}">` block with all CSS.
-3a. Embeds a `<link>` or `<style>` reference to the VS Code codicon font (from the extension's `node_modules/@vscode/codicons` or bundled asset), gated by the same nonce.
 4. Embeds a single `<script nonce="${nonce}">` block with all client-side JavaScript.
 
 ### Not Initialized Page DOM (id: `page-not-initialized`)
@@ -73,13 +71,13 @@ Construction constraint: This is a standalone exported function, not a class. Si
 
 The detail page uses a full-height flex column layout (`display: flex; flex-direction: column; height: 100%;`). The event history fills all available vertical space, and the input controls are pinned to the bottom.
 
-8. A back button (id: `btn-back`) at the top-left, rendered as an icon-only button displaying the `codicon-chevron-left` glyph. No text label. On hover: subtle background highlight (`var(--vscode-toolbar-hoverBackground)`). Triggers `navigateToList`.
+8. A back button (id: `btn-back`) at the top-left, rendered as a 28×28px square icon-only button containing an inline SVG chevron-left icon. The SVG uses `currentColor` for stroke so it inherits the text color from the VS Code theme. The button uses `display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; flex-shrink: 0;` — it does NOT stretch to fill the row. No text label. On hover: subtle background highlight (`var(--vscode-toolbar-hoverBackground)`) with `border-radius: 4px`. Triggers `navigateToList`.
 
 9. Below the back button: an event history container (id: `event-list`) styled as a chat-style conversation view.
    - The container uses `flex: 1; overflow-y: auto;` (fills remaining vertical space, scrolls when content overflows).
    - Each event entry is rendered as a chat bubble:
-     - Alignment: events where `emittedBy` matches a human role are right-aligned (user's own messages); all other events (agent-emitted) are left-aligned.
-     - Above the bubble: a small label displaying the event `Type` in muted/secondary color (`var(--vscode-descriptionForeground)`), font-size 11px.
+     - Alignment: events where `EmittedBy` equals the session's `entryNode` value are right-aligned (user's own messages); all other events (agent-emitted) are left-aligned. The `entryNode` value is available from the `showDetail` state payload and stored in a module-level variable.
+     - Above the bubble: a small label displaying the event `Type` field in muted/secondary color (`var(--vscode-descriptionForeground)`), font-size 11px.
      - Bubble styling: rounded corners (border-radius: 12px), padding 8px 12px, max-width 80% of container width.
      - Left-aligned bubbles use `var(--vscode-editorWidget-background)` background.
      - Right-aligned bubbles use `var(--vscode-button-background)` at 20% opacity (or a distinguishable secondary color).
@@ -108,20 +106,20 @@ The detail page uses a full-height flex column layout (`display: flex; flex-dire
 11. Acquires VS Code API via `const vscode = acquireVsCodeApi()`.
 12. Registers `window.addEventListener('message', handler)` to receive messages from the extension host.
 13a. On receiving `{ type: 'showNotInitialized' }`:
-    - Hides `page-sessions` and `page-detail`, shows `page-not-initialized`.
+    - Adds `.hidden` class to `page-sessions` and `page-detail`; removes `.hidden` class from `page-not-initialized`.
 13. On receiving `{ type: 'showSessions', state }`:
-    - Hides `page-detail` and `page-not-initialized`, shows `page-sessions`.
+    - Adds `.hidden` class to `page-detail` and `page-not-initialized`; removes `.hidden` class from `page-sessions`.
     - Populates the `workflow-select` dropdown with `state.workflows`.
     - Clears and rebuilds the `session-list` container from `state.sessions`.
     - Re-evaluates stop button visibility (only for `status === 'running'` sessions).
 14. On receiving `{ type: 'showDetail', state }`:
-    - Hides `page-sessions` and `page-not-initialized`, shows `page-detail`.
+    - Adds `.hidden` class to `page-sessions` and `page-not-initialized`; removes `.hidden` class from `page-detail`.
     - Stores `state.entryNode`, `state.currentState`, and `state.status` in module-level variables for the send-button guard.
     - Populates the `event-type-select` dropdown with `state.eventTypes`.
     - Clears and rebuilds the `event-list` container from `state.events` as chat bubbles:
-      - For each event: creates a wrapper div with appropriate alignment class (right for human-emitted, left for others).
-      - Renders the Type label above the bubble using `textContent` (never innerHTML).
-      - Renders the Message text inside the bubble using `textContent` (preserves text safely; CSS `white-space: pre-wrap` handles line breaks).
+      - For each event: creates a wrapper div with appropriate alignment class (right-aligned if `event.EmittedBy === entryNode`, left-aligned otherwise).
+      - Renders the `event.Type` label above the bubble using `textContent` (never innerHTML).
+      - Renders the `event.Message` text inside the bubble using `textContent` (preserves text safely; CSS `white-space: pre-wrap` handles line breaks).
       - After rebuilding, scrolls the `event-list` container to the bottom (`scrollTop = scrollHeight`).
     - Re-evaluates the send button's enabled/disabled state based on the guard condition.
 15. Button cooldown implementation:
@@ -155,12 +153,12 @@ The detail page uses a full-height flex column layout (`display: flex; flex-dire
 
 ## Invariants
 
-- Must include a Content Security Policy meta tag with `default-src 'none'`, nonce-gated `style-src` and `script-src`, and `font-src ${webview.cspSource}` (for codicon font loading from extension local assets).
+- Must include a Content Security Policy meta tag with `default-src 'none'`, nonce-gated `style-src` and `script-src`. No `font-src` directive is needed (no external fonts are loaded; icons are inline SVG).
 - Must never inject dynamic data (user content, session IDs, messages) via string interpolation into the HTML template — all dynamic rendering happens via DOM manipulation in the embedded JS after `message` events.
 - Must not use inline event handlers (`onclick`, `onsubmit`, etc.) — all event binding is in the script block.
 - Must produce valid HTML5 (`<!DOCTYPE html>`).
 - The nonce must be cryptographically random and unique per invocation.
-- All three pages exist in the DOM simultaneously; visibility is toggled via CSS (`display: none` / `display: block`).
+- All three pages exist in the DOM simultaneously; visibility is toggled via a `.hidden` CSS class that applies `display: none !important`. Removing the class restores the element's intrinsic display mode (e.g., `flex` for the detail page). Each page element sets its own layout display in its base CSS rule; the `.hidden` class overrides it when applied.
 - All buttons with cooldown must show a visual disabled state (grey/light-grey color) while locked.
 - The send button must be disabled (grey) whenever `currentState !== entryNode` OR `status !== 'running'`, regardless of cooldown state.
 - Event history bubbles must use `textContent` for rendering message text — never `innerHTML` — to prevent XSS and ensure all characters display correctly.
