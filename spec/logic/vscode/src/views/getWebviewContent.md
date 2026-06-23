@@ -86,14 +86,15 @@ The detail page uses a full-height flex column layout (`display: flex; flex-dire
      - Bubbles have vertical spacing (margin-bottom: 8px) between each entry.
    - The container auto-scrolls to the bottom when new events arrive (on each `showDetail` re-render).
 
-10. Below the event history (pinned to bottom): a vertical stack containing the event controls.
+10. Below the event history (pinned to bottom): a vertical stack (id: `detail-controls`) containing the event controls.
+    - The container has `padding-right: 8px;` to provide consistent right-side spacing that aligns its content's right edge with the rest of the sidebar content.
     - First row: a flex row (`display: flex; align-items: center; gap: 8px;`) containing:
       - An event-type `<select>` dropdown (id: `event-type-select`) using `flex: 1; min-width: 0;` (fills remaining horizontal space, shrinks gracefully).
       - A "Send" button (id: `btn-send`) with fixed width (`flex-shrink: 0; width: auto; padding: 4px 12px;`), right-aligned by flex layout.
       - The entire row adapts to sidebar width: dropdown stretches/shrinks, Send button stays fixed.
     - Second row (below the first row, margin-top: 8px): a `<textarea>` (id: `event-message-input`) for multi-line message input.
       - Height: 3 rows (approximately 72px, set via `rows="3"` attribute and matching CSS `height`).
-      - Width: 100% of the container.
+      - Width: 100% of the container (respects the container's padding-right, so its right edge aligns with the Send button's right edge).
       - CSS: `resize: vertical;` (user may drag to enlarge vertically), `white-space: pre-wrap; word-wrap: break-word;`.
     - The dropdown is populated dynamically when `showDetail` state arrives (from `eventTypes`).
     - The "Send" button triggers `sendEvent` with the selected `eventType` and the textarea text.
@@ -122,6 +123,10 @@ The detail page uses a full-height flex column layout (`display: flex; flex-dire
       - Renders the `event.Message` text inside the bubble using `textContent` (preserves text safely; CSS `white-space: pre-wrap` handles line breaks).
       - After rebuilding, scrolls the `event-list` container to the bottom (`scrollTop = scrollHeight`).
     - Re-evaluates the send button's enabled/disabled state based on the guard condition.
+14a. On receiving `{ type: 'sendResult', success }`:
+    - If `success` is `true`: clears the `event-message-input` textarea value (sets to empty string).
+    - If `success` is `false`: does nothing (textarea retains the user's message so they can retry).
+
 15. Button cooldown implementation:
     - On button click: immediately sets `button.disabled = true` and applies the disabled CSS class.
     - After 2000ms (`setTimeout`): removes `disabled` attribute and the disabled CSS class — unless the button is also held by the send-button guard (in which case it stays disabled).
@@ -164,6 +169,8 @@ The detail page uses a full-height flex column layout (`display: flex; flex-dire
 - Event history bubbles must use `textContent` for rendering message text — never `innerHTML` — to prevent XSS and ensure all characters display correctly.
 - Event history bubbles must apply `word-wrap: break-word; white-space: pre-wrap; overflow-wrap: break-word;` to ensure long unbroken strings wrap and line breaks are preserved.
 - The stop button pulse animation must use CSS `@keyframes` (not JavaScript timers) for performance and battery efficiency.
+- The textarea must only be cleared upon receiving a `sendResult` message with `success: true` — never on button click alone.
+- The `detail-controls` container must apply `padding-right: 8px` so the textarea's right edge aligns with the Send button's right edge.
 
 ## Edge Cases
 
@@ -220,6 +227,15 @@ The detail page uses a full-height flex column layout (`display: flex; flex-dire
 
 - Condition: The sidebar is narrowed such that the event-type dropdown and Send button row has minimal space.
   Expected: The event-type dropdown shrinks (respecting `flex: 1; min-width: 0;`) while the Send button maintains its fixed width. The row does not overflow.
+
+- Condition: `sendResult` with `success: true` arrives.
+  Expected: The textarea is cleared. The event-type dropdown retains its current selection.
+
+- Condition: `sendResult` with `success: false` arrives.
+  Expected: The textarea retains its content. The user can retry sending without re-typing.
+
+- Condition: `sendResult` arrives while the user has already started typing a new message (race between fast typing and async result).
+  Expected: On `success: true`, the textarea is still cleared (the new partial input is lost). This is acceptable because the prior send succeeded and the user's new typing occurred during the brief async gap.
 
 ## Related
 

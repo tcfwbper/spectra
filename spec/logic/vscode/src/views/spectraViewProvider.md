@@ -71,6 +71,12 @@ Construction constraints:
 22. If `view` is null, stores the message as `pendingMessage` and returns.
 23. Calls `view.webview.postMessage(message)`.
 
+### postSendResult(success)
+
+24a. Constructs message `{ type: 'sendResult', success }`.
+24b. If `view` is null, does nothing (result is ephemeral — no pending storage needed).
+24c. Calls `view.webview.postMessage(message)`.
+
 ### dispose()
 
 24. Disposes the `EventEmitter` instance.
@@ -88,6 +94,7 @@ Construction constraints:
 | token | `vscode.CancellationToken` | Provided by VS Code | Yes (resolveWebviewView) |
 | state (showSessionList) | `SessionListState` | Object with `sessions: SessionSummary[]` and `workflows: string[]` | Yes |
 | state (showSessionDetail) | `SessionDetailState` | As defined in SessionDetailController | Yes |
+| success (postSendResult) | `boolean` | `true` if dispatch succeeded, `false` otherwise | Yes |
 
 ## Outputs
 
@@ -112,6 +119,7 @@ Construction constraints:
 - Must not call `postMessage` when `view` is null — show methods store the message as `pendingMessage` for delivery in `resolveWebviewView`.
 - Must deliver `pendingMessage` exactly once in `resolveWebviewView` and then clear it.
 - Must not interpret or validate message content — forwards all messages as-is.
+- `postSendResult` does not store a pending message when view is null — the result is ephemeral and has no replay value.
 - Must set `currentPage` before posting the corresponding message to the webview.
 - Must use a Content Security Policy in the generated HTML (responsibility of `getWebviewContent`, but SpectraViewProvider must not override `webview.html` after resolveWebviewView).
 - Must set `retainContextWhenHidden: true` in webview options to preserve state when sidebar is hidden.

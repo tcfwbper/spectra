@@ -81,9 +81,10 @@ Construction constraints:
 11. Creates a `SpectraViewProvider(context.extensionUri, logger)` instance — uses `deps.createViewProvider` if provided.
 12. Registers the view provider via `vscode.window.registerWebviewViewProvider('spectra.chatView', viewProvider, { webviewOptions: { retainContextWhenHidden: true } })` — uses `deps.registerWebviewViewProvider` if provided.
 13. Initializes an internal `cachedSessionListState` variable to `null`.
+13a. Initializes an internal `activePage` variable to `'sessions'`.
 14. Subscribes to `sessionListController.onDidUpdate`:
     - Stores the received state in `cachedSessionListState`.
-    - Calls `viewProvider.showSessionList(state)`.
+    - Only calls `viewProvider.showSessionList(state)` if `activePage === 'sessions'`. If `activePage !== 'sessions'`, the state is cached but the view is not pushed (the user remains on the current page undisturbed).
 15. Subscribes to `sessionDetailController.onDidUpdate`:
     - Calls `viewProvider.showSessionDetail(state)`.
 16. Subscribes to `sessionListController.onDidError`:
@@ -91,11 +92,11 @@ Construction constraints:
 17. Subscribes to `sessionDetailController.onDidError`:
     - Calls `showErrorMessage(error.message)`.
 18. Subscribes to `viewProvider.onDidReceiveMessage` and routes based on `msg.command`:
-    - `'navigateToDetail'`: calls `sessionDetailController.open(msg.sessionId, msg.workflowName)`.
-    - `'navigateToList'`: if `cachedSessionListState` is not null, calls `viewProvider.showSessionList(cachedSessionListState)`.
+    - `'navigateToDetail'`: sets `activePage` to `'detail'`, then calls `sessionDetailController.open(msg.sessionId, msg.workflowName)`.
+    - `'navigateToList'`: sets `activePage` to `'sessions'`, then if `cachedSessionListState` is not null, calls `viewProvider.showSessionList(cachedSessionListState)`.
     - `'launchSession'`: calls `sessionListController.launch(msg.workflowName)`.
     - `'terminateSession'`: calls `sessionListController.terminate(msg.pid)`.
-    - `'sendEvent'`: calls `sessionDetailController.sendEvent(msg.eventType, msg.message)`.
+    - `'sendEvent'`: calls `sessionDetailController.sendEvent(msg.eventType, msg.message)`. Awaits the returned Promise. If the result is `true`, calls `viewProvider.postSendResult(true)`. If the result is `false`, calls `viewProvider.postSendResult(false)`.
     - Any other command: logs a warning via `logger.warn` with the unrecognized command value.
 19. Registers the `spectra.openPanel` command via `registerCommand` — the handler is a no-op (view is managed by VS Code sidebar).
 20. Pushes all disposables to `context.subscriptions`: the OutputChannel, sessionListController, sessionDetailController, viewProvider, the view provider registration, the command disposable, and all subscription disposables.
@@ -126,6 +127,9 @@ Construction constraints:
 - Must not proceed past step 8 (creating controllers) if `projectRoot` is `undefined`.
 - Must register all disposables with `context.subscriptions` — no manual cleanup in `deactivate()`.
 - Must cache the latest `SessionListState` for immediate replay on `navigateToList`.
+- Must track `activePage` (`'sessions' | 'detail'`) and update it on `navigateToDetail` and `navigateToList` messages.
+- Must suppress `viewProvider.showSessionList()` calls when `activePage !== 'sessions'` — the cached state is still updated but not pushed to the webview.
+- Must await `sessionDetailController.sendEvent()` and relay the boolean result to the webview via `viewProvider.postSendResult()`.
 - Must route `terminateSession` to `sessionListController.terminate()` regardless of which page originated the message.
 - Must log a warning (not throw) for unrecognized webview message commands.
 - Must use the OutputChannel for all diagnostic output — never `console.log`.
@@ -140,7 +144,10 @@ Construction constraints:
   Expected: Shows error message "Spectra: No workspace folder open." via `showErrorMessage`. Logs error. Only OutputChannel pushed to subscriptions. No controllers, no ViewProvider created. Returns early.
 
 - Condition: `navigateToList` received before the first `onDidUpdate` from SessionListController (cachedSessionListState is null).
-  Expected: No-op — `viewProvider.showSessionList` is not called. The webview remains on whatever page it currently shows until the first scan completes.
+  Expected: `activePage` is set to `'sessions'`. `viewProvider.showSessionList` is not called (cache is null). The webview remains on whatever page it currently shows until the first scan completes.
+
+- Condition: `sessionListController.onDidUpdate` fires while `activePage` is `'detail'`.
+  Expected: The state is cached in `cachedSessionListState` but NOT pushed to the webview. The user stays on the detail page undisturbed. When they later navigate to the list, the cached state is used.
 
 - Condition: `terminateSession` arrives from the detail page with a `pid` value.
   Expected: Routes identically to a `terminateSession` from the list page — calls `sessionListController.terminate(msg.pid)`.

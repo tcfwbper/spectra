@@ -79,12 +79,12 @@ Construction constraints:
 30. Sets scanning flag to `false`.
 31. If the dirty flag is `true`, resets it to `false` and re-invokes this routine (loop until clean).
 
-### sendEvent(eventType, message)
+### sendEvent(eventType, message) → Promise\<boolean\>
 
-32. If disposed, returns immediately (no-op).
+32. If disposed, returns `false` immediately.
 33. Calls `EventDispatcher.dispatch(eventType, currentSessionId, message, projectRoot, logger)`.
-34. If the call throws (spawn failure — ENOENT, EACCES), catches the error, logs via `logger.error`, and fires `onDidError` with the caught error.
-35. If the call succeeds, no immediate action (the EventWatcher will detect the resulting file change and trigger a re-scan).
+34. If the call throws (spawn failure — ENOENT, EACCES), catches the error, logs via `logger.error`, fires `onDidError` with the caught error, and returns `false`.
+35. If the call succeeds, returns `true`. No other immediate action (the EventWatcher will detect the resulting file change and trigger a re-scan).
 
 ### Dispose
 
@@ -105,6 +105,13 @@ Construction constraints:
 | message | string | Non-empty | Yes (sendEvent method) |
 
 ## Outputs
+
+### sendEvent Return Value
+
+| Value | Meaning |
+|---|---|
+| `true` | Dispatch succeeded. Caller may clear input state. |
+| `false` | Dispatch failed or controller is disposed. Caller should preserve input state. |
 
 | Field | Type | Description |
 |---|---|---|
