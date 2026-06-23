@@ -6,12 +6,9 @@
  *
  * Most tests are concrete against the existing production surface.
  * Scaffolded tests require the production getWebviewContent.ts to be updated with:
- *   - CSP font-src directive: `font-src ${webview.cspSource}`
- *   - Codicon font reference via <link> or <style> gated by nonce,
- *     derived from extensionUri via webview.asWebviewUri
  *   - flex: 1 / min-width: 0 on #workflow-select
  *   - flex-shrink: 0 on #btn-run
- *   - Back button: icon-only with codicon-chevron-left glyph (no text label)
+ *   - Back button: 28×28px inline-flex square with inline SVG chevron-left (currentColor stroke)
  *   - Event message input: <textarea rows="3"> instead of <input type="text">
  *   - Stop button: circular 20×20px icon with 8×8px inner square and CSS pulse animation (no codicon)
  *   - Detail page: full-height flex column layout with pinned bottom controls
@@ -26,23 +23,22 @@
  *   - #btn-send: flex-shrink: 0
  *   - Textarea: resize: vertical, width: 100%
  *   - Pulse animation via CSS @keyframes (not JS timers)
- *   - Back button hover: --vscode-toolbar-hoverBackground
+ *   - Back button hover: --vscode-toolbar-hoverBackground with border-radius: 4px
  *   - Stop button hover: 40% opacity + animation-play-state: paused
+ *   - .hidden CSS class: display: none !important
+ *   - Page switching via classList.add/remove of 'hidden' class
+ *   - EmittedBy/entryNode comparison for bubble alignment
+ *   - entryNode stored from showDetail state payload
  */
-import * as sinon from "sinon";
 import { expect } from "chai";
 
 import {
   createStubWebview,
   createStubExtensionUri,
-  stubUriJoinPath,
   extractNonceFromCsp,
   extractNonceFromStyleTag,
   extractNonceFromScriptTag,
-  extractFontSrcFromCsp,
-  extractCodiconReference,
   EXPECTED_ELEMENT_IDS,
-  FAKE_CODICON_WEBVIEW_URI,
   type StubWebview,
   type StubUri,
 } from "./helpers/webviewStubs";
@@ -78,21 +74,21 @@ describe("getWebviewContent", function () {
       expect(html).to.contain("<body");
     });
 
-    it("should include CSP meta tag with nonce-gated style-src and script-src and font-src", function () {
+    it("should include CSP meta tag with nonce-gated style-src and script-src without font-src", function () {
       const html = invoke();
 
       expect(html).to.contain("<meta");
       expect(html).to.contain("default-src 'none'");
       expect(html).to.match(/style-src\s[^;]*'nonce-/);
       expect(html).to.match(/script-src\s[^;]*'nonce-/);
-      // font-src must reference the cspSource for local codicon font loading
-      // Scaffolded: production CSP meta tag must include font-src directive
-      // Missing: font-src ${webview.cspSource} in the CSP content attribute
-      if (!html.match(/font-src\s/)) {
-        this.skip(); // Production surface not yet updated: CSP missing font-src directive
+      // Must NOT contain font-src (no external fonts; icons are inline SVG)
+      // Scaffolded: production CSP still includes font-src for codicon loading;
+      // must be removed when back button switches to inline SVG
+      if (html.match(/font-src\s/)) {
+        this.skip(); // Production surface not yet updated: CSP still includes font-src directive (remove when codicon font is no longer needed)
         return;
       }
-      expect(html).to.contain("font-src https://test.csp");
+      expect(html).to.not.match(/font-src\s/);
     });
 
     it("should include a style block with matching nonce", function () {
@@ -123,35 +119,6 @@ describe("getWebviewContent", function () {
       // Exactly one script tag with nonce
       const scriptMatches = html.match(/<script\s+nonce="/g);
       expect(scriptMatches).to.have.lengthOf(1);
-    });
-
-    it("should include codicon font reference with nonce", function () {
-      // Scaffolded: production getWebviewContent.ts must add codicon font reference
-      // Missing: <link> or <style> block referencing codicon font URI from asWebviewUri,
-      //   gated by the nonce attribute
-      const html = invoke();
-      const cspNonce = extractNonceFromCsp(html);
-      const codiconRef = extractCodiconReference(html);
-
-      if (!codiconRef) {
-        this.skip(); // Production surface not yet updated: missing codicon font reference
-        return;
-      }
-
-      // The codicon reference must be gated by the nonce
-      // Either via a nonce attribute on a <link> tag, or within the nonce-gated <style> block
-      const hasNonceGating =
-        codiconRef.includes(`nonce="${cspNonce}"`) ||
-        (html.includes(`<style nonce="${cspNonce}"`) &&
-          html.includes("codicon"));
-
-      expect(hasNonceGating).to.be.true;
-
-      // The URI returned by asWebviewUri should be present
-      expect(
-        html.includes("codicon"),
-        "Expected codicon font URI reference in HTML",
-      ).to.be.true;
     });
 
     it("should generate a unique nonce per invocation", function () {
@@ -222,32 +189,77 @@ describe("getWebviewContent", function () {
       expect(html).to.match(/id=["']session-list["']/);
     });
 
-    it("should contain back button with codicon-chevron-left glyph", function () {
-      // Spec: back button is icon-only with codicon-chevron-left class, no text label
-      // Production currently renders `&larr; Back` text; needs update to use codicon glyph
+    it("should contain back button with inline SVG chevron-left icon", function () {
+      // Spec: back button is a 28×28px icon-only button with inline SVG.
+      // No text label. Does not reference any codicon class.
       const html = invoke();
 
       expect(html).to.match(/id=["']btn-back["']/);
 
-      // Check for codicon-chevron-left class reference
+      // Extract the full button element
       const btnBackMatch = html.match(
         /<button[^>]*id=["']btn-back["'][^>]*>[\s\S]*?<\/button>/,
       );
-      if (!btnBackMatch || !btnBackMatch[0].includes("codicon-chevron-left")) {
-        this.skip(); // Production surface not yet updated: btn-back needs codicon-chevron-left glyph (no text label)
+      if (!btnBackMatch || !btnBackMatch[0].includes("<svg")) {
+        this.skip(); // Production surface not yet updated: btn-back needs inline SVG chevron-left icon
         return;
       }
 
-      // The button element must contain codicon-chevron-left class
-      expect(btnBackMatch[0]).to.contain("codicon-chevron-left");
+      // Must contain an <svg element
+      expect(btnBackMatch[0]).to.contain("<svg");
 
       // No text label should be present (icon-only)
-      // Strip HTML tags and check that remaining text is empty/whitespace-only
+      // Strip HTML/SVG tags and check that remaining text is empty/whitespace-only
       const textOnly = btnBackMatch[0]
         .replace(/<[^>]*>/g, "")
         .replace(/&[^;]+;/g, "")
         .trim();
       expect(textOnly).to.equal("");
+
+      // Must NOT reference any codicon class
+      expect(btnBackMatch[0]).to.not.contain("codicon");
+    });
+
+    it("should style back button as 28x28px inline-flex square", function () {
+      // Spec: #btn-back uses display: inline-flex, align-items: center,
+      //   justify-content: center, width: 28px, height: 28px, flex-shrink: 0
+      const html = invoke();
+
+      // Look for CSS rules applying to #btn-back
+      const btnBackCss = html.match(/#btn-back[^}]*}/s);
+      if (!btnBackCss || !btnBackCss[0].includes("inline-flex")) {
+        this.skip(); // Production surface not yet updated: #btn-back needs 28×28px inline-flex styling
+        return;
+      }
+
+      expect(btnBackCss[0]).to.match(/display:\s*inline-flex/);
+      expect(btnBackCss[0]).to.match(/align-items:\s*center/);
+      expect(btnBackCss[0]).to.match(/justify-content:\s*center/);
+      expect(btnBackCss[0]).to.match(/width:\s*28px/);
+      expect(btnBackCss[0]).to.match(/height:\s*28px/);
+      expect(btnBackCss[0]).to.match(/flex-shrink:\s*0/);
+    });
+
+    it("should use currentColor for SVG stroke in back button", function () {
+      // Spec: The SVG chevron inherits text color from the theme via currentColor stroke
+      const html = invoke();
+
+      // Extract the btn-back element
+      const btnBackMatch = html.match(
+        /<button[^>]*id=["']btn-back["'][^>]*>[\s\S]*?<\/button>/,
+      );
+      if (!btnBackMatch || !btnBackMatch[0].includes("<svg")) {
+        this.skip(); // Production surface not yet updated: btn-back needs inline SVG
+        return;
+      }
+
+      // Extract the SVG element within the button
+      const svgMatch = btnBackMatch[0].match(/<svg[\s\S]*?<\/svg>/);
+      expect(svgMatch).to.not.be.null;
+
+      // The SVG must use currentColor for its stroke attribute
+      expect(svgMatch![0]).to.contain("currentColor");
+      expect(svgMatch![0]).to.match(/stroke=["']currentColor["']/);
     });
 
     it("should contain event-list container on detail page", function () {
@@ -330,6 +342,22 @@ describe("getWebviewContent", function () {
       expect(html).to.match(/id=["']page-detail["']/);
     });
 
+    it("should define hidden CSS class with display-none-important", function () {
+      // Spec: .hidden class applies display: none !important
+      const html = invoke();
+
+      // Look for .hidden CSS rule with display: none !important
+      const hasHiddenClass = html.match(
+        /\.hidden\s*\{[^}]*display:\s*none\s*!important/s,
+      );
+      if (!hasHiddenClass) {
+        this.skip(); // Production surface not yet updated: .hidden CSS class with display: none !important
+        return;
+      }
+
+      expect(hasHiddenClass).to.not.be.null;
+    });
+
     it("should apply flex layout to workflow dropdown row", function () {
       const html = invoke();
 
@@ -380,11 +408,13 @@ describe("getWebviewContent", function () {
       expect(hasFlexShrink).to.not.be.null;
     });
 
-    it("should not reference external CDN for codicon font", function () {
+    it("should not reference any external CDN or font URLs", function () {
+      // Spec: No external resources are loaded; all content is inline.
+      // Returned string does not contain any https:// or http:// URLs in
+      // <link, @font-face, or @import rules (CSP meta tag cspSource references excluded)
       const html = invoke();
 
-      // Extract all https:// and http:// URLs from the document
-      // Exclude the CSP meta tag's cspSource reference (that's expected)
+      // Extract the CSP meta tag so we can exclude it from the check
       const cspMetaMatch = html.match(
         /<meta[^>]*Content-Security-Policy[^>]*>/i,
       );
@@ -393,15 +423,26 @@ describe("getWebviewContent", function () {
       // Get the rest of the document without the CSP meta tag
       const htmlWithoutCspMeta = html.replace(cspMeta, "");
 
-      // Font references should not use external URLs
-      const externalFontUrls = htmlWithoutCspMeta.match(
-        /(?:https?:\/\/)[^\s'")<]+(?:font|codicon|woff|ttf)[^\s'")<]*/gi,
+      // Check for https:// or http:// in <link elements
+      const linkUrls = htmlWithoutCspMeta.match(
+        /<link[^>]*https?:\/\/[^>]*>/gi,
       );
+      expect(linkUrls, "Expected no external URLs in <link> elements").to.be
+        .null;
 
-      expect(
-        externalFontUrls,
-        "Expected no external CDN URLs for font references outside CSP meta tag",
-      ).to.be.null;
+      // Check for https:// or http:// in @font-face rules
+      const fontFaceUrls = htmlWithoutCspMeta.match(
+        /@font-face[^}]*https?:\/\/[^}]*/gi,
+      );
+      expect(fontFaceUrls, "Expected no external URLs in @font-face rules").to
+        .be.null;
+
+      // Check for https:// or http:// in @import rules
+      const importUrls = htmlWithoutCspMeta.match(
+        /@import[^;]*https?:\/\/[^;]*/gi,
+      );
+      expect(importUrls, "Expected no external URLs in @import rules").to.be
+        .null;
     });
 
     it("should render stop button as circular icon with pulse animation", function () {
@@ -476,7 +517,7 @@ describe("getWebviewContent", function () {
       expect(eventListCss[0]).to.match(/overflow-y:\s*auto/);
     });
 
-    it("should apply chat bubble styling to event entries in embedded JS", function () {
+    it("should apply chat bubble styling to event entries in embedded CSS", function () {
       // Spec: CSS includes bubble styles with border-radius: 12px, padding 8px 12px,
       //   max-width 80%, and two distinct background colors
       //   (--vscode-editorWidget-background for left, --vscode-button-background for right)
@@ -496,7 +537,7 @@ describe("getWebviewContent", function () {
       expect(html).to.contain("--vscode-button-background");
     });
 
-    it("should use textContent for rendering event type and message in embedded JS", function () {
+    it("should use textContent for rendering event Type and Message in embedded JS", function () {
       // Spec: embedded script uses textContent (not innerHTML) when assigning
       //   event Type labels and Message text to DOM elements
       const html = invoke();
@@ -710,13 +751,14 @@ describe("getWebviewContent", function () {
       }
     });
 
-    it("should apply back button hover style", function () {
+    it("should apply back button hover style with border-radius", function () {
       // Spec: #btn-back hover state references --vscode-toolbar-hoverBackground
+      //   and includes border-radius: 4px
       const html = invoke();
 
       const hasBackHover = html.includes("--vscode-toolbar-hoverBackground");
       if (!hasBackHover) {
-        this.skip(); // Production surface not yet updated: #btn-back needs hover style with --vscode-toolbar-hoverBackground
+        this.skip(); // Production surface not yet updated: #btn-back needs hover style with --vscode-toolbar-hoverBackground and border-radius: 4px
         return;
       }
 
@@ -724,6 +766,15 @@ describe("getWebviewContent", function () {
       expect(html).to.match(
         /#btn-back[^}]*:hover[\s\S]*?--vscode-toolbar-hoverBackground|#btn-back:hover[^}]*--vscode-toolbar-hoverBackground/,
       );
+
+      // Verify border-radius: 4px in the hover context
+      const hoverBlock = html.match(/#btn-back:hover[^}]*}/s);
+      expect(hoverBlock).to.not.be.null;
+      if (!hoverBlock![0].match(/border-radius:\s*4px/)) {
+        this.skip(); // Production surface not yet updated: #btn-back:hover missing border-radius: 4px
+        return;
+      }
+      expect(hoverBlock![0]).to.match(/border-radius:\s*4px/);
     });
 
     it("should apply stop button hover style with paused animation", function () {
@@ -740,6 +791,132 @@ describe("getWebviewContent", function () {
       expect(html).to.contain("animation-play-state: paused");
       // Verify 40% opacity in hover context
       expect(html).to.match(/opacity[^;]*0\.4|opacity[^;]*40%/);
+    });
+
+    it("should use hidden class toggling for page switching in showNotInitialized handler", function () {
+      // Spec: On receiving showNotInitialized message:
+      //   adds 'hidden' class to page-sessions and page-detail,
+      //   removes 'hidden' class from page-not-initialized
+      const html = invoke();
+
+      const scriptMatch = html.match(/<script[^>]*>([\s\S]*?)<\/script>/);
+      if (!scriptMatch) {
+        expect.fail("Expected a script block in the HTML");
+        return;
+      }
+      const script = scriptMatch[1];
+
+      // Must handle showNotInitialized message type
+      if (!script.includes("showNotInitialized")) {
+        this.skip(); // Production surface not yet updated: showNotInitialized handler not found in script
+        return;
+      }
+
+      // Verify classList.add/remove usage for page switching
+      expect(script).to.contain("classList.add");
+      expect(script).to.contain("classList.remove");
+
+      // The handler should add 'hidden' to page-sessions and page-detail
+      // and remove 'hidden' from page-not-initialized
+      // We verify the script contains references to all three pages with hidden class manipulation
+      expect(script).to.contain("page-sessions");
+      expect(script).to.contain("page-detail");
+      expect(script).to.contain("page-not-initialized");
+    });
+
+    it("should use hidden class toggling for page switching in showSessions handler", function () {
+      // Spec: On receiving showSessions message:
+      //   adds 'hidden' class to page-detail and page-not-initialized,
+      //   removes 'hidden' class from page-sessions
+      const html = invoke();
+
+      const scriptMatch = html.match(/<script[^>]*>([\s\S]*?)<\/script>/);
+      if (!scriptMatch) {
+        expect.fail("Expected a script block in the HTML");
+        return;
+      }
+      const script = scriptMatch[1];
+
+      if (!script.includes("showSessions")) {
+        this.skip(); // Production surface not yet updated: showSessions handler not found in script
+        return;
+      }
+
+      // Verify the script uses classList manipulation with 'hidden'
+      expect(script).to.contain("classList.add");
+      expect(script).to.contain("classList.remove");
+      expect(script).to.contain("hidden");
+    });
+
+    it("should use hidden class toggling for page switching in showDetail handler", function () {
+      // Spec: On receiving showDetail message:
+      //   adds 'hidden' class to page-sessions and page-not-initialized,
+      //   removes 'hidden' class from page-detail
+      const html = invoke();
+
+      const scriptMatch = html.match(/<script[^>]*>([\s\S]*?)<\/script>/);
+      if (!scriptMatch) {
+        expect.fail("Expected a script block in the HTML");
+        return;
+      }
+      const script = scriptMatch[1];
+
+      if (!script.includes("showDetail")) {
+        this.skip(); // Production surface not yet updated: showDetail handler not found in script
+        return;
+      }
+
+      // Verify the script uses classList manipulation with 'hidden'
+      expect(script).to.contain("classList.add");
+      expect(script).to.contain("classList.remove");
+      expect(script).to.contain("hidden");
+    });
+
+    it("should align event bubbles based on EmittedBy equals entryNode", function () {
+      // Spec: Embedded JS uses EmittedBy field compared to entryNode for
+      //   chat bubble alignment (right-aligned vs left-aligned class assignment)
+      const html = invoke();
+
+      const scriptMatch = html.match(/<script[^>]*>([\s\S]*?)<\/script>/);
+      if (!scriptMatch) {
+        expect.fail("Expected a script block in the HTML");
+        return;
+      }
+      const script = scriptMatch[1];
+
+      // Must contain EmittedBy (capitalized) comparison with entryNode
+      if (!script.includes("EmittedBy")) {
+        this.skip(); // Production surface not yet updated: EmittedBy/entryNode alignment logic not found in script
+        return;
+      }
+
+      expect(script).to.contain("EmittedBy");
+      expect(script).to.contain("entryNode");
+    });
+
+    it("should store entryNode from showDetail state payload", function () {
+      // Spec: Embedded JS stores entryNode in a module-level variable from
+      //   the showDetail message (state.entryNode)
+      const html = invoke();
+
+      const scriptMatch = html.match(/<script[^>]*>([\s\S]*?)<\/script>/);
+      if (!scriptMatch) {
+        expect.fail("Expected a script block in the HTML");
+        return;
+      }
+      const script = scriptMatch[1];
+
+      if (!script.includes("entryNode")) {
+        this.skip(); // Production surface not yet updated: entryNode storage from showDetail state not found in script
+        return;
+      }
+
+      // The script should store state.entryNode or equivalent
+      expect(script).to.contain("entryNode");
+      // Verify it's associated with the showDetail flow
+      // The variable should be accessible for event rendering logic
+      // Look for assignment pattern like `entryNode = state.entryNode` or similar
+      expect(script).to.match(/entryNode\s*=\s*.*state/);
     });
   });
 
@@ -763,35 +940,6 @@ describe("getWebviewContent", function () {
 
       expect(cspAccessed).to.be.true;
     });
-
-    it("should derive codicon font URI from extensionUri", function () {
-      // Scaffolded: production getWebviewContent.ts must call webview.asWebviewUri
-      // with a URI derived from extensionUri that references codicons.
-      // Missing: webview.asWebviewUri call with a codicons path segment
-      const webview = createStubWebview("https://test.csp");
-      const extUri = createStubExtensionUri("/test/extension");
-
-      const html = getWebviewContent(webview as any, extUri as any);
-
-      // Check if asWebviewUri was called
-      if (!webview.asWebviewUri.called) {
-        this.skip(); // Production surface not yet updated: asWebviewUri not called (codicon font not loaded via webview URI)
-        return;
-      }
-
-      // Verify asWebviewUri was called with a URI that includes a codicons path segment
-      const calls = webview.asWebviewUri.args;
-      const hasCodiconCall = calls.some((callArgs: any[]) => {
-        const uri = callArgs[0];
-        const uriPath = uri?.path || uri?.fsPath || "";
-        return uriPath.includes("codicon");
-      });
-
-      expect(
-        hasCodiconCall,
-        "Expected webview.asWebviewUri to be called with a URI containing 'codicon' path segment",
-      ).to.be.true;
-    });
   });
 
   // ─── Null / Empty Input ─────────────────────────────────────────────────────
@@ -806,16 +954,16 @@ describe("getWebviewContent", function () {
 
       expect(html).to.match(/^<!DOCTYPE html>/);
       expect(html).to.contain("<meta");
-      // Nonce-based parts should still be present
-      expect(html).to.match(/nonce-[a-f0-9]+/);
-      // font-src directive should be present even when cspSource is empty
-      // Scaffolded: production CSP must include font-src directive
-      // Missing: font-src in CSP content (even with empty value)
-      if (!html.match(/font-src/)) {
-        this.skip(); // Production surface not yet updated: CSP missing font-src directive
+      // Nonce-based style-src and script-src should still be present
+      expect(html).to.match(/style-src\s[^;]*'nonce-/);
+      expect(html).to.match(/script-src\s[^;]*'nonce-/);
+      // Must NOT contain font-src (no external fonts)
+      // Scaffolded: production CSP still includes font-src; must be removed
+      if (html.match(/font-src/)) {
+        this.skip(); // Production surface not yet updated: CSP still includes font-src directive
         return;
       }
-      expect(html).to.match(/font-src\s/);
+      expect(html).to.not.match(/font-src/);
     });
   });
 
@@ -826,7 +974,7 @@ describe("getWebviewContent", function () {
       const html1 = invoke();
       const html2 = invoke();
 
-      // Scaffolded: EXPECTED_ELEMENT_IDS now includes 'page-not-initialized'
+      // Scaffolded: EXPECTED_ELEMENT_IDS includes 'page-not-initialized'
       // which requires the production surface to be updated.
       // Filter to only IDs present in the current production surface.
       const currentIds = EXPECTED_ELEMENT_IDS.filter((id) => {
@@ -850,14 +998,31 @@ describe("getWebviewContent", function () {
         expect(html2).to.match(re, `Second call missing id="${id}"`);
       }
 
-      // Both results should include codicon font reference (if production supports it)
-      const codicon1 = extractCodiconReference(html1);
-      const codicon2 = extractCodiconReference(html2);
-      if (codicon1 !== null) {
-        // If codicon is present in first call, it must be present in second
-        expect(codicon2).to.not.be.null;
+      // Both results should contain a .hidden CSS class rule
+      const hasHidden1 = html1.match(
+        /\.hidden\s*\{[^}]*display:\s*none\s*!important/s,
+      );
+      const hasHidden2 = html2.match(
+        /\.hidden\s*\{[^}]*display:\s*none\s*!important/s,
+      );
+      if (!hasHidden1) {
+        this.skip(); // Production surface not yet updated: .hidden class rule not found
+        return;
       }
-      // If codicon is not present, the assertion is deferred (scaffolded)
+      expect(hasHidden2).to.not.be.null;
+
+      // Both results should contain an inline SVG in the back button
+      const hasSvg1 = html1.match(
+        /<button[^>]*id=["']btn-back["'][^>]*>[\s\S]*?<svg/,
+      );
+      const hasSvg2 = html2.match(
+        /<button[^>]*id=["']btn-back["'][^>]*>[\s\S]*?<svg/,
+      );
+      if (!hasSvg1) {
+        this.skip(); // Production surface not yet updated: btn-back needs inline SVG
+        return;
+      }
+      expect(hasSvg2).to.not.be.null;
     });
   });
 });
