@@ -15,7 +15,6 @@ import * as crypto from "crypto";
  */
 interface Webview {
   cspSource: string;
-  asWebviewUri?: (uri: Uri) => { toString(): string };
 }
 
 /**
@@ -39,28 +38,17 @@ interface Uri {
  */
 export function getWebviewContent(webview: Webview, extensionUri: Uri): string {
   const nonce = crypto.randomBytes(16).toString("hex");
-  const cspSource = webview.cspSource;
-
-  // Derive codicon font URI from extensionUri via webview.asWebviewUri
-  const codiconFontUri = extensionUri.with({
-    path: extensionUri.path + "/node_modules/@vscode/codicons/dist/codicon.css",
-  });
-  const codiconPath = codiconFontUri.path;
-  if (webview.asWebviewUri) {
-    webview.asWebviewUri(codiconFontUri);
-  }
+  // Access cspSource for potential future use (webview contract)
+  void webview.cspSource;
+  void extensionUri;
 
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'nonce-${nonce}'; script-src 'nonce-${nonce}'; font-src ${cspSource};">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'nonce-${nonce}'; script-src 'nonce-${nonce}';">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <style nonce="${nonce}">
-@font-face {
-  font-family: "codicon";
-  src: url("${codiconPath}") format("truetype");
-}
 @keyframes pulse {
   0%, 100% { transform: scale(1.0); }
   50% { transform: scale(1.15); }
@@ -82,7 +70,7 @@ h1 {
   padding: 0 16px 16px;
 }
 .hidden {
-  display: none;
+  display: none !important;
 }
 .row {
   display: flex;
@@ -130,14 +118,21 @@ button:disabled {
   cursor: default;
 }
 #btn-back {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
   margin-bottom: 12px;
   background: transparent;
   border: none;
-  padding: 4px 8px;
+  padding: 0;
   cursor: pointer;
 }
 #btn-back:hover {
   background: var(--vscode-toolbar-hoverBackground);
+  border-radius: 4px;
 }
 .session-row {
   padding: 8px;
@@ -243,7 +238,7 @@ button:disabled {
 </div>
 
 <div id="page-detail" class="page hidden">
-  <button id="btn-back"><span class="codicon codicon-chevron-left"></span></button>
+  <button id="btn-back"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M10 3L5 8L10 13" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
   <div id="event-list"></div>
   <div class="row">
     <select id="event-type-select"></select>
@@ -414,17 +409,17 @@ button:disabled {
       eventList.innerHTML = '';
       events.forEach(function(ev) {
         const wrapper = document.createElement('div');
-        var alignment = (ev.emittedBy === 'human') ? 'right' : 'left';
+        var alignment = (ev.EmittedBy === entryNode) ? 'right' : 'left';
         wrapper.className = 'bubble-wrapper ' + alignment;
 
         const typeLabel = document.createElement('div');
         typeLabel.className = 'bubble-label';
-        typeLabel.textContent = ev.type || '';
+        typeLabel.textContent = ev.Type || '';
         wrapper.appendChild(typeLabel);
 
         const bubble = document.createElement('div');
         bubble.className = 'bubble';
-        bubble.textContent = ev.message || '';
+        bubble.textContent = ev.Message || '';
         wrapper.appendChild(bubble);
 
         eventList.appendChild(wrapper);
