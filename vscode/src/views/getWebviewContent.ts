@@ -61,12 +61,17 @@ export function getWebviewContent(webview: Webview, extensionUri: Uri): string {
   font-family: "codicon";
   src: url("${codiconPath}") format("truetype");
 }
+@keyframes pulse {
+  0%, 100% { transform: scale(1.0); }
+  50% { transform: scale(1.15); }
+}
 body {
   font-family: var(--vscode-font-family, sans-serif);
   padding: 0;
   margin: 0;
   color: var(--vscode-foreground, #ccc);
   background: var(--vscode-editor-background, #1e1e1e);
+  height: 100vh;
 }
 h1 {
   margin: 0;
@@ -85,7 +90,7 @@ h1 {
   align-items: center;
   margin-bottom: 12px;
 }
-select, input {
+select, input, textarea {
   padding: 4px 8px;
   background: var(--vscode-input-background, #3c3c3c);
   color: var(--vscode-input-foreground, #ccc);
@@ -98,6 +103,20 @@ select, input {
 #btn-run {
   flex-shrink: 0;
 }
+#event-type-select {
+  flex: 1;
+  min-width: 0;
+}
+#btn-send {
+  flex-shrink: 0;
+}
+#event-message-input {
+  resize: vertical;
+  width: 100%;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  white-space: pre-wrap;
+}
 button {
   padding: 4px 12px;
   cursor: pointer;
@@ -109,6 +128,16 @@ button:disabled {
   background: #555;
   color: #999;
   cursor: default;
+}
+#btn-back {
+  margin-bottom: 12px;
+  background: transparent;
+  border: none;
+  padding: 4px 8px;
+  cursor: pointer;
+}
+#btn-back:hover {
+  background: var(--vscode-toolbar-hoverBackground);
 }
 .session-row {
   padding: 8px;
@@ -129,13 +158,67 @@ button:disabled {
   opacity: 0.7;
   margin-top: 2px;
 }
-.event-entry {
-  padding: 4px 0;
-  font-size: 0.9em;
-  border-bottom: 1px solid var(--vscode-panel-border, #333);
+.stop-btn {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: rgba(var(--vscode-progressBar-background), 0.2);
+  border: none;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  animation: pulse 2s ease-in-out infinite;
+  flex-shrink: 0;
 }
-#btn-back {
-  margin-bottom: 12px;
+.stop-btn:hover {
+  opacity: 0.4;
+  animation-play-state: paused;
+}
+.stop-btn .stop-icon {
+  width: 8px;
+  height: 8px;
+  background: var(--vscode-progressBar-background);
+}
+#page-detail {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+#event-list {
+  flex: 1;
+  overflow-y: auto;
+}
+.bubble-wrapper {
+  margin-bottom: 8px;
+  max-width: 80%;
+}
+.bubble-wrapper.left {
+  margin-right: auto;
+}
+.bubble-wrapper.right {
+  margin-left: auto;
+}
+.bubble-label {
+  color: var(--vscode-descriptionForeground);
+  font-size: 11px;
+  margin-bottom: 2px;
+}
+.bubble {
+  border-radius: 12px;
+  padding: 8px 12px;
+  max-width: 80%;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  white-space: pre-wrap;
+  color: var(--vscode-editor-foreground);
+}
+.bubble-wrapper.left .bubble {
+  background: var(--vscode-editorWidget-background);
+}
+.bubble-wrapper.right .bubble {
+  background: var(--vscode-button-background);
 }
 .not-initialized-text {
   color: var(--vscode-descriptionForeground, #999);
@@ -160,13 +243,13 @@ button:disabled {
 </div>
 
 <div id="page-detail" class="page hidden">
-  <button id="btn-back">&larr; Back</button>
+  <button id="btn-back"><span class="codicon codicon-chevron-left"></span></button>
   <div id="event-list"></div>
   <div class="row">
     <select id="event-type-select"></select>
-    <input id="event-message-input" type="text" placeholder="Message">
     <button id="btn-send">Send</button>
   </div>
+  <textarea id="event-message-input" rows="3" placeholder="Message"></textarea>
 </div>
 
 <script nonce="${nonce}">
@@ -278,7 +361,10 @@ button:disabled {
           const stopBtn = document.createElement('button');
           stopBtn.className = 'stop-btn';
           const stopIcon = document.createElement('span');
-          stopIcon.className = 'codicon codicon-close';
+          stopIcon.className = 'stop-icon';
+          stopIcon.style.width = '8px';
+          stopIcon.style.height = '8px';
+          stopIcon.style.background = 'var(--vscode-progressBar-background)';
           stopBtn.appendChild(stopIcon);
           stopBtn.addEventListener('click', function(e) {
             e.stopPropagation();
@@ -327,11 +413,23 @@ button:disabled {
 
       eventList.innerHTML = '';
       events.forEach(function(ev) {
-        const entry = document.createElement('div');
-        entry.className = 'event-entry';
-        entry.textContent = '[' + (ev.type || '') + '] ' + (ev.emittedBy || '') + ': ' + (ev.message || '');
-        eventList.appendChild(entry);
+        const wrapper = document.createElement('div');
+        var alignment = (ev.emittedBy === 'human') ? 'right' : 'left';
+        wrapper.className = 'bubble-wrapper ' + alignment;
+
+        const typeLabel = document.createElement('div');
+        typeLabel.className = 'bubble-label';
+        typeLabel.textContent = ev.type || '';
+        wrapper.appendChild(typeLabel);
+
+        const bubble = document.createElement('div');
+        bubble.className = 'bubble';
+        bubble.textContent = ev.message || '';
+        wrapper.appendChild(bubble);
+
+        eventList.appendChild(wrapper);
       });
+      eventList.scrollTop = eventList.scrollHeight;
 
       if (!sendCooldown) {
         const guardMet = (currentState === entryNode && status === 'running');
