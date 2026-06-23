@@ -15,6 +15,7 @@ import * as crypto from "crypto";
  */
 interface Webview {
   cspSource: string;
+  asWebviewUri?: (uri: Uri) => { toString(): string };
 }
 
 /**
@@ -24,6 +25,7 @@ interface Uri {
   fsPath: string;
   scheme: string;
   path: string;
+  with(change: { path: string }): Uri;
 }
 
 /**
@@ -39,13 +41,26 @@ export function getWebviewContent(webview: Webview, extensionUri: Uri): string {
   const nonce = crypto.randomBytes(16).toString("hex");
   const cspSource = webview.cspSource;
 
+  // Derive codicon font URI from extensionUri via webview.asWebviewUri
+  const codiconFontUri = extensionUri.with({
+    path: extensionUri.path + "/node_modules/@vscode/codicons/dist/codicon.css",
+  });
+  const codiconPath = codiconFontUri.path;
+  if (webview.asWebviewUri) {
+    webview.asWebviewUri(codiconFontUri);
+  }
+
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'nonce-${nonce}'; script-src 'nonce-${nonce}';">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'nonce-${nonce}'; script-src 'nonce-${nonce}'; font-src ${cspSource};">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <style nonce="${nonce}">
+@font-face {
+  font-family: "codicon";
+  src: url("${codiconPath}") format("truetype");
+}
 body {
   font-family: var(--vscode-font-family, sans-serif);
   padding: 0;
@@ -75,6 +90,13 @@ select, input {
   background: var(--vscode-input-background, #3c3c3c);
   color: var(--vscode-input-foreground, #ccc);
   border: 1px solid var(--vscode-input-border, #555);
+}
+#workflow-select {
+  flex: 1;
+  min-width: 0;
+}
+#btn-run {
+  flex-shrink: 0;
 }
 button {
   padding: 4px 12px;
@@ -254,7 +276,10 @@ button:disabled {
 
         if (s.status === 'running') {
           const stopBtn = document.createElement('button');
-          stopBtn.textContent = 'Stop';
+          stopBtn.className = 'stop-btn';
+          const stopIcon = document.createElement('span');
+          stopIcon.className = 'codicon codicon-close';
+          stopBtn.appendChild(stopIcon);
           stopBtn.addEventListener('click', function(e) {
             e.stopPropagation();
             if (stopBtn.disabled) return;
