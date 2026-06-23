@@ -19,18 +19,35 @@ export interface StubWebview {
   cspSource: string;
   postMessage: sinon.SinonStub;
   onDidReceiveMessage: sinon.SinonStub;
+  asWebviewUri: sinon.SinonStub;
   html: string;
   options: any;
 }
 
 /**
+ * Default fake URI returned by asWebviewUri when no custom implementation is given.
+ */
+export const FAKE_CODICON_WEBVIEW_URI =
+  "https://file+.vscode-resource.vscode-cdn.net/test/extension/node_modules/@vscode/codicons/dist/codicon.css";
+
+/**
  * Creates a stub vscode.Webview with configurable cspSource.
+ * The `asWebviewUri` stub returns a predictable local URI by default.
  */
 export function createStubWebview(cspSource = "https://test.csp"): StubWebview {
+  const asWebviewUri = sinon.stub().callsFake((uri: any) => {
+    // Return a vscode-resource style URI based on the input path
+    const path = uri?.path || uri?.fsPath || "/unknown";
+    return {
+      toString: () => `https://file+.vscode-resource.vscode-cdn.net${path}`,
+    };
+  });
+
   return {
     cspSource,
     postMessage: sinon.stub().resolves(true),
     onDidReceiveMessage: sinon.stub(),
+    asWebviewUri,
     html: "",
     options: {},
   };
@@ -45,17 +62,36 @@ export interface StubUri {
   fsPath: string;
   scheme: string;
   path: string;
+  with: (change: { path: string }) => StubUri;
 }
 
 /**
  * Creates a stub vscode.Uri for the extension root.
+ * Supports the `with({ path })` method used by `Uri.joinPath` patterns.
  */
 export function createStubExtensionUri(fsPath = "/test/extension"): StubUri {
-  return {
+  const uri: StubUri = {
     fsPath,
     scheme: "file",
     path: fsPath,
+    with(change: { path: string }) {
+      return createStubExtensionUri(change.path);
+    },
   };
+  return uri;
+}
+
+/**
+ * Creates a stub vscode.Uri.joinPath implementation for tests that need
+ * to verify URI construction from extensionUri (e.g., codicon font path).
+ * Returns a new StubUri with the joined path segments appended.
+ */
+export function stubUriJoinPath(
+  base: StubUri,
+  ...pathSegments: string[]
+): StubUri {
+  const joined = base.path + "/" + pathSegments.join("/");
+  return createStubExtensionUri(joined);
 }
 
 // ─── Stub WebviewPanel ───────────────────────────────────────────────────────
@@ -199,6 +235,28 @@ export function extractNonceFromStyleTag(html: string): string | null {
 export function extractNonceFromScriptTag(html: string): string | null {
   const match = html.match(/<script\s+nonce="([^"]+)"/);
   return match ? match[1] : null;
+}
+
+/**
+ * Extracts the font-src directive value from a CSP meta tag in the HTML string.
+ * Returns null if no font-src is found.
+ */
+export function extractFontSrcFromCsp(html: string): string | null {
+  const match = html.match(/font-src\s+([^;"]+)/);
+  return match ? match[1].trim() : null;
+}
+
+/**
+ * Checks whether the HTML includes a codicon font reference (link or style).
+ * Returns the matched string segment or null.
+ */
+export function extractCodiconReference(html: string): string | null {
+  // Look for a <link> with codicon in href, or an @font-face referencing codicon
+  const linkMatch = html.match(/<link[^>]*codicon[^>]*>/i);
+  if (linkMatch) return linkMatch[0];
+  const fontFaceMatch = html.match(/@font-face[^}]*codicon[^}]*/i);
+  if (fontFaceMatch) return fontFaceMatch[0];
+  return null;
 }
 
 // ─── HTML Content Assertions ─────────────────────────────────────────────────

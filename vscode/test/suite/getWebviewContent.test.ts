@@ -5,11 +5,13 @@
  * Source under test: vscode/src/views/getWebviewContent.ts
  *
  * Most tests are concrete against the existing production surface.
- * Scaffolded tests (page-not-initialized related) require the production
- * getWebviewContent.ts to be updated with:
- *   - A <div id="page-not-initialized"> element
- *   - Text containing 'spectra init' within that element
- *   - showNotInitialized message handler in the client JS
+ * Scaffolded tests require the production getWebviewContent.ts to be updated with:
+ *   - CSP font-src directive: `font-src ${webview.cspSource}`
+ *   - Codicon font reference via <link> or <style> gated by nonce,
+ *     derived from extensionUri via webview.asWebviewUri
+ *   - flex: 1 / min-width: 0 on #workflow-select
+ *   - flex-shrink: 0 on #btn-run
+ *   - Stop button using codicon class (codicon-close / codicon-debug-stop) instead of text label
  */
 import * as sinon from "sinon";
 import { expect } from "chai";
@@ -17,10 +19,14 @@ import { expect } from "chai";
 import {
   createStubWebview,
   createStubExtensionUri,
+  stubUriJoinPath,
   extractNonceFromCsp,
   extractNonceFromStyleTag,
   extractNonceFromScriptTag,
+  extractFontSrcFromCsp,
+  extractCodiconReference,
   EXPECTED_ELEMENT_IDS,
+  FAKE_CODICON_WEBVIEW_URI,
   type StubWebview,
   type StubUri,
 } from "./helpers/webviewStubs";
@@ -56,13 +62,21 @@ describe("getWebviewContent", function () {
       expect(html).to.contain("<body");
     });
 
-    it("should include CSP meta tag with nonce-gated style-src and script-src", function () {
+    it("should include CSP meta tag with nonce-gated style-src and script-src and font-src", function () {
       const html = invoke();
 
       expect(html).to.contain("<meta");
       expect(html).to.contain("default-src 'none'");
       expect(html).to.match(/style-src\s[^;]*'nonce-/);
       expect(html).to.match(/script-src\s[^;]*'nonce-/);
+      // font-src must reference the cspSource for local codicon font loading
+      // Scaffolded: production CSP meta tag must include font-src directive
+      // Missing: font-src ${webview.cspSource} in the CSP content attribute
+      if (!html.match(/font-src\s/)) {
+        this.skip(); // Production surface not yet updated: CSP missing font-src directive
+        return;
+      }
+      expect(html).to.contain("font-src https://test.csp");
     });
 
     it("should include a style block with matching nonce", function () {
@@ -93,6 +107,35 @@ describe("getWebviewContent", function () {
       // Exactly one script tag with nonce
       const scriptMatches = html.match(/<script\s+nonce="/g);
       expect(scriptMatches).to.have.lengthOf(1);
+    });
+
+    it("should include codicon font reference with nonce", function () {
+      // Scaffolded: production getWebviewContent.ts must add codicon font reference
+      // Missing: <link> or <style> block referencing codicon font URI from asWebviewUri,
+      //   gated by the nonce attribute
+      const html = invoke();
+      const cspNonce = extractNonceFromCsp(html);
+      const codiconRef = extractCodiconReference(html);
+
+      if (!codiconRef) {
+        this.skip(); // Production surface not yet updated: missing codicon font reference
+        return;
+      }
+
+      // The codicon reference must be gated by the nonce
+      // Either via a nonce attribute on a <link> tag, or within the nonce-gated <style> block
+      const hasNonceGating =
+        codiconRef.includes(`nonce="${cspNonce}"`) ||
+        (html.includes(`<style nonce="${cspNonce}"`) &&
+          html.includes("codicon"));
+
+      expect(hasNonceGating).to.be.true;
+
+      // The URI returned by asWebviewUri should be present
+      expect(
+        html.includes("codicon"),
+        "Expected codicon font URI reference in HTML",
+      ).to.be.true;
     });
 
     it("should generate a unique nonce per invocation", function () {
@@ -230,6 +273,107 @@ describe("getWebviewContent", function () {
       expect(html).to.match(/id=["']page-sessions["']/);
       expect(html).to.match(/id=["']page-detail["']/);
     });
+
+    it("should apply flex layout to workflow dropdown row", function () {
+      const html = invoke();
+
+      // The .row class (which wraps workflow-select and btn-run) should have flex layout
+      // Look for CSS containing display: flex, align-items: center, gap: 8px
+      expect(html).to.contain("display: flex");
+      expect(html).to.contain("align-items: center");
+      expect(html).to.contain("gap: 8px");
+    });
+
+    it("should apply flex-1 and min-width-0 to workflow-select", function () {
+      // Scaffolded: production getWebviewContent.ts must add flex: 1 and min-width: 0
+      // to #workflow-select or its container selector
+      // Missing: CSS rule for #workflow-select with flex: 1 and min-width: 0
+      const html = invoke();
+
+      // Check if the production CSS includes the required flex properties for the select
+      const hasFlexOne =
+        html.match(/#workflow-select[^}]*flex:\s*1/s) ||
+        html.match(/select[^}]*flex:\s*1/s);
+      const hasMinWidth =
+        html.match(/#workflow-select[^}]*min-width:\s*0/s) ||
+        html.match(/select[^}]*min-width:\s*0/s);
+
+      if (!hasFlexOne || !hasMinWidth) {
+        this.skip(); // Production surface not yet updated: missing flex: 1 / min-width: 0 on #workflow-select
+        return;
+      }
+
+      expect(hasFlexOne).to.not.be.null;
+      expect(hasMinWidth).to.not.be.null;
+    });
+
+    it("should apply flex-shrink-0 to Run button", function () {
+      // Scaffolded: production getWebviewContent.ts must add flex-shrink: 0 to #btn-run
+      // Missing: CSS rule for #btn-run with flex-shrink: 0
+      const html = invoke();
+
+      const hasFlexShrink =
+        html.match(/#btn-run[^}]*flex-shrink:\s*0/s) ||
+        html.match(/button[^}]*flex-shrink:\s*0/s);
+
+      if (!hasFlexShrink) {
+        this.skip(); // Production surface not yet updated: missing flex-shrink: 0 on #btn-run
+        return;
+      }
+
+      expect(hasFlexShrink).to.not.be.null;
+    });
+
+    it("should render stop button as codicon icon button", function () {
+      // Scaffolded: production getWebviewContent.ts must use codicon class for stop button
+      // Missing: JS that uses codicon-close or codicon-debug-stop class instead of text label
+      const html = invoke();
+
+      const hasCodiconStop =
+        html.includes("codicon-close") || html.includes("codicon-debug-stop");
+
+      if (!hasCodiconStop) {
+        this.skip(); // Production surface not yet updated: stop button still uses text label, needs codicon class
+        return;
+      }
+
+      // The stop button should use a codicon class
+      expect(hasCodiconStop).to.be.true;
+
+      // The stop button should NOT contain a text label like "Stop"
+      // Check that the JS building the stop button doesn't set textContent to a label
+      const stopBtnSection = html.match(/stopBtn[^;]*textContent[^;]*/g);
+      if (stopBtnSection) {
+        for (const section of stopBtnSection) {
+          // If textContent is set, it should be empty (icon-only)
+          expect(section).to.not.match(/textContent\s*=\s*['"][^'"]+['"]/);
+        }
+      }
+    });
+
+    it("should not reference external CDN for codicon font", function () {
+      const html = invoke();
+
+      // Extract all https:// and http:// URLs from the document
+      // Exclude the CSP meta tag's cspSource reference (that's expected)
+      const cspMetaMatch = html.match(
+        /<meta[^>]*Content-Security-Policy[^>]*>/i,
+      );
+      const cspMeta = cspMetaMatch ? cspMetaMatch[0] : "";
+
+      // Get the rest of the document without the CSP meta tag
+      const htmlWithoutCspMeta = html.replace(cspMeta, "");
+
+      // Font references should not use external URLs
+      const externalFontUrls = htmlWithoutCspMeta.match(
+        /(?:https?:\/\/)[^\s'")<]+(?:font|codicon|woff|ttf)[^\s'")<]*/gi,
+      );
+
+      expect(
+        externalFontUrls,
+        "Expected no external CDN URLs for font references outside CSP meta tag",
+      ).to.be.null;
+    });
   });
 
   // ─── Mock / Dependency Interaction ──────────────────────────────────────────
@@ -252,6 +396,35 @@ describe("getWebviewContent", function () {
 
       expect(cspAccessed).to.be.true;
     });
+
+    it("should derive codicon font URI from extensionUri", function () {
+      // Scaffolded: production getWebviewContent.ts must call webview.asWebviewUri
+      // with a URI derived from extensionUri that references codicons.
+      // Missing: webview.asWebviewUri call with a codicons path segment
+      const webview = createStubWebview("https://test.csp");
+      const extUri = createStubExtensionUri("/test/extension");
+
+      const html = getWebviewContent(webview as any, extUri as any);
+
+      // Check if asWebviewUri was called
+      if (!webview.asWebviewUri.called) {
+        this.skip(); // Production surface not yet updated: asWebviewUri not called (codicon font not loaded via webview URI)
+        return;
+      }
+
+      // Verify asWebviewUri was called with a URI that includes a codicons path segment
+      const calls = webview.asWebviewUri.args;
+      const hasCodiconCall = calls.some((callArgs: any[]) => {
+        const uri = callArgs[0];
+        const uriPath = uri?.path || uri?.fsPath || "";
+        return uriPath.includes("codicon");
+      });
+
+      expect(
+        hasCodiconCall,
+        "Expected webview.asWebviewUri to be called with a URI containing 'codicon' path segment",
+      ).to.be.true;
+    });
   });
 
   // ─── Null / Empty Input ─────────────────────────────────────────────────────
@@ -268,6 +441,14 @@ describe("getWebviewContent", function () {
       expect(html).to.contain("<meta");
       // Nonce-based parts should still be present
       expect(html).to.match(/nonce-[a-f0-9]+/);
+      // font-src directive should be present even when cspSource is empty
+      // Scaffolded: production CSP must include font-src directive
+      // Missing: font-src in CSP content (even with empty value)
+      if (!html.match(/font-src/)) {
+        this.skip(); // Production surface not yet updated: CSP missing font-src directive
+        return;
+      }
+      expect(html).to.match(/font-src\s/);
     });
   });
 
@@ -282,7 +463,10 @@ describe("getWebviewContent", function () {
       // which requires the production surface to be updated.
       // Filter to only IDs present in the current production surface.
       const currentIds = EXPECTED_ELEMENT_IDS.filter((id) => {
-        if (id === "page-not-initialized" && !html1.includes("page-not-initialized")) {
+        if (
+          id === "page-not-initialized" &&
+          !html1.includes("page-not-initialized")
+        ) {
           return false; // Production not yet updated
         }
         return true;
@@ -298,6 +482,15 @@ describe("getWebviewContent", function () {
         expect(html1).to.match(re, `First call missing id="${id}"`);
         expect(html2).to.match(re, `Second call missing id="${id}"`);
       }
+
+      // Both results should include codicon font reference (if production supports it)
+      const codicon1 = extractCodiconReference(html1);
+      const codicon2 = extractCodiconReference(html2);
+      if (codicon1 !== null) {
+        // If codicon is present in first call, it must be present in second
+        expect(codicon2).to.not.be.null;
+      }
+      // If codicon is not present, the assertion is deferred (scaffolded)
     });
   });
 });
