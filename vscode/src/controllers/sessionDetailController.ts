@@ -202,19 +202,22 @@ export class SessionDetailController implements Disposable {
 
   /**
    * Sends an event via EventDispatcher.
+   * Returns true on success, false on failure or when disposed.
    */
-  async sendEvent(eventType: string, message: string): Promise<void> {
+  async sendEvent(eventType: string, message: string): Promise<boolean> {
     if (this._disposed) {
-      return;
+      return false;
     }
 
     try {
       await this._deps.dispatchEvent(eventType, this._currentSessionId!, message, this._projectRoot, this._logger);
+      return true;
     } catch (err: any) {
       if (!this._disposed) {
         this._logger.error(err.message);
         this._errorEmitter.fire(err);
       }
+      return false;
     }
   }
 

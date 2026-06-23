@@ -69,7 +69,7 @@ export interface ISessionDetailController extends IDisposable {
   onDidUpdate: (listener: (state: any) => void) => IDisposable;
   onDidError: (listener: (err: any) => void) => IDisposable;
   open(sessionId: string, workflowName: string): void;
-  sendEvent(eventType: string, message: string): void;
+  sendEvent(eventType: string, message: string): Promise<boolean>;
 }
 
 /**
@@ -89,6 +89,7 @@ export interface IViewProvider extends IDisposable {
   showSessionList(state: any): void;
   showSessionDetail(state: any): void;
   showNotInitialized(): void;
+  postSendResult(success: boolean): void;
   onDidReceiveMessage: (listener: (msg: any) => void) => IDisposable;
 }
 
@@ -275,10 +276,15 @@ export function activate(context: IExtensionContext, deps: ActivateDeps | Extens
   // Step 9: Initialize cached session list state
   let cachedSessionListState: any = null;
 
+  // Step 9a: Initialize activePage tracking
+  let activePage: "sessions" | "detail" = "sessions";
+
   // Step 10: Subscribe sessionListController.onDidUpdate
   const listUpdateSub = sessionListController.onDidUpdate((state: any) => {
     cachedSessionListState = state;
-    viewProvider.showSessionList(state);
+    if (activePage === "sessions") {
+      viewProvider.showSessionList(state);
+    }
   });
 
   // Step 11: Subscribe sessionDetailController.onDidUpdate
@@ -300,9 +306,11 @@ export function activate(context: IExtensionContext, deps: ActivateDeps | Extens
   const messageSub = viewProvider.onDidReceiveMessage((msg: any) => {
     switch (msg.command) {
       case "navigateToDetail":
+        activePage = "detail";
         sessionDetailController.open(msg.sessionId, msg.workflowName);
         break;
       case "navigateToList":
+        activePage = "sessions";
         if (cachedSessionListState !== null) {
           viewProvider.showSessionList(cachedSessionListState);
         }
@@ -314,7 +322,9 @@ export function activate(context: IExtensionContext, deps: ActivateDeps | Extens
         sessionListController.terminate(msg.pid);
         break;
       case "sendEvent":
-        sessionDetailController.sendEvent(msg.eventType, msg.message);
+        sessionDetailController.sendEvent(msg.eventType, msg.message).then((result: boolean) => {
+          viewProvider.postSendResult(result);
+        });
         break;
       default:
         logger.warn(`Unrecognized webview command: ${msg.command}`);

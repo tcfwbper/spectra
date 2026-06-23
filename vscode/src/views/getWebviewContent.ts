@@ -91,6 +91,9 @@ select, input, textarea {
 #btn-run {
   flex-shrink: 0;
 }
+#detail-controls {
+  padding-right: 8px;
+}
 #event-type-select {
   flex: 1;
   min-width: 0;
@@ -240,11 +243,13 @@ button:disabled {
 <div id="page-detail" class="page hidden">
   <button id="btn-back"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M10 3L5 8L10 13" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
   <div id="event-list"></div>
-  <div class="row">
-    <select id="event-type-select"></select>
-    <button id="btn-send">Send</button>
+  <div id="detail-controls">
+    <div class="row">
+      <select id="event-type-select"></select>
+      <button id="btn-send">Send</button>
+    </div>
+    <textarea id="event-message-input" rows="3" placeholder="Message"></textarea>
   </div>
-  <textarea id="event-message-input" rows="3" placeholder="Message"></textarea>
 </div>
 
 <script nonce="${nonce}">
@@ -429,6 +434,12 @@ button:disabled {
       if (!sendCooldown) {
         const guardMet = (currentState === entryNode && status === 'running');
         btnSend.disabled = !guardMet;
+      }
+    }
+
+    if (msg.type === 'sendResult') {
+      if (msg.success === true) {
+        eventMessageInput.value = '';
       }
     }
   });

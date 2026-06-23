@@ -290,6 +290,18 @@ export class SpectraViewProvider implements Disposable {
   }
 
   /**
+   * Posts the send result to the webview.
+   * Ephemeral — does not store as pendingMessage when view is null.
+   */
+  postSendResult(success: boolean): void {
+    const message = { type: "sendResult", success };
+    if (this._view === null) {
+      return;
+    }
+    this._view.webview.postMessage(message);
+  }
+
+  /**
    * Disposes the SpectraViewProvider.
    */
   dispose(): void {
