@@ -1,7 +1,7 @@
 {
   "name": "spectra-vscode",
   "displayName": "Spectra",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "description": "Spectra VS Code Extension",
   "license": "Apache-2.0",
   "publisher": "tsung-han-chang",
