@@ -87,6 +87,7 @@ The detail page uses a full-height flex column layout (`display: flex; flex-dire
    - The container auto-scrolls to the bottom when new events arrive (on each `showDetail` re-render).
 
 10. Below the event history (pinned to bottom): a vertical stack (id: `detail-controls`) containing the event controls.
+    - The container has `margin-top: 8px;` to provide visual separation between the last message bubble and the input controls.
     - The container has `padding-right: 8px;` to provide consistent right-side spacing that aligns its content's right edge with the rest of the sidebar content.
     - First row: a flex row (`display: flex; align-items: center; gap: 8px;`) containing:
       - An event-type `<select>` dropdown (id: `event-type-select`) using `flex: 1; min-width: 0;` (fills remaining horizontal space, shrinks gracefully).
@@ -170,6 +171,7 @@ The detail page uses a full-height flex column layout (`display: flex; flex-dire
 - Event history bubbles must apply `word-wrap: break-word; white-space: pre-wrap; overflow-wrap: break-word;` to ensure long unbroken strings wrap and line breaks are preserved.
 - The stop button pulse animation must use CSS `@keyframes` (not JavaScript timers) for performance and battery efficiency.
 - The textarea must only be cleared upon receiving a `sendResult` message with `success: true` — never on button click alone.
+- The `detail-controls` container must apply `margin-top: 8px` to visually separate the message bubbles from the input controls.
 - The `detail-controls` container must apply `padding-right: 8px` so the textarea's right edge aligns with the Send button's right edge.
 
 ## Edge Cases
