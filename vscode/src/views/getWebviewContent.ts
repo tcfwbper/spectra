@@ -92,6 +92,7 @@ select, input, textarea {
   flex-shrink: 0;
 }
 #detail-controls {
+  margin-top: 8px;
   padding-right: 8px;
 }
 #event-type-select {
