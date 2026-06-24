@@ -16,6 +16,7 @@ const (
 	testUUID2         = "660e8400-e29b-41d4-a716-446655440000"
 	testWorkflow      = "my-workflow"
 	testEntryNode     = "start"
+	testPid           = 42
 	testCreatedAt     = int64(1700000000)
 	testSessionID     = testUUID
 	testEventID       = "770e8400-e29b-41d4-a716-446655440000"
@@ -32,7 +33,7 @@ const (
 // newTestSession constructs a valid session for testing using default test constants.
 func newTestSession(t *testing.T) *Session {
 	t.Helper()
-	s, err := NewSession(testUUID, testWorkflow, testEntryNode, testCreatedAt)
+	s, err := NewSession(testUUID, testWorkflow, testEntryNode, testPid, testCreatedAt)
 	if err != nil {
 		t.Fatalf("newTestSession: unexpected error: %v", err)
 	}

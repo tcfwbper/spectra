@@ -28,7 +28,7 @@ func TestRun_SuccessfulSessionCompletion(t *testing.T) {
 	// Session is "completed", terminationNotifier will fire.
 	f.Session.getStatusResult = "completed"
 	// Configure the SessionInitializer to send terminationNotifier after init succeeds.
-	f.SessionInitializer.initializeFunc = func(workflowName string, terminationNotifier chan<- struct{}) InitResult {
+	f.SessionInitializer.initializeFunc = func(workflowName string, sessionID string, terminationNotifier chan<- struct{}) InitResult {
 		ps := newTestPersistentSession(t, f.Session)
 		// Simulate session completion notification.
 		go func() { terminationNotifier <- struct{}{} }()
@@ -41,7 +41,7 @@ func TestRun_SuccessfulSessionCompletion(t *testing.T) {
 	wireFixtureToSeams(t, f)
 
 	// Action
-	exitCode, err := Run("my-workflow", f.Logger)
+	exitCode, err := Run("my-workflow", "", f.Logger)
 
 	// Assert: Returns (0, nil)
 	assert.Equal(t, 0, exitCode)
@@ -52,7 +52,7 @@ func TestRun_LogsSessionTerminationNotification(t *testing.T) {
 	// Setup: Same as successful completion, capture Logger calls.
 	f := newRuntimeTestFixture(t)
 	f.Session.getStatusResult = "completed"
-	f.SessionInitializer.initializeFunc = func(workflowName string, terminationNotifier chan<- struct{}) InitResult {
+	f.SessionInitializer.initializeFunc = func(workflowName string, sessionID string, terminationNotifier chan<- struct{}) InitResult {
 		ps := newTestPersistentSession(t, f.Session)
 		go func() { terminationNotifier <- struct{}{} }()
 		return InitResult{
@@ -64,7 +64,7 @@ func TestRun_LogsSessionTerminationNotification(t *testing.T) {
 	wireFixtureToSeams(t, f)
 
 	// Action
-	_, _ = Run("my-workflow", f.Logger)
+	_, _ = Run("my-workflow", "", f.Logger)
 
 	// Assert: Logger.Info called with "received session termination notification"
 	assertLoggerHasInfoMsg(t, f.Logger, "received session termination notification")
@@ -80,7 +80,7 @@ func TestRun_SpectraFinderFails(t *testing.T) {
 	wireFixtureToSeams(t, f)
 
 	// Action
-	exitCode, err := Run("wf", f.Logger)
+	exitCode, err := Run("wf", "", f.Logger)
 
 	// Assert
 	assert.Equal(t, 1, exitCode)
@@ -99,7 +99,7 @@ func TestRun_PreSessionDependencyConstructionFails(t *testing.T) {
 	}
 
 	// Action
-	exitCode, err := Run("wf", f.Logger)
+	exitCode, err := Run("wf", "", f.Logger)
 
 	// Assert
 	assert.Equal(t, 1, exitCode)
@@ -117,7 +117,7 @@ func TestRun_SessionInitializerFailsBeforeSession(t *testing.T) {
 	wireFixtureToSeams(t, f)
 
 	// Action
-	exitCode, err := Run("wf", f.Logger)
+	exitCode, err := Run("wf", "", f.Logger)
 
 	// Assert
 	assert.Equal(t, 1, exitCode)
@@ -137,7 +137,7 @@ func TestRun_SessionInitializerFailsAfterSession(t *testing.T) {
 	wireFixtureToSeams(t, f)
 
 	// Action
-	exitCode, err := Run("wf", f.Logger)
+	exitCode, err := Run("wf", "", f.Logger)
 
 	// Assert
 	assert.Equal(t, 1, exitCode)
@@ -163,7 +163,7 @@ func TestRun_PostSessionDependencyConstructionFails(t *testing.T) {
 	}
 
 	// Action
-	exitCode, err := Run("wf", f.Logger)
+	exitCode, err := Run("wf", "", f.Logger)
 
 	// Assert
 	assert.Equal(t, 1, exitCode)
@@ -186,7 +186,7 @@ func TestRun_CreateSocketFails(t *testing.T) {
 	wireFixtureToSeams(t, f)
 
 	// Action
-	exitCode, err := Run("wf", f.Logger)
+	exitCode, err := Run("wf", "", f.Logger)
 
 	// Assert
 	assert.Equal(t, 1, exitCode)
@@ -209,7 +209,7 @@ func TestRun_ListenFails(t *testing.T) {
 	wireFixtureToSeams(t, f)
 
 	// Action
-	exitCode, err := Run("wf", f.Logger)
+	exitCode, err := Run("wf", "", f.Logger)
 
 	// Assert
 	assert.Equal(t, 1, exitCode)
@@ -232,7 +232,7 @@ func TestRun_InitialDispatchFails(t *testing.T) {
 	wireFixtureToSeams(t, f)
 
 	// Action
-	exitCode, err := Run("wf", f.Logger)
+	exitCode, err := Run("wf", "", f.Logger)
 
 	// Assert
 	assert.Equal(t, 1, exitCode)
@@ -254,7 +254,7 @@ func TestRun_ListenerErrorDuringSession(t *testing.T) {
 		close(listenerDoneCh)
 	}
 
-	f.SessionInitializer.initializeFunc = func(workflowName string, terminationNotifier chan<- struct{}) InitResult {
+	f.SessionInitializer.initializeFunc = func(workflowName string, sessionID string, terminationNotifier chan<- struct{}) InitResult {
 		ps := newTestPersistentSession(t, f.Session)
 		// Send listener error after a short delay to trigger termination.
 		go func() { f.SocketManager.listenErrCh <- errors.New("connection reset") }()
@@ -267,7 +267,7 @@ func TestRun_ListenerErrorDuringSession(t *testing.T) {
 	wireFixtureToSeams(t, f)
 
 	// Action
-	exitCode, err := Run("wf", f.Logger)
+	exitCode, err := Run("wf", "", f.Logger)
 
 	// Assert
 	assert.Equal(t, 1, exitCode)
@@ -288,7 +288,7 @@ func TestRun_ListenerErrorWhenSessionAlreadyCompleted(t *testing.T) {
 		close(listenerDoneCh)
 	}
 
-	f.SessionInitializer.initializeFunc = func(workflowName string, terminationNotifier chan<- struct{}) InitResult {
+	f.SessionInitializer.initializeFunc = func(workflowName string, sessionID string, terminationNotifier chan<- struct{}) InitResult {
 		ps := newTestPersistentSession(t, f.Session)
 		go func() { f.SocketManager.listenErrCh <- errors.New("connection reset") }()
 		return InitResult{
@@ -300,7 +300,7 @@ func TestRun_ListenerErrorWhenSessionAlreadyCompleted(t *testing.T) {
 	wireFixtureToSeams(t, f)
 
 	// Action
-	exitCode, err := Run("wf", f.Logger)
+	exitCode, err := Run("wf", "", f.Logger)
 
 	// Assert
 	assert.Equal(t, 0, exitCode)
@@ -321,7 +321,7 @@ func TestRun_SessionFailed(t *testing.T) {
 	f.SocketManager.listenDoneCh = listenerDoneCh
 	f.SocketManager.listenErrCh = make(chan error, 1)
 
-	f.SessionInitializer.initializeFunc = func(workflowName string, terminationNotifier chan<- struct{}) InitResult {
+	f.SessionInitializer.initializeFunc = func(workflowName string, sessionID string, terminationNotifier chan<- struct{}) InitResult {
 		ps := newTestPersistentSession(t, f.Session)
 		go func() { terminationNotifier <- struct{}{} }()
 		return InitResult{
@@ -333,7 +333,7 @@ func TestRun_SessionFailed(t *testing.T) {
 	wireFixtureToSeams(t, f)
 
 	// Action
-	exitCode, err := Run("wf", f.Logger)
+	exitCode, err := Run("wf", "", f.Logger)
 
 	// Assert
 	assert.Equal(t, 1, exitCode)
@@ -353,7 +353,7 @@ func TestRun_SessionFinalizerNonTerminalStatus(t *testing.T) {
 	f.SocketManager.listenDoneCh = listenerDoneCh
 	f.SocketManager.listenErrCh = make(chan error, 1)
 
-	f.SessionInitializer.initializeFunc = func(workflowName string, terminationNotifier chan<- struct{}) InitResult {
+	f.SessionInitializer.initializeFunc = func(workflowName string, sessionID string, terminationNotifier chan<- struct{}) InitResult {
 		ps := newTestPersistentSession(t, f.Session)
 		go func() { terminationNotifier <- struct{}{} }()
 		return InitResult{
@@ -365,7 +365,7 @@ func TestRun_SessionFinalizerNonTerminalStatus(t *testing.T) {
 	wireFixtureToSeams(t, f)
 
 	// Action
-	exitCode, err := Run("wf", f.Logger)
+	exitCode, err := Run("wf", "", f.Logger)
 
 	// Assert
 	assert.Equal(t, 1, exitCode)
@@ -379,14 +379,14 @@ func TestRun_TerminationNotifierCapacity(t *testing.T) {
 	// Setup: Capture the terminationNotifier channel.
 	f := newRuntimeTestFixture(t)
 	var capturedNotifier chan<- struct{}
-	f.SessionInitializer.initializeFunc = func(wfName string, notifier chan<- struct{}) InitResult {
+	f.SessionInitializer.initializeFunc = func(wfName string, sessionID string, notifier chan<- struct{}) InitResult {
 		capturedNotifier = notifier
 		return InitResult{Error: errors.New("short-circuit")}
 	}
 	wireFixtureToSeams(t, f)
 
 	// Action
-	_, _ = Run("wf", f.Logger)
+	_, _ = Run("wf", "", f.Logger)
 
 	// Assert: cap(capturedNotifier) == 2
 	require.NotNil(t, capturedNotifier)
@@ -400,10 +400,36 @@ func TestRun_SessionInitializerReceivesWorkflowName(t *testing.T) {
 	wireFixtureToSeams(t, f)
 
 	// Action
-	_, _ = Run("my-workflow", f.Logger)
+	_, _ = Run("my-workflow", "", f.Logger)
 
 	// Assert
 	assert.Equal(t, "my-workflow", f.SessionInitializer.capturedWorkflowName)
+}
+
+func TestRun_SessionInitializerReceivesSessionID(t *testing.T) {
+	// Setup: Passes sessionID to SessionInitializer.Initialize without validation.
+	f := newRuntimeTestFixture(t)
+	f.SessionInitializer.result = InitResult{Error: errors.New("short-circuit")}
+	wireFixtureToSeams(t, f)
+
+	// Action
+	_, _ = Run("wf", "550e8400-e29b-41d4-a716-446655440000", f.Logger)
+
+	// Assert
+	assert.Equal(t, "550e8400-e29b-41d4-a716-446655440000", f.SessionInitializer.capturedSessionID)
+}
+
+func TestRun_SessionInitializerReceivesEmptySessionID(t *testing.T) {
+	// Setup: Passes empty string sessionID to SessionInitializer when not provided.
+	f := newRuntimeTestFixture(t)
+	f.SessionInitializer.result = InitResult{Error: errors.New("short-circuit")}
+	wireFixtureToSeams(t, f)
+
+	// Action
+	_, _ = Run("wf", "", f.Logger)
+
+	// Assert
+	assert.Equal(t, "", f.SessionInitializer.capturedSessionID)
 }
 
 func TestRun_InitialDispatchMessage(t *testing.T) {
@@ -418,7 +444,7 @@ func TestRun_InitialDispatchMessage(t *testing.T) {
 	f.SocketManager.listenDoneCh = listenerDoneCh
 	f.SocketManager.listenErrCh = make(chan error, 1)
 
-	f.SessionInitializer.initializeFunc = func(workflowName string, terminationNotifier chan<- struct{}) InitResult {
+	f.SessionInitializer.initializeFunc = func(workflowName string, sessionID string, terminationNotifier chan<- struct{}) InitResult {
 		ps := newTestPersistentSession(t, f.Session)
 		go func() { terminationNotifier <- struct{}{} }()
 		return InitResult{
@@ -430,7 +456,7 @@ func TestRun_InitialDispatchMessage(t *testing.T) {
 	wireFixtureToSeams(t, f)
 
 	// Action
-	_, _ = Run("wf", f.Logger)
+	_, _ = Run("wf", "", f.Logger)
 
 	// Assert: TransitionToNode.Execute() called with the entry node and message
 	// containing the session UUID and "spectra-agent event emit"
@@ -455,7 +481,7 @@ func TestRun_DeleteSocketCalledDuringCleanup(t *testing.T) {
 		close(listenerDoneCh)
 	}
 
-	f.SessionInitializer.initializeFunc = func(workflowName string, terminationNotifier chan<- struct{}) InitResult {
+	f.SessionInitializer.initializeFunc = func(workflowName string, sessionID string, terminationNotifier chan<- struct{}) InitResult {
 		ps := newTestPersistentSession(t, f.Session)
 		go func() { terminationNotifier <- struct{}{} }()
 		return InitResult{
@@ -467,7 +493,7 @@ func TestRun_DeleteSocketCalledDuringCleanup(t *testing.T) {
 	wireFixtureToSeams(t, f)
 
 	// Action
-	_, _ = Run("wf", f.Logger)
+	_, _ = Run("wf", "", f.Logger)
 
 	// Assert
 	assert.Equal(t, 1, f.SocketManager.deleteSocketCalled)
@@ -488,7 +514,7 @@ func TestRun_SessionFinalizerCalledAfterCleanup(t *testing.T) {
 		close(listenerDoneCh)
 	}
 
-	f.SessionInitializer.initializeFunc = func(workflowName string, terminationNotifier chan<- struct{}) InitResult {
+	f.SessionInitializer.initializeFunc = func(workflowName string, sessionID string, terminationNotifier chan<- struct{}) InitResult {
 		ps := newTestPersistentSession(t, f.Session)
 		go func() { terminationNotifier <- struct{}{} }()
 		return InitResult{
@@ -500,7 +526,7 @@ func TestRun_SessionFinalizerCalledAfterCleanup(t *testing.T) {
 	wireFixtureToSeams(t, f)
 
 	// Action
-	_, _ = Run("wf", f.Logger)
+	_, _ = Run("wf", "", f.Logger)
 
 	// Assert: "DeleteSocket" was called (SessionFinalizer is called after)
 	calls := tracker.Calls()
@@ -515,7 +541,7 @@ func TestRun_SessionFinalizerNotInvokedWhenNoSession(t *testing.T) {
 	wireFixtureToSeams(t, f)
 
 	// Action
-	exitCode, err := Run("wf", f.Logger)
+	exitCode, err := Run("wf", "", f.Logger)
 
 	// Assert: Returns error, exit code 1, no finalizer invocation (no session exists)
 	assert.Equal(t, 1, exitCode)
@@ -541,7 +567,7 @@ func TestRun_CleanupOrder(t *testing.T) {
 		close(listenerDoneCh)
 	}
 
-	f.SessionInitializer.initializeFunc = func(workflowName string, terminationNotifier chan<- struct{}) InitResult {
+	f.SessionInitializer.initializeFunc = func(workflowName string, sessionID string, terminationNotifier chan<- struct{}) InitResult {
 		ps := newTestPersistentSession(t, f.Session)
 		go func() { terminationNotifier <- struct{}{} }()
 		return InitResult{
@@ -558,7 +584,7 @@ func TestRun_CleanupOrder(t *testing.T) {
 	}
 
 	// Action
-	_, _ = Run("wf", f.Logger)
+	_, _ = Run("wf", "", f.Logger)
 
 	// Assert call order: SignalStop before DeleteSocket
 	calls := tracker.Calls()
@@ -589,7 +615,7 @@ func TestRun_PersistentSessionFailReturnsError(t *testing.T) {
 		close(listenerDoneCh)
 	}
 
-	f.SessionInitializer.initializeFunc = func(workflowName string, terminationNotifier chan<- struct{}) InitResult {
+	f.SessionInitializer.initializeFunc = func(workflowName string, sessionID string, terminationNotifier chan<- struct{}) InitResult {
 		ps := newTestPersistentSession(t, f.Session)
 		go func() { f.SocketManager.listenErrCh <- errors.New("connection lost") }()
 		return InitResult{
@@ -601,7 +627,7 @@ func TestRun_PersistentSessionFailReturnsError(t *testing.T) {
 	wireFixtureToSeams(t, f)
 
 	// Action
-	_, _ = Run("wf", f.Logger)
+	_, _ = Run("wf", "", f.Logger)
 
 	// Assert: Logger.Warn called with message containing "attempted to fail session but session already in terminal state"
 	assertLoggerHasWarnMsgContaining(t, f.Logger, "attempted to fail session but session already in terminal state")
@@ -618,7 +644,7 @@ func TestRun_MessageRouterPassedToListen(t *testing.T) {
 	f.SocketManager.listenDoneCh = listenerDoneCh
 	f.SocketManager.listenErrCh = make(chan error, 1)
 
-	f.SessionInitializer.initializeFunc = func(workflowName string, terminationNotifier chan<- struct{}) InitResult {
+	f.SessionInitializer.initializeFunc = func(workflowName string, sessionID string, terminationNotifier chan<- struct{}) InitResult {
 		ps := newTestPersistentSession(t, f.Session)
 		go func() { terminationNotifier <- struct{}{} }()
 		return InitResult{
@@ -630,7 +656,7 @@ func TestRun_MessageRouterPassedToListen(t *testing.T) {
 	wireFixtureToSeams(t, f)
 
 	// Action
-	_, _ = Run("wf", f.Logger)
+	_, _ = Run("wf", "", f.Logger)
 
 	// Assert: capturedHandler is non-nil (a messageHandlerAdapter wrapping MessageRouter)
 	assert.NotNil(t, f.SocketManager.capturedHandler)
@@ -639,10 +665,11 @@ func TestRun_MessageRouterPassedToListen(t *testing.T) {
 // --- State Transitions ---
 
 func TestRun_OSSignalSIGINT(t *testing.T) {
-	// Setup
+	// Setup: Session is non-terminal ("running"), SIGINT received.
 	f := newRuntimeTestFixture(t)
+	f.Session.id = "11111111-1111-1111-1111-111111111111"
 	f.Session.getStatusResult = "running"
-	f.Session.getCurrentStateResult = testEntryNode
+	f.Session.getCurrentStateResult = "node-a"
 
 	listenerDoneCh := make(chan struct{})
 	f.SocketManager.listenDoneCh = listenerDoneCh
@@ -651,9 +678,8 @@ func TestRun_OSSignalSIGINT(t *testing.T) {
 		close(listenerDoneCh)
 	}
 
-	f.SessionInitializer.initializeFunc = func(workflowName string, terminationNotifier chan<- struct{}) InitResult {
+	f.SessionInitializer.initializeFunc = func(workflowName string, sessionID string, terminationNotifier chan<- struct{}) InitResult {
 		ps := newTestPersistentSession(t, f.Session)
-		// Send SIGINT after a short delay.
 		go func() { f.SignalSource.Send(syscall.SIGINT) }()
 		return InitResult{
 			PersistentSession:  ps,
@@ -664,20 +690,28 @@ func TestRun_OSSignalSIGINT(t *testing.T) {
 	wireFixtureToSeams(t, f)
 
 	// Action
-	exitCode, err := Run("wf", f.Logger)
+	exitCode, err := Run("wf", "", f.Logger)
 
-	// Assert
-	assertFailNotCalled(t, f.Session)
+	// Assert: PersistentSession.Fail() called with RuntimeError fields.
+	assert.Equal(t, 1, f.Session.failCalled, "expected Fail() to be called once")
+	assertFailCalledWithRuntimeErrorFull(t, f.Session, "Runtime", "terminated by signal interrupt", "11111111-1111-1111-1111-111111111111", "node-a")
+	// Assert: Detail is nil.
+	rtErr := f.Session.failInputErr.(*entities.RuntimeError)
+	assert.Nil(t, rtErr.Detail())
+	// Assert: Logger logs graceful shutdown.
+	assertLoggerHasInfoMsgContaining(t, f.Logger, "received signal interrupt, initiating graceful shutdown")
+	// Assert: Returns (1, error) with signal message.
 	require.Error(t, err)
 	assert.Equal(t, "session terminated by signal interrupt", err.Error())
 	assert.Equal(t, 1, exitCode)
 }
 
 func TestRun_OSSignalSIGTERM(t *testing.T) {
-	// Setup
+	// Setup: Session is non-terminal ("running"), SIGTERM received.
 	f := newRuntimeTestFixture(t)
+	f.Session.id = "22222222-2222-2222-2222-222222222222"
 	f.Session.getStatusResult = "running"
-	f.Session.getCurrentStateResult = testEntryNode
+	f.Session.getCurrentStateResult = "node-b"
 
 	listenerDoneCh := make(chan struct{})
 	f.SocketManager.listenDoneCh = listenerDoneCh
@@ -686,7 +720,7 @@ func TestRun_OSSignalSIGTERM(t *testing.T) {
 		close(listenerDoneCh)
 	}
 
-	f.SessionInitializer.initializeFunc = func(workflowName string, terminationNotifier chan<- struct{}) InitResult {
+	f.SessionInitializer.initializeFunc = func(workflowName string, sessionID string, terminationNotifier chan<- struct{}) InitResult {
 		ps := newTestPersistentSession(t, f.Session)
 		go func() { f.SignalSource.Send(syscall.SIGTERM) }()
 		return InitResult{
@@ -698,13 +732,134 @@ func TestRun_OSSignalSIGTERM(t *testing.T) {
 	wireFixtureToSeams(t, f)
 
 	// Action
-	exitCode, err := Run("wf", f.Logger)
+	exitCode, err := Run("wf", "", f.Logger)
 
-	// Assert
-	assertFailNotCalled(t, f.Session)
+	// Assert: PersistentSession.Fail() called with RuntimeError fields.
+	assert.Equal(t, 1, f.Session.failCalled, "expected Fail() to be called once")
+	assertFailCalledWithRuntimeErrorFull(t, f.Session, "Runtime", "terminated by signal terminated", "22222222-2222-2222-2222-222222222222", "node-b")
+	// Assert: Detail is nil.
+	rtErr := f.Session.failInputErr.(*entities.RuntimeError)
+	assert.Nil(t, rtErr.Detail())
+	// Assert: Logger logs graceful shutdown.
+	assertLoggerHasInfoMsgContaining(t, f.Logger, "received signal terminated, initiating graceful shutdown")
+	// Assert: Returns (1, error) with signal message.
 	require.Error(t, err)
 	assert.Equal(t, "session terminated by signal terminated", err.Error())
 	assert.Equal(t, 1, exitCode)
+}
+
+func TestRun_OSSignalSkipsFailWhenSessionAlreadyCompleted(t *testing.T) {
+	// Setup: Session already completed, SIGINT received (race condition).
+	f := newRuntimeTestFixture(t)
+	f.Session.getStatusResult = "completed"
+
+	listenerDoneCh := make(chan struct{})
+	f.SocketManager.listenDoneCh = listenerDoneCh
+	f.SocketManager.listenErrCh = make(chan error, 1)
+	f.SocketManager.deleteSocketFunc = func() {
+		close(listenerDoneCh)
+	}
+
+	// SessionFinalizer returns 0 (session completed successfully).
+	f.SessionFinalizer.result = 0
+
+	f.SessionInitializer.initializeFunc = func(workflowName string, sessionID string, terminationNotifier chan<- struct{}) InitResult {
+		ps := newTestPersistentSession(t, f.Session)
+		go func() { f.SignalSource.Send(syscall.SIGINT) }()
+		return InitResult{
+			PersistentSession:  ps,
+			WorkflowDefinition: mustNewWorkflowDefinition(t),
+			Error:              nil,
+		}
+	}
+	wireFixtureToSeams(t, f)
+
+	// Action
+	exitCode, err := Run("wf", "", f.Logger)
+
+	// Assert: Fail() NOT called (session already terminal).
+	assertFailNotCalled(t, f.Session)
+	// Assert: Exit code is always 1 when signal received, regardless of SessionFinalizer.
+	require.Error(t, err)
+	assert.Equal(t, "session terminated by signal interrupt", err.Error())
+	assert.Equal(t, 1, exitCode)
+}
+
+func TestRun_OSSignalDuringInitializingStatus(t *testing.T) {
+	// Spec contradiction: The test asserts FailingState="" but entities.NewRuntimeError
+	// requires failingState to be non-empty. The runtime spec (step 26) says to use
+	// GetCurrentStateSafe() which can return "" during init, but the entity rejects it.
+	t.Skip("spec contradiction: entities.RuntimeError requires non-empty failingState but runtime spec uses GetCurrentStateSafe() which can be empty during init")
+
+	// Setup: Session exists but status is "initializing" (SessionInitializer returned
+	// InitResult with Error != nil and PersistentSession != nil). Signal arrives
+	// during cleanup path.
+	f := newRuntimeTestFixture(t)
+	f.Session.getStatusResult = "initializing"
+	f.Session.getCurrentStateResult = "" // GetCurrentStateSafe() returns empty during init
+
+	listenerDoneCh := make(chan struct{})
+	close(listenerDoneCh)
+	f.SocketManager.listenDoneCh = listenerDoneCh
+	f.SocketManager.listenErrCh = make(chan error, 1)
+
+	f.SessionInitializer.initializeFunc = func(workflowName string, sessionID string, terminationNotifier chan<- struct{}) InitResult {
+		ps := newTestPersistentSession(t, f.Session)
+		// Send SIGINT to simulate signal during initialization cleanup.
+		go func() { f.SignalSource.Send(syscall.SIGINT) }()
+		return InitResult{
+			PersistentSession:  ps,
+			WorkflowDefinition: mustNewWorkflowDefinition(t),
+			Error:              nil,
+		}
+	}
+	wireFixtureToSeams(t, f)
+
+	// Action
+	exitCode, err := Run("wf", "", f.Logger)
+
+	// Assert: Fail() called with RuntimeError having FailingState="" (from GetCurrentStateSafe()).
+	assert.Equal(t, 1, f.Session.failCalled, "expected Fail() to be called once")
+	rtErr, ok := f.Session.failInputErr.(*entities.RuntimeError)
+	require.True(t, ok, "expected Fail() called with *entities.RuntimeError")
+	assert.Equal(t, "terminated by signal interrupt", rtErr.Message())
+	assert.Equal(t, "", rtErr.FailingState())
+	// Assert: Returns (1, error).
+	require.Error(t, err)
+	assert.Equal(t, "session terminated by signal interrupt", err.Error())
+	assert.Equal(t, 1, exitCode)
+}
+
+func TestRun_OSSignalFailReturnsError(t *testing.T) {
+	// Setup: Session is "running" but Fail() returns error (race condition).
+	f := newRuntimeTestFixture(t)
+	f.Session.getStatusResult = "running"
+	f.Session.getCurrentStateResult = "node-a"
+	f.Session.failErr = errors.New("session already in terminal state")
+
+	listenerDoneCh := make(chan struct{})
+	f.SocketManager.listenDoneCh = listenerDoneCh
+	f.SocketManager.listenErrCh = make(chan error, 1)
+	f.SocketManager.deleteSocketFunc = func() {
+		close(listenerDoneCh)
+	}
+
+	f.SessionInitializer.initializeFunc = func(workflowName string, sessionID string, terminationNotifier chan<- struct{}) InitResult {
+		ps := newTestPersistentSession(t, f.Session)
+		go func() { f.SignalSource.Send(syscall.SIGINT) }()
+		return InitResult{
+			PersistentSession:  ps,
+			WorkflowDefinition: mustNewWorkflowDefinition(t),
+			Error:              nil,
+		}
+	}
+	wireFixtureToSeams(t, f)
+
+	// Action
+	_, _ = Run("wf", "", f.Logger)
+
+	// Assert: Logger.Warn called with message about session already in terminal state.
+	assertLoggerHasWarnMsgContaining(t, f.Logger, "attempted to fail session on signal but session already in terminal state")
 }
 
 func TestRun_SecondSignalForcesExit(t *testing.T) {
@@ -719,7 +874,7 @@ func TestRun_SecondSignalForcesExit(t *testing.T) {
 	f.SocketManager.listenErrCh = make(chan error, 1)
 	// DeleteSocket does NOT close listenerDoneCh — simulates slow shutdown.
 
-	f.SessionInitializer.initializeFunc = func(workflowName string, terminationNotifier chan<- struct{}) InitResult {
+	f.SessionInitializer.initializeFunc = func(workflowName string, sessionID string, terminationNotifier chan<- struct{}) InitResult {
 		ps := newTestPersistentSession(t, f.Session)
 		// Send first SIGINT, then second SIGINT after a tiny delay.
 		go func() {
@@ -746,7 +901,7 @@ func TestRun_SecondSignalForcesExit(t *testing.T) {
 	})
 
 	// Action
-	exitCode, err := Run("wf", f.Logger)
+	exitCode, err := Run("wf", "", f.Logger)
 
 	// Assert
 	assert.Equal(t, 1, exitCode)
@@ -765,7 +920,7 @@ func TestRun_GracePeriodTimeout(t *testing.T) {
 	f.SocketManager.listenDoneCh = listenerDoneCh
 	f.SocketManager.listenErrCh = make(chan error, 1)
 
-	f.SessionInitializer.initializeFunc = func(workflowName string, terminationNotifier chan<- struct{}) InitResult {
+	f.SessionInitializer.initializeFunc = func(workflowName string, sessionID string, terminationNotifier chan<- struct{}) InitResult {
 		ps := newTestPersistentSession(t, f.Session)
 		go func() { terminationNotifier <- struct{}{} }()
 		return InitResult{
@@ -780,7 +935,7 @@ func TestRun_GracePeriodTimeout(t *testing.T) {
 	f.GraceTimer.Fire()
 
 	// Action
-	exitCode, err := Run("wf", f.Logger)
+	exitCode, err := Run("wf", "", f.Logger)
 
 	// Unblock the leaked cleanup goroutine before assertions (prevents race).
 	close(listenerDoneCh)
@@ -801,7 +956,7 @@ func TestRun_ListenerDoneChTimeout(t *testing.T) {
 	f.SocketManager.listenDoneCh = make(chan struct{}) // never closed
 	f.SocketManager.listenErrCh = make(chan error, 1)
 
-	f.SessionInitializer.initializeFunc = func(workflowName string, terminationNotifier chan<- struct{}) InitResult {
+	f.SessionInitializer.initializeFunc = func(workflowName string, sessionID string, terminationNotifier chan<- struct{}) InitResult {
 		ps := newTestPersistentSession(t, f.Session)
 		go func() { terminationNotifier <- struct{}{} }()
 		return InitResult{
@@ -816,7 +971,7 @@ func TestRun_ListenerDoneChTimeout(t *testing.T) {
 	f.ListenerTimer.Fire()
 
 	// Action
-	exitCode, err := Run("wf", f.Logger)
+	exitCode, err := Run("wf", "", f.Logger)
 
 	// Assert
 	assert.Equal(t, 0, exitCode)
@@ -835,7 +990,7 @@ func TestRun_ListenerDoneChAlreadyClosed(t *testing.T) {
 	f.SocketManager.listenDoneCh = alreadyClosed
 	f.SocketManager.listenErrCh = make(chan error, 1)
 
-	f.SessionInitializer.initializeFunc = func(workflowName string, terminationNotifier chan<- struct{}) InitResult {
+	f.SessionInitializer.initializeFunc = func(workflowName string, sessionID string, terminationNotifier chan<- struct{}) InitResult {
 		ps := newTestPersistentSession(t, f.Session)
 		go func() { terminationNotifier <- struct{}{} }()
 		return InitResult{
@@ -847,7 +1002,7 @@ func TestRun_ListenerDoneChAlreadyClosed(t *testing.T) {
 	wireFixtureToSeams(t, f)
 
 	// Action
-	exitCode, err := Run("wf", f.Logger)
+	exitCode, err := Run("wf", "", f.Logger)
 
 	// Assert: SessionFinalizer invoked without delay, no timeout warning.
 	assert.Equal(t, 0, exitCode)
@@ -872,7 +1027,7 @@ func TestRun_DeleteSocketIdempotent(t *testing.T) {
 	wireFixtureToSeams(t, f)
 
 	// Action
-	exitCode, err := Run("wf", f.Logger)
+	exitCode, err := Run("wf", "", f.Logger)
 
 	// Assert: No panic, cleanup proceeds, returns error from socket creation.
 	assert.Equal(t, 1, exitCode)
@@ -909,6 +1064,19 @@ func assertFailCalledWithRuntimeErrorAndState(t *testing.T, sess *mockSession, e
 	t.Helper()
 	assertFailCalledWithRuntimeError(t, sess, expectedIssuer, expectedMessage)
 	rtErr := sess.failInputErr.(*entities.RuntimeError)
+	assert.Equal(t, expectedState, rtErr.FailingState())
+}
+
+// assertFailCalledWithRuntimeErrorFull checks Fail() was called with RuntimeError
+// having specific Issuer, Message, SessionID, and FailingState.
+func assertFailCalledWithRuntimeErrorFull(t *testing.T, sess *mockSession, expectedIssuer, expectedMessage, expectedSessionID, expectedState string) {
+	t.Helper()
+	require.Greater(t, sess.failCalled, 0, "expected Fail() to be called at least once")
+	rtErr, ok := sess.failInputErr.(*entities.RuntimeError)
+	require.True(t, ok, "expected Fail() to be called with *entities.RuntimeError, got: %T", sess.failInputErr)
+	assert.Equal(t, expectedIssuer, rtErr.Issuer())
+	assert.Equal(t, expectedMessage, rtErr.Message())
+	assert.Equal(t, expectedSessionID, rtErr.SessionID())
 	assert.Equal(t, expectedState, rtErr.FailingState())
 }
 

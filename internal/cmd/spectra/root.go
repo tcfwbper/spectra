@@ -15,7 +15,7 @@ import (
 )
 
 // version is the current version of the spectra CLI.
-const version = "1.0.0"
+const version = "1.1.0"
 
 // NewRootCommand creates and returns the root cobra.Command for the spectra CLI.
 // It registers global flags (--version) and all subcommands (init, run, clear).
@@ -166,6 +166,8 @@ func newInitCobraCommand() *cobra.Command {
 func newRunCobraCommand() *cobra.Command {
 	var workflow string
 
+	var sessionID string
+
 	cmd := &cobra.Command{
 		Use:   "run",
 		Short: "Run a Spectra workflow",
@@ -176,6 +178,7 @@ func newRunCobraCommand() *cobra.Command {
 				Runtime:          &productionRuntime{},
 				Workflow:         workflow,
 				WorkflowProvided: workflowProvided,
+				SessionID:        sessionID,
 				Args:             args,
 				Stdout:           cmd.OutOrStdout(),
 				Stderr:           cmd.ErrOrStderr(),
@@ -188,6 +191,7 @@ func newRunCobraCommand() *cobra.Command {
 		},
 	}
 	cmd.Flags().StringVar(&workflow, "workflow", "", "Name of the workflow to execute")
+	cmd.Flags().StringVar(&sessionID, "session-id", "", "User-specified session UUID")
 	return cmd
 }
 
@@ -252,8 +256,8 @@ func newStubSubcommand(name string, exitCode int) *cobra.Command {
 // productionRuntime is the production adapter that delegates to the runtime package.
 type productionRuntime struct{}
 
-func (p *productionRuntime) Run(workflowName string, log logger.Logger) (int, error) {
-	return runtimex.Run(workflowName, log)
+func (p *productionRuntime) Run(workflowName string, sessionID string, log logger.Logger) (int, error) {
+	return runtimex.Run(workflowName, sessionID, log)
 }
 
 // productionStorageLayout is the production adapter for StorageLayoutInterface used by BuiltinResourceCopier.

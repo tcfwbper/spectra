@@ -3,6 +3,8 @@ package runtime
 import (
 	"context"
 	"fmt"
+	"os"
+	"regexp"
 	"time"
 
 	"github.com/tcfwbper/spectra/components"
@@ -11,6 +13,14 @@ import (
 	"github.com/tcfwbper/spectra/logger"
 	"github.com/tcfwbper/spectra/storage"
 )
+
+// uuidRegex validates UUID format (same validation as entities/session.NewSession).
+var uuidRegex = regexp.MustCompile(`^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$`)
+
+// isValidUUID checks if a string matches UUID format.
+func isValidUUID(s string) bool {
+	return uuidRegex.MatchString(s)
+}
 
 // WorkflowLoader defines the interface for loading workflow definitions.
 type WorkflowLoader interface {
@@ -31,7 +41,7 @@ type InitResult struct {
 
 // SessionFactory defines the interface for constructing a Session entity.
 // In production this calls entitysession.NewSession; tests can replace it.
-type SessionFactory func(id, workflowName, entryNode string, createdAt int64) (Session, error)
+type SessionFactory func(id, workflowName, entryNode string, pid int, createdAt int64) (Session, error)
 
 // ContextFactory creates a context and cancel function for the initialization flow.
 // In production this returns context.WithTimeout(context.Background(), 30*time.Second).
@@ -45,6 +55,7 @@ type SessionInitializer struct {
 	logger         logger.Logger
 	uuidGen        UUIDGenerator
 	nowFunc        func() int64
+	pidFunc        func() int
 	sessionFactory SessionFactory
 	contextFactory ContextFactory
 }
@@ -58,8 +69,9 @@ func NewSessionInitializer(projectRoot string, loader WorkflowLoader, dirMgr Ses
 		logger:      log,
 		uuidGen:     &defaultUUIDGenerator{},
 		nowFunc:     func() int64 { return time.Now().Unix() },
-		sessionFactory: func(id, workflowName, entryNode string, createdAt int64) (Session, error) {
-			sess, err := entitysession.NewSession(id, workflowName, entryNode, createdAt)
+		pidFunc:     os.Getpid,
+		sessionFactory: func(id, workflowName, entryNode string, pid int, createdAt int64) (Session, error) {
+			sess, err := entitysession.NewSession(id, workflowName, entryNode, pid, createdAt)
 			if err != nil {
 				return nil, err
 			}
@@ -72,9 +84,10 @@ func NewSessionInitializer(projectRoot string, loader WorkflowLoader, dirMgr Ses
 }
 
 // Initialize performs the session initialization sequence:
-// validates termination notifier, generates UUID, loads workflow,
-// creates directory, constructs session, and transitions to running.
-func (si *SessionInitializer) Initialize(workflowName string, terminationNotifier chan<- struct{}) InitResult {
+// validates termination notifier, determines session UUID (validates user-provided
+// or generates new), loads workflow, creates directory, constructs session,
+// and transitions to running.
+func (si *SessionInitializer) Initialize(workflowName string, sessionID string, terminationNotifier chan<- struct{}) InitResult {
 	// Step 2: Validate terminationNotifier capacity >= 2.
 	chanCap := cap(terminationNotifier)
 	if chanCap < 2 {
@@ -87,16 +100,32 @@ func (si *SessionInitializer) Initialize(workflowName string, terminationNotifie
 	ctx, cancel := si.contextFactory()
 	defer cancel()
 
-	// Step 4: Generate session UUID.
-	sessionUUID, err := si.uuidGen.Generate()
-	if err != nil {
-		return InitResult{
-			Error: fmt.Errorf("failed to generate session UUID: %v", err),
+	// Step 4: Determine session UUID.
+	var sessionUUID string
+	var source string
+	if sessionID == "" {
+		// Generate a new UUID v4.
+		var err error
+		sessionUUID, err = si.uuidGen.Generate()
+		if err != nil {
+			return InitResult{
+				Error: fmt.Errorf("failed to generate session UUID: %v", err),
+			}
 		}
+		source = "generated"
+	} else {
+		// Validate user-provided session ID using the same UUID regex as NewSession.
+		if !isValidUUID(sessionID) {
+			return InitResult{
+				Error: fmt.Errorf("invalid session ID: must be a valid UUID"),
+			}
+		}
+		sessionUUID = sessionID
+		source = "user"
 	}
 
-	// Step 5: Log session UUID immediately.
-	si.logger.Info("session created", "sessionID", sessionUUID)
+	// Step 5: Log session UUID immediately with source.
+	si.logger.Info("session created", "sessionID", sessionUUID, "source", source)
 
 	// Step 6: Check context.
 	if ctx.Err() != nil {
@@ -123,7 +152,7 @@ func (si *SessionInitializer) Initialize(workflowName string, terminationNotifie
 	// Step 10: Create session directory.
 	if err := si.dirMgr.CreateSessionDirectory(si.projectRoot, sessionUUID); err != nil {
 		return InitResult{
-			Error: fmt.Errorf("failed to create session directory: %s", err.Error()),
+			Error: fmt.Errorf("failed to create session directory: %w", err),
 		}
 	}
 
@@ -136,7 +165,8 @@ func (si *SessionInitializer) Initialize(workflowName string, terminationNotifie
 
 	// Step 13: Construct Session entity.
 	now := si.nowFunc()
-	sess, err := si.sessionFactory(sessionUUID, workflowName, wfDef.EntryNode(), now)
+	pid := si.pidFunc()
+	sess, err := si.sessionFactory(sessionUUID, workflowName, wfDef.EntryNode(), pid, now)
 	if err != nil {
 		return InitResult{
 			Error: fmt.Errorf("failed to construct session: %s", err.Error()),

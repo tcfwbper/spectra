@@ -23,7 +23,7 @@ type Session struct {
 }
 
 // NewSession validates all inputs and returns an initialized Session.
-func NewSession(id string, workflowName string, entryNode string, createdAt int64) (*Session, error) {
+func NewSession(id string, workflowName string, entryNode string, pid int, createdAt int64) (*Session, error) {
 	if !uuidRegex.MatchString(id) {
 		return nil, fmt.Errorf("invalid session ID: must be a valid UUID")
 	}
@@ -36,6 +36,10 @@ func NewSession(id string, workflowName string, entryNode string, createdAt int6
 		return nil, fmt.Errorf("entry node cannot be empty")
 	}
 
+	if pid <= 0 {
+		return nil, fmt.Errorf("pid must be a positive integer")
+	}
+
 	if createdAt <= 0 {
 		return nil, fmt.Errorf("createdAt must be a positive POSIX timestamp")
 	}
@@ -44,6 +48,7 @@ func NewSession(id string, workflowName string, entryNode string, createdAt int6
 		SessionMetadata: SessionMetadata{
 			ID:           id,
 			WorkflowName: workflowName,
+			Pid:          pid,
 			Status:       "initializing",
 			CreatedAt:    createdAt,
 			UpdatedAt:    createdAt,

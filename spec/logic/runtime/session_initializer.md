@@ -2,13 +2,14 @@
 
 ## Overview
 
-SessionInitializer orchestrates the initialization flow for creating a new session. It receives a workflow name and a termination notifier channel, then performs the following sequence: generates a session UUID, logs the UUID for user visibility, loads the workflow definition, creates the session directory, constructs the Session entity, constructs per-session stores (SessionMetadataStore, EventStore), constructs a PersistentSession wrapper, and transitions the session to status="running" via PersistentSession.Run(). All persistence is handled automatically by PersistentSession — SessionInitializer does not perform manual store writes. The entire flow is governed by a context.Context with a 30-second timeout.
+SessionInitializer orchestrates the initialization flow for creating a new session. It receives a workflow name, an optional session ID, and a termination notifier channel, then performs the following sequence: determines the session UUID (validates and uses the provided one, or generates a new UUID v4 if not provided), logs the UUID with its source for user visibility, loads the workflow definition, creates the session directory, constructs the Session entity, constructs per-session stores (SessionMetadataStore, EventStore), constructs a PersistentSession wrapper, and transitions the session to status="running" via PersistentSession.Run(). All persistence is handled automatically by PersistentSession — SessionInitializer does not perform manual store writes. The entire flow is governed by a context.Context with a 30-second timeout.
 
 SessionInitializer does not create the runtime socket (socket lifecycle is owned by Runtime). SessionInitializer does not clean up partial resources on failure; the session directory and files remain on disk for inspection.
 
 ## Boundaries
 
-- Owns: session UUID generation and logging.
+- Owns: session UUID determination — either validates a user-provided UUID or generates a new UUID v4.
+- Owns: session UUID logging (with source indicator: "user" or "generated").
 - Owns: orchestration of initialization steps in sequence (load workflow → create directory → construct session → construct stores → construct PersistentSession → transition).
 - Owns: context.Context timeout enforcement (30 seconds).
 - Owns: RuntimeError construction and PersistentSession.Fail invocation when PersistentSession.Run() fails or timeout is exceeded after PersistentSession construction.
@@ -45,11 +46,13 @@ Construction constraint: SessionInitializer is constructed with `projectRoot`, `
 
 ## Behavior
 
-1. SessionInitializer is invoked by Runtime with inputs: `workflowName` (string) and `terminationNotifier` (chan<- struct{}).
+1. SessionInitializer is invoked by Runtime with inputs: `workflowName` (string), `sessionID` (string, may be empty), and `terminationNotifier` (chan<- struct{}).
 2. Validates that `terminationNotifier` has a buffer capacity of at least 2. If the capacity is less than 2, returns an error immediately: `"terminationNotifier channel must have buffer capacity >= 2, got <actual-capacity>"`.
 3. Creates a context.Context with a 30-second timeout: `ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)`. Defers `cancel()`.
-4. Generates a new session UUID (UUID v4).
-5. Logs the session UUID via `Logger.Info("session created", "sessionID", sessionUUID)`.
+4. Determines the session UUID:
+   - If `sessionID` is empty: generates a new UUID v4 and sets `source = "generated"`.
+   - If `sessionID` is non-empty: validates that it is a valid UUID format (same validation as NewSession uses for the `id` parameter). If invalid, returns an error immediately: `"invalid session ID: must be a valid UUID"`. If valid, uses the provided value and sets `source = "user"`.
+5. Logs the session UUID via `Logger.Info("session created", "sessionID", sessionUUID, "source", source)`.
 6. Checks `ctx.Err()`. If context is cancelled, returns a timeout error (see Timeout Handling).
 7. Calls `WorkflowDefinitionLoader.Load(workflowName)` to load the workflow definition.
 8. If the workflow definition fails to load, returns an error: `"failed to load workflow definition: <error>"`. No session entity is returned.
@@ -57,7 +60,7 @@ Construction constraint: SessionInitializer is constructed with `projectRoot`, `
 10. Calls `SessionDirectoryManager.CreateSessionDirectory(projectRoot, sessionUUID)` to create the session directory.
 11. If directory creation fails, returns an error: `"failed to create session directory: <error>"`. No session entity is returned.
 12. Checks `ctx.Err()`. If context is cancelled, returns a timeout error.
-13. Constructs a Session entity via `NewSession(sessionUUID, workflowName, workflowDefinition.EntryNode(), now())`.
+13. Constructs a Session entity via `NewSession(sessionUUID, workflowName, workflowDefinition.EntryNode(), os.Getpid(), now())`. The PID is obtained from the OS at this point — it is the process ID of the running `spectra run` process.
 14. If Session construction fails, returns an error: `"failed to construct session: <error>"`. No session entity is returned.
 15. Constructs `SessionMetadataStore` via `NewSessionMetadataStore(projectRoot, sessionUUID)`.
 16. Constructs `EventStore` via `NewEventStore(projectRoot, sessionUUID, logger)`.
@@ -93,6 +96,7 @@ Construction constraint: SessionInitializer is constructed with `projectRoot`, `
 | Field | Type | Constraints | Required |
 |-------|------|-------------|----------|
 | WorkflowName | string | Non-empty, must reference a valid workflow definition file | Yes |
+| SessionID | string | Valid UUID format if non-empty; empty string means auto-generate | No |
 | TerminationNotifier | chan<- struct{} | Buffered channel with capacity >= 2 | Yes |
 
 ## Outputs
@@ -110,6 +114,7 @@ Construction constraint: SessionInitializer is constructed with `projectRoot`, `
 | Error Message Format | PersistentSession in InitResult? | Description |
 |---------------------|------------------------|-------------|
 | `"terminationNotifier channel must have buffer capacity >= 2, got <N>"` | No | Channel validation failed |
+| `"invalid session ID: must be a valid UUID"` | No | User-provided session ID has invalid UUID format |
 | `"session initialization timed out"` | Depends on timing | Timeout before PersistentSession construction → No. After → Yes (Status="failed"). |
 | `"failed to load workflow definition: <error>"` | No | WorkflowDefinitionLoader failed |
 | `"failed to create session directory: <error>"` | No | SessionDirectoryManager failed |
@@ -132,7 +137,7 @@ Construction constraint: SessionInitializer is constructed with `projectRoot`, `
 
 7. **Persistence Delegated to PersistentSession**: SessionInitializer does not call SessionMetadataStore.Write() or EventStore.Append() directly. All persistence is automatic via PersistentSession. Persistence failures are non-fatal (logged by PersistentSession).
 
-8. **Session UUID Logged Immediately**: The session UUID is logged via Logger.Info immediately after generation, before any I/O that could fail.
+8. **Session UUID Logged Immediately**: The session UUID is logged via Logger.Info immediately after generation or validation, before any I/O that could fail. The log includes a `"source"` field indicating `"user"` or `"generated"`.
 
 9. **InitResult Completeness**: On success, InitResult contains a non-nil PersistentSession (Status="running") and WorkflowDefinition. On failure, fields are populated up to the point of failure.
 
@@ -144,6 +149,18 @@ Construction constraint: SessionInitializer is constructed with `projectRoot`, `
 
 ## Edge Cases
 
+- **Condition**: User-provided `sessionID` is not a valid UUID format (e.g., `"not-a-uuid"`, `"12345"`, `"abc"`).
+  **Expected**: Returns error `"invalid session ID: must be a valid UUID"`. No session directory or resources created. No PersistentSession in InitResult.
+
+- **Condition**: User-provided `sessionID` is a valid UUID format.
+  **Expected**: Uses the provided UUID as the session ID. Logs with `"source", "user"`. Proceeds with initialization.
+
+- **Condition**: User-provided `sessionID` is a valid UUID but a session directory with that UUID already exists.
+  **Expected**: SessionDirectoryManager returns `ErrSessionDirExists`. SessionInitializer returns error `"failed to create session directory: <error>"` (wrapping ErrSessionDirExists). No PersistentSession in InitResult.
+
+- **Condition**: `sessionID` is empty string (not provided by user).
+  **Expected**: Generates a new UUID v4. Logs with `"source", "generated"`. Proceeds with initialization (existing behavior).
+
 - **Condition**: WorkflowDefinitionLoader fails (file not found, parse error, validation error).
   **Expected**: Returns error `"failed to load workflow definition: <error>"`. No session directory or resources created. No PersistentSession in InitResult.
 
@@ -153,7 +170,7 @@ Construction constraint: SessionInitializer is constructed with `projectRoot`, `
 - **Condition**: SessionDirectoryManager fails because session directory already exists (UUID collision).
   **Expected**: Returns error `"failed to create session directory: <error>"` (wrapping ErrSessionDirExists).
 
-- **Condition**: NewSession constructor fails (invalid UUID format from UUID library — extremely unlikely).
+- **Condition**: NewSession constructor fails (invalid entryNode or createdAt — extremely unlikely since inputs are validated upstream).
   **Expected**: Returns error `"failed to construct session: <error>"`. No PersistentSession in InitResult.
 
 - **Condition**: PersistentSession.Run() fails because status is not "initializing" (concurrent Fail from timeout).

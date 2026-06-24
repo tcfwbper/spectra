@@ -14,6 +14,7 @@ func TestSessionMetadata_AccessViaSession(t *testing.T) {
 
 	assert.Equal(t, testUUID, s.ID)
 	assert.Equal(t, testWorkflow, s.WorkflowName)
+	assert.Equal(t, testPid, s.Pid)
 	assert.Equal(t, "initializing", s.Status)
 	assert.Equal(t, testCreatedAt, s.CreatedAt)
 	assert.Equal(t, testCreatedAt, s.UpdatedAt)

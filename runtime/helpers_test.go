@@ -296,3 +296,41 @@ func assertLogHasMessage(t *testing.T, calls []logCall, expectedMsg string) {
 	}
 	t.Errorf("expected log call with msg=%q, got calls: %+v", expectedMsg, calls)
 }
+
+// assertSessionCreatedLogWithSource checks that the "session created" log includes
+// the given "source" key-value pair.
+func assertSessionCreatedLogWithSource(t *testing.T, calls []logCall, expectedSource string) {
+	t.Helper()
+	for _, call := range calls {
+		if call.msg == "session created" {
+			for i := 0; i+1 < len(call.args); i += 2 {
+				if call.args[i] == "source" {
+					src, ok := call.args[i+1].(string)
+					if ok && src == expectedSource {
+						return
+					}
+				}
+			}
+		}
+	}
+	t.Errorf("expected Logger.Info 'session created' with source=%q, got calls: %+v", expectedSource, calls)
+}
+
+// assertSessionCreatedLogWithSessionID checks that the "session created" log
+// includes the given "sessionID" key-value pair with an exact match.
+func assertSessionCreatedLogWithSessionID(t *testing.T, calls []logCall, expectedID string) {
+	t.Helper()
+	for _, call := range calls {
+		if call.msg == "session created" {
+			for i := 0; i+1 < len(call.args); i += 2 {
+				if call.args[i] == "sessionID" {
+					sid, ok := call.args[i+1].(string)
+					if ok && sid == expectedID {
+						return
+					}
+				}
+			}
+		}
+	}
+	t.Errorf("expected Logger.Info 'session created' with sessionID=%q, got calls: %+v", expectedID, calls)
+}

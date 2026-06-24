@@ -123,6 +123,33 @@ spectra-agent event emit <EventType> \
   --claude-session-id <ClaudeSessionUUID>
 ```
 
+# VS Code Extension
+
+The `vscode/` directory contains a VS Code extension that provides a graphical interface for Spectra workflows. It adds a sidebar panel where you can:
+
+- Browse and launch workflow sessions
+- View session details and event history
+- Emit events into running sessions
+
+## Installation
+
+```bash
+cd vscode
+npm install
+npm run compile
+npm run package
+```
+
+Then install the generated `.vsix` file via `code --install-extension spectra-vscode-*.vsix`.
+
+## Configuration
+
+| Setting | Description |
+|---------|-------------|
+| `spectra.binaryPath` | Path to the `spectra` binary (defaults to PATH lookup) |
+| `spectra.agentBinaryPath` | Path to the `spectra-agent` binary (defaults to PATH lookup) |
+| `spectra.projectRoot` | Project root directory (defaults to the workspace folder) |
+
 # Contribution
 
 This project prefers a spec-first contribution workflow.

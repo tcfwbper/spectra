@@ -21,13 +21,14 @@ func runRun(t *testing.T, rt *fakeRuntime, args []string) runResult {
 	stdout := &bytes.Buffer{}
 	stderr := &bytes.Buffer{}
 
-	// Parse args to extract --workflow flag and positional args
-	workflow, workflowProvided, positionalArgs := parseRunArgs(args)
+	// Parse args to extract --workflow flag, --session-id flag, and positional args
+	workflow, workflowProvided, sessionID, positionalArgs := parseRunArgs(args)
 
 	code := RunRunCommand(RunCommandOptions{
 		Runtime:          rt,
 		Workflow:         workflow,
 		WorkflowProvided: workflowProvided,
+		SessionID:        sessionID,
 		Args:             positionalArgs,
 		Stdout:           stdout,
 		Stderr:           stderr,
@@ -40,11 +41,13 @@ func runRun(t *testing.T, rt *fakeRuntime, args []string) runResult {
 	}
 }
 
-// parseRunArgs parses command-line args to extract --workflow value and positional args.
-// Returns (workflow, workflowProvided, positionalArgs).
-func parseRunArgs(args []string) (string, bool, []string) {
+// parseRunArgs parses command-line args to extract --workflow value,
+// --session-id value, and positional args.
+// Returns (workflow, workflowProvided, sessionID, positionalArgs).
+func parseRunArgs(args []string) (string, bool, string, []string) {
 	var workflow string
 	var workflowProvided bool
+	var sessionID string
 	var positionalArgs []string
 
 	for i := 0; i < len(args); i++ {
@@ -54,10 +57,15 @@ func parseRunArgs(args []string) (string, bool, []string) {
 				workflow = args[i+1]
 				i++ // skip next arg (the value)
 			}
+		} else if args[i] == "--session-id" {
+			if i+1 < len(args) {
+				sessionID = args[i+1]
+				i++ // skip next arg (the value)
+			}
 		} else {
 			positionalArgs = append(positionalArgs, args[i])
 		}
 	}
 
-	return workflow, workflowProvided, positionalArgs
+	return workflow, workflowProvided, sessionID, positionalArgs
 }

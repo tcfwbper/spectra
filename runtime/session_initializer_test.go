@@ -3,6 +3,7 @@ package runtime
 import (
 	"context"
 	"errors"
+	"os"
 	"sync"
 	"testing"
 
@@ -11,6 +12,7 @@ import (
 
 	"github.com/tcfwbper/spectra/components"
 	"github.com/tcfwbper/spectra/entities"
+	"github.com/tcfwbper/spectra/storage"
 )
 
 // =============================================================================
@@ -21,7 +23,7 @@ import (
 //   - type SessionInitializer struct { ... }
 //   - func NewSessionInitializer(projectRoot string, loader WorkflowLoader,
 //       dirMgr SessionDirManager, logger logger.Logger) *SessionInitializer
-//   - func (si *SessionInitializer) Initialize(workflowName string,
+//   - func (si *SessionInitializer) Initialize(workflowName string, sessionID string,
 //       terminationNotifier chan<- struct{}) InitResult
 //   - type InitResult struct {
 //       PersistentSession *PersistentSession
@@ -35,12 +37,13 @@ import (
 //
 // The SessionInitializer orchestrates session creation:
 //   1. Validate terminationNotifier capacity >= 2
-//   2. Generate UUID, log it
-//   3. Load workflow definition
-//   4. Create session directory
-//   5. Construct Session, stores, PersistentSession
-//   6. Call PersistentSession.Run()
-//   7. Return InitResult
+//   2. Determine session UUID (validate user-provided or generate new)
+//   3. Log session UUID with source ("user" or "generated")
+//   4. Load workflow definition
+//   5. Create session directory
+//   6. Construct Session, stores, PersistentSession
+//   7. Call PersistentSession.Run()
+//   8. Return InitResult
 // =============================================================================
 
 // --- Mock: WorkflowLoader ---
@@ -147,25 +150,7 @@ func mustNewWorkflowDefinition(t *testing.T) *components.WorkflowDefinition {
 }
 
 // --- Assertion Helpers: UUID validation ---
-
-// isValidUUID checks if a string matches UUID v4 format.
-func isValidUUID(s string) bool {
-	if len(s) != 36 {
-		return false
-	}
-	for i, c := range s {
-		if i == 8 || i == 13 || i == 18 || i == 23 {
-			if c != '-' {
-				return false
-			}
-			continue
-		}
-		if !((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F')) {
-			return false
-		}
-	}
-	return true
-}
+// isValidUUID is now defined in session_initializer.go (production code).
 
 // =============================================================================
 // Happy Path — Construction
@@ -190,7 +175,7 @@ func TestSessionInitializer_Initialize_TerminationNotifierCapacityOne(t *testing
 
 	// Act
 	si := NewSessionInitializer(f.projectRoot, f.loader, f.dirMgr, f.logger)
-	result := si.Initialize("workflow", make(chan struct{}, 1))
+	result := si.Initialize("workflow", "", make(chan struct{}, 1))
 
 	// Assert
 	require.Error(t, result.Error)
@@ -202,7 +187,7 @@ func TestSessionInitializer_Initialize_TerminationNotifierNil(t *testing.T) {
 
 	// Act
 	si := NewSessionInitializer(f.projectRoot, f.loader, f.dirMgr, f.logger)
-	result := si.Initialize("workflow", nil)
+	result := si.Initialize("workflow", "", nil)
 
 	// Assert
 	require.Error(t, result.Error)
@@ -214,45 +199,88 @@ func TestSessionInitializer_Initialize_TerminationNotifierUnbuffered(t *testing.
 
 	// Act
 	si := NewSessionInitializer(f.projectRoot, f.loader, f.dirMgr, f.logger)
-	result := si.Initialize("workflow", make(chan struct{}))
+	result := si.Initialize("workflow", "", make(chan struct{}))
 
 	// Assert
 	require.Error(t, result.Error)
 	assert.Equal(t, "terminationNotifier channel must have buffer capacity >= 2, got 0", result.Error.Error())
 }
 
-// =============================================================================
-// Happy Path — Initialize
-// =============================================================================
-
-func TestSessionInitializer_Initialize_Success(t *testing.T) {
+func TestSessionInitializer_Initialize_InvalidSessionID(t *testing.T) {
 	f := newSessionInitializerFixture(t).withWorkflowLoaderSuccess(t).withDirManagerSuccess()
 
 	// Act
 	si := NewSessionInitializer(f.projectRoot, f.loader, f.dirMgr, f.logger)
-	result := si.Initialize("my-wf", make(chan struct{}, 2))
+	result := si.Initialize("workflow", "not-a-uuid", make(chan struct{}, 2))
+
+	// Assert
+	require.Error(t, result.Error)
+	assert.Equal(t, "invalid session ID: must be a valid UUID", result.Error.Error())
+	assert.Nil(t, result.PersistentSession)
+}
+
+func TestSessionInitializer_Initialize_InvalidSessionID_NumericString(t *testing.T) {
+	f := newSessionInitializerFixture(t).withWorkflowLoaderSuccess(t).withDirManagerSuccess()
+
+	// Act
+	si := NewSessionInitializer(f.projectRoot, f.loader, f.dirMgr, f.logger)
+	result := si.Initialize("workflow", "12345", make(chan struct{}, 2))
+
+	// Assert
+	require.Error(t, result.Error)
+	assert.Equal(t, "invalid session ID: must be a valid UUID", result.Error.Error())
+	assert.Nil(t, result.PersistentSession)
+}
+
+// =============================================================================
+// Happy Path — Initialize
+// =============================================================================
+
+func TestSessionInitializer_Initialize_Success_GeneratedUUID(t *testing.T) {
+	f := newSessionInitializerFixture(t).withWorkflowLoaderSuccess(t).withDirManagerSuccess()
+
+	// Act
+	si := NewSessionInitializer(f.projectRoot, f.loader, f.dirMgr, f.logger)
+	result := si.Initialize("my-wf", "", make(chan struct{}, 2))
 
 	// Assert
 	require.NoError(t, result.Error)
 	require.NotNil(t, result.PersistentSession)
 	require.NotNil(t, result.WorkflowDefinition)
 	assert.Equal(t, "running", result.PersistentSession.GetStatusSafe())
-	// Logger.Info called with "session created" and a valid sessionID
+	// Logger.Info called with "session created", valid sessionID, and source "generated"
 	assertLogHasMessage(t, f.logger.infoCalls, "session created")
+	assertSessionCreatedLogWithSource(t, f.logger.infoCalls, "generated")
+}
+
+func TestSessionInitializer_Initialize_Success_UserProvidedUUID(t *testing.T) {
+	f := newSessionInitializerFixture(t).withWorkflowLoaderSuccess(t).withDirManagerSuccess()
+
+	// Act
+	si := NewSessionInitializer(f.projectRoot, f.loader, f.dirMgr, f.logger)
+	result := si.Initialize("my-wf", "550e8400-e29b-41d4-a716-446655440000", make(chan struct{}, 2))
+
+	// Assert
+	require.NoError(t, result.Error)
+	require.NotNil(t, result.PersistentSession)
+	assert.Equal(t, "550e8400-e29b-41d4-a716-446655440000", result.PersistentSession.ID)
+	// Logger.Info called with "session created", the user-provided sessionID, and source "user"
+	assertSessionCreatedLogWithSessionID(t, f.logger.infoCalls, "550e8400-e29b-41d4-a716-446655440000")
+	assertSessionCreatedLogWithSource(t, f.logger.infoCalls, "user")
 }
 
 // =============================================================================
 // Mock / Dependency Interaction
 // =============================================================================
 
-func TestSessionInitializer_Initialize_LogsSessionID(t *testing.T) {
+func TestSessionInitializer_Initialize_LogsSessionID_Generated(t *testing.T) {
 	f := newSessionInitializerFixture(t).withWorkflowLoaderSuccess(t).withDirManagerSuccess()
 
 	// Act
 	si := NewSessionInitializer(f.projectRoot, f.loader, f.dirMgr, f.logger)
-	_ = si.Initialize("wf", make(chan struct{}, 2))
+	_ = si.Initialize("wf", "", make(chan struct{}, 2))
 
-	// Assert: Logger.Info called with "session created" containing a valid UUID
+	// Assert: Logger.Info called with "session created" containing a valid UUID and source "generated"
 	require.NotEmpty(t, f.logger.infoCalls)
 	found := false
 	for _, call := range f.logger.infoCalls {
@@ -269,10 +297,24 @@ func TestSessionInitializer_Initialize_LogsSessionID(t *testing.T) {
 		}
 	}
 	assert.True(t, found, "expected Logger.Info called with 'session created' and sessionID")
+	assertSessionCreatedLogWithSource(t, f.logger.infoCalls, "generated")
 
 	// Assert: logged before any call to WorkflowDefinitionLoader or SessionDirectoryManager
-	// This requires call-order tracking which the current mocks partially support
-	// via the loadCalled count being 1 (meaning Load was called after the log).
+	assert.Equal(t, 1, f.loader.loadCalled)
+}
+
+func TestSessionInitializer_Initialize_LogsSessionID_User(t *testing.T) {
+	f := newSessionInitializerFixture(t).withWorkflowLoaderSuccess(t).withDirManagerSuccess()
+
+	// Act
+	si := NewSessionInitializer(f.projectRoot, f.loader, f.dirMgr, f.logger)
+	_ = si.Initialize("wf", "550e8400-e29b-41d4-a716-446655440000", make(chan struct{}, 2))
+
+	// Assert: Logger.Info called with "session created", the user UUID, and source "user"
+	assertSessionCreatedLogWithSessionID(t, f.logger.infoCalls, "550e8400-e29b-41d4-a716-446655440000")
+	assertSessionCreatedLogWithSource(t, f.logger.infoCalls, "user")
+
+	// Assert: logged before any call to WorkflowDefinitionLoader or SessionDirectoryManager
 	assert.Equal(t, 1, f.loader.loadCalled)
 }
 
@@ -281,7 +323,7 @@ func TestSessionInitializer_Initialize_CallsLoadWithWorkflowName(t *testing.T) {
 
 	// Act
 	si := NewSessionInitializer(f.projectRoot, f.loader, f.dirMgr, f.logger)
-	_ = si.Initialize("target-wf", make(chan struct{}, 2))
+	_ = si.Initialize("target-wf", "", make(chan struct{}, 2))
 
 	// Assert
 	assert.Equal(t, 1, f.loader.loadCalled)
@@ -293,12 +335,37 @@ func TestSessionInitializer_Initialize_CallsCreateSessionDirectory(t *testing.T)
 
 	// Act
 	si := NewSessionInitializer(f.projectRoot, f.loader, f.dirMgr, f.logger)
-	_ = si.Initialize("wf", make(chan struct{}, 2))
+	_ = si.Initialize("wf", "", make(chan struct{}, 2))
 
 	// Assert
 	assert.Equal(t, 1, f.dirMgr.createSessionDirCalled)
 	assert.Equal(t, "/project/root", f.dirMgr.createSessionDirProjectRoot)
 	assert.True(t, isValidUUID(f.dirMgr.createSessionDirUUID), "sessionUUID passed to CreateSessionDirectory should be valid UUID")
+}
+
+func TestSessionInitializer_Initialize_CallsCreateSessionDirectoryWithUserUUID(t *testing.T) {
+	f := newSessionInitializerFixture(t).withWorkflowLoaderSuccess(t).withDirManagerSuccess()
+
+	// Act
+	si := NewSessionInitializer(f.projectRoot, f.loader, f.dirMgr, f.logger)
+	_ = si.Initialize("wf", "550e8400-e29b-41d4-a716-446655440000", make(chan struct{}, 2))
+
+	// Assert: user-provided UUID is passed to SessionDirectoryManager
+	assert.Equal(t, 1, f.dirMgr.createSessionDirCalled)
+	assert.Equal(t, "/project/root", f.dirMgr.createSessionDirProjectRoot)
+	assert.Equal(t, "550e8400-e29b-41d4-a716-446655440000", f.dirMgr.createSessionDirUUID)
+}
+
+func TestSessionInitializer_Initialize_PassesOsPidToNewSession(t *testing.T) {
+	f := newSessionInitializerFixture(t).withWorkflowLoaderSuccess(t).withDirManagerSuccess()
+
+	si := NewSessionInitializer(f.projectRoot, f.loader, f.dirMgr, f.logger)
+	result := si.Initialize("wf", "", make(chan struct{}, 2))
+
+	require.NoError(t, result.Error)
+	require.NotNil(t, result.PersistentSession)
+	snapshot := result.PersistentSession.GetMetadataSnapshotSafe()
+	assert.Equal(t, os.Getpid(), snapshot.Pid)
 }
 
 // =============================================================================
@@ -312,7 +379,7 @@ func TestSessionInitializer_Initialize_WorkflowLoadFails(t *testing.T) {
 
 	// Act
 	si := NewSessionInitializer(f.projectRoot, f.loader, f.dirMgr, f.logger)
-	result := si.Initialize("bad-wf", make(chan struct{}, 2))
+	result := si.Initialize("bad-wf", "", make(chan struct{}, 2))
 
 	// Assert
 	require.Error(t, result.Error)
@@ -327,11 +394,26 @@ func TestSessionInitializer_Initialize_DirectoryCreationFails(t *testing.T) {
 
 	// Act
 	si := NewSessionInitializer(f.projectRoot, f.loader, f.dirMgr, f.logger)
-	result := si.Initialize("wf", make(chan struct{}, 2))
+	result := si.Initialize("wf", "", make(chan struct{}, 2))
 
 	// Assert
 	require.Error(t, result.Error)
 	assert.Contains(t, result.Error.Error(), "failed to create session directory: permission denied")
+	assert.Nil(t, result.PersistentSession)
+}
+
+func TestSessionInitializer_Initialize_DirectoryExistsWithUserUUID(t *testing.T) {
+	f := newSessionInitializerFixture(t).withWorkflowLoaderSuccess(t)
+	f.dirMgr.createSessionDirErr = storage.ErrSessionDirExists
+
+	// Act
+	si := NewSessionInitializer(f.projectRoot, f.loader, f.dirMgr, f.logger)
+	result := si.Initialize("wf", "550e8400-e29b-41d4-a716-446655440000", make(chan struct{}, 2))
+
+	// Assert: error wraps ErrSessionDirExists
+	require.Error(t, result.Error)
+	assert.Contains(t, result.Error.Error(), "failed to create session directory:")
+	assert.ErrorIs(t, result.Error, storage.ErrSessionDirExists)
 	assert.Nil(t, result.PersistentSession)
 }
 
@@ -341,10 +423,10 @@ func TestSessionInitializer_Initialize_SessionConstructionFails(t *testing.T) {
 	// Act
 	si := NewSessionInitializer(f.projectRoot, f.loader, f.dirMgr, f.logger)
 	// Inject a failing session factory.
-	si.sessionFactory = func(id, workflowName, entryNode string, createdAt int64) (Session, error) {
+	si.sessionFactory = func(id, workflowName, entryNode string, pid int, createdAt int64) (Session, error) {
 		return nil, errors.New("invalid session parameters")
 	}
-	result := si.Initialize("wf", make(chan struct{}, 2))
+	result := si.Initialize("wf", "", make(chan struct{}, 2))
 
 	// Assert: returns wrapped error, no PersistentSession created.
 	require.Error(t, result.Error)
@@ -358,7 +440,7 @@ func TestSessionInitializer_Initialize_RunFails(t *testing.T) {
 	// Act
 	si := NewSessionInitializer(f.projectRoot, f.loader, f.dirMgr, f.logger)
 	// Inject a session factory that returns a mock session whose Run() fails.
-	si.sessionFactory = func(id, workflowName, entryNode string, createdAt int64) (Session, error) {
+	si.sessionFactory = func(id, workflowName, entryNode string, pid int, createdAt int64) (Session, error) {
 		ms := newDefaultMockSession()
 		ms.id = id
 		ms.workflowName = workflowName
@@ -366,7 +448,7 @@ func TestSessionInitializer_Initialize_RunFails(t *testing.T) {
 		ms.getStatusResult = "initializing"
 		return ms, nil
 	}
-	result := si.Initialize("wf", make(chan struct{}, 2))
+	result := si.Initialize("wf", "", make(chan struct{}, 2))
 
 	// Assert: error returned, PersistentSession non-nil (failed), Fail was called.
 	require.Error(t, result.Error)
@@ -392,7 +474,7 @@ func TestSessionInitializer_Initialize_TimeoutBeforePersistentSession(t *testing
 		cancel() // already cancelled
 		return ctx, cancel
 	}
-	result := si.Initialize("wf", make(chan struct{}, 2))
+	result := si.Initialize("wf", "", make(chan struct{}, 2))
 
 	// Assert: timeout error, no PersistentSession.
 	require.Error(t, result.Error)
@@ -417,7 +499,7 @@ func TestSessionInitializer_Initialize_TimeoutAfterPersistentSession(t *testing.
 	}
 	// Inject a session factory that cancels context after returning (simulates
 	// timeout occurring between session construction and step 18 check).
-	si.sessionFactory = func(id, workflowName, entryNode string, createdAt int64) (Session, error) {
+	si.sessionFactory = func(id, workflowName, entryNode string, pid int, createdAt int64) (Session, error) {
 		ms := newDefaultMockSession()
 		ms.id = id
 		ms.workflowName = workflowName
@@ -426,7 +508,7 @@ func TestSessionInitializer_Initialize_TimeoutAfterPersistentSession(t *testing.
 		cancel()
 		return ms, nil
 	}
-	result := si.Initialize("wf", make(chan struct{}, 2))
+	result := si.Initialize("wf", "", make(chan struct{}, 2))
 
 	// Assert: timeout error with PersistentSession present (failed).
 	require.Error(t, result.Error)
@@ -450,7 +532,7 @@ func TestSessionInitializer_Initialize_TimeoutAfterRunSucceeds(t *testing.T) {
 		return ctx, cancel
 	}
 	// Inject a session factory whose Run() cancels the context on success.
-	si.sessionFactory = func(id, workflowName, entryNode string, createdAt int64) (Session, error) {
+	si.sessionFactory = func(id, workflowName, entryNode string, pid int, createdAt int64) (Session, error) {
 		ms := newDefaultMockSession()
 		ms.id = id
 		ms.workflowName = workflowName
@@ -458,7 +540,7 @@ func TestSessionInitializer_Initialize_TimeoutAfterRunSucceeds(t *testing.T) {
 		ms.runErr = nil
 		return &cancelOnRunSession{mockSession: ms, cancelFn: &cancel}, nil
 	}
-	result := si.Initialize("wf", make(chan struct{}, 2))
+	result := si.Initialize("wf", "", make(chan struct{}, 2))
 
 	// Assert: timeout error with PersistentSession present (failed after Run succeeded).
 	require.Error(t, result.Error)
@@ -474,7 +556,7 @@ func TestSessionInitializer_Initialize_RunFailsRuntimeErrorDetails(t *testing.T)
 	var capturedFailErr error
 	// Act
 	si := NewSessionInitializer(f.projectRoot, f.loader, f.dirMgr, f.logger)
-	si.sessionFactory = func(id, workflowName, entryNode string, createdAt int64) (Session, error) {
+	si.sessionFactory = func(id, workflowName, entryNode string, pid int, createdAt int64) (Session, error) {
 		ms := newDefaultMockSession()
 		ms.id = id
 		ms.workflowName = workflowName
@@ -482,7 +564,7 @@ func TestSessionInitializer_Initialize_RunFailsRuntimeErrorDetails(t *testing.T)
 		ms.runErr = errors.New("cannot transition")
 		return &capturingFailSession{mockSession: ms, captured: &capturedFailErr}, nil
 	}
-	result := si.Initialize("wf", make(chan struct{}, 2))
+	result := si.Initialize("wf", "", make(chan struct{}, 2))
 
 	// Assert: error returned with correct message.
 	require.Error(t, result.Error)
@@ -507,7 +589,7 @@ func TestSessionInitializer_Initialize_TerminationNotifierCapacityTwo(t *testing
 
 	// Act
 	si := NewSessionInitializer(f.projectRoot, f.loader, f.dirMgr, f.logger)
-	result := si.Initialize("wf", make(chan struct{}, 2))
+	result := si.Initialize("wf", "", make(chan struct{}, 2))
 
 	// Assert: succeeds with capacity exactly 2
 	require.NoError(t, result.Error)
@@ -518,7 +600,7 @@ func TestSessionInitializer_Initialize_TerminationNotifierCapacityLarge(t *testi
 
 	// Act
 	si := NewSessionInitializer(f.projectRoot, f.loader, f.dirMgr, f.logger)
-	result := si.Initialize("wf", make(chan struct{}, 10))
+	result := si.Initialize("wf", "", make(chan struct{}, 10))
 
 	// Assert: succeeds with capacity > 2
 	require.NoError(t, result.Error)

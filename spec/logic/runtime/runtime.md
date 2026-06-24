@@ -2,7 +2,7 @@
 
 ## Overview
 
-Runtime is the top-level orchestrator invoked by `spectra run`. It receives a workflow name and a Logger, bootstraps all dependencies, initializes a session, creates the runtime socket, performs the initial dispatch of the entry node, runs the main event loop, handles termination signals (session completion/failure, listener errors, OS signals), enforces a grace period for cleanup, and returns an exit code with an optional error. Runtime is the single entry point for workflow execution and coordinates the lifecycle of all runtime components.
+Runtime is the top-level orchestrator invoked by `spectra run`. It receives a workflow name, an optional session ID, and a Logger, bootstraps all dependencies, initializes a session, creates the runtime socket, performs the initial dispatch of the entry node, runs the main event loop, handles termination signals (session completion/failure, listener errors, OS signals), enforces a grace period for cleanup, and returns an exit code with an optional error. Runtime is the single entry point for workflow execution and coordinates the lifecycle of all runtime components.
 
 Runtime does not manage session directory creation or deletion (SessionInitializer and `spectra clear` respectively), does not validate messages (RuntimeSocketManager and processors), and does not evaluate transitions (TransitionEvaluator).
 
@@ -36,8 +36,8 @@ Runtime does not manage session directory creation or deletion (SessionInitializ
 | Collaborator | Role | Allowed Interaction | Forbidden Interaction |
 |---|---|---|---|
 | `SpectraFinder` | Project root discovery | `Find()` | — |
-| `SessionInitializer` | Session bootstrap | `Initialize(workflowName, terminationNotifier)` | Must not call after initialization |
-| `PersistentSession` | State container with auto-persist | `Fail(err, notifier)`, `GetStatusSafe()`, read `ID`, `WorkflowName` | Must not call `Run()`, `Done()`, must not modify fields directly, must not call stores directly |
+| `SessionInitializer` | Session bootstrap | `Initialize(workflowName, sessionID, terminationNotifier)` | Must not call after initialization |
+| `PersistentSession` | State container with auto-persist | `Fail(err, notifier)`, `GetStatusSafe()`, `GetCurrentStateSafe()`, read `ID`, `WorkflowName` | Must not call `Run()`, `Done()`, must not modify fields directly, must not call stores directly |
 | `RuntimeSocketManager` | Socket lifecycle | `CreateSocket()`, `Listen(handler)`, `DeleteSocket()` | Must not construct via struct literal |
 | `MessageRouter` | Message dispatch | Pass as MessageHandler to Listen | Must not invoke Handle directly |
 | `TransitionToNode` | Node dispatch | `Transition(targetNodeName, message)` | Must not access internal state |
@@ -46,13 +46,13 @@ Runtime does not manage session directory creation or deletion (SessionInitializ
 | `Logger` | Structured logging | `Info(msg, args...)`, `Warn(msg, args...)`, `Error(msg, args...)` | Must not use for session status output (SessionFinalizer's job) |
 | `WorkflowDefinition` | Configuration source | Read `EntryNode()` for initial dispatch | Must not modify |
 
-Construction constraint: Runtime is an exported function `Run(workflowName string, logger logger.Logger) (int, error)`. It is not a struct. All dependencies are constructed internally during execution. Logger is the only externally injected dependency.
+Construction constraint: Runtime is an exported function `Run(workflowName string, sessionID string, logger logger.Logger) (int, error)`. It is not a struct. All dependencies are constructed internally during execution. Logger is the only externally injected dependency. `sessionID` is an optional parameter: empty string means SessionInitializer will auto-generate a UUID.
 
 ## Behavior
 
 ### Initialization and Bootstrap
 
-1. Runtime is invoked by `spectra run` with inputs: `workflowName` (string) and `logger` (logger.Logger).
+1. Runtime is invoked by `spectra run` with inputs: `workflowName` (string), `sessionID` (string, may be empty), and `logger` (logger.Logger).
 2. Calls `SpectraFinder.Find()` to locate the `.spectra` directory and obtain the `projectRoot` absolute path.
 3. If `SpectraFinder.Find()` returns an error, returns `(1, error)` with message: `"failed to locate project root: <error>"`. No resources created.
 4. Creates a buffered channel `terminationNotifier` with capacity 2 (`make(chan struct{}, 2)`).
@@ -61,7 +61,7 @@ Construction constraint: Runtime is an exported function `Run(workflowName strin
    2. `SessionDirectoryManager` (requires `projectRoot`)
 6. If any dependency construction fails, returns `(1, error)` with message: `"failed to initialize runtime dependencies: <error>"`.
 7. Constructs `SessionInitializer` with `projectRoot`, `WorkflowDefinitionLoader`, `SessionDirectoryManager`, and `logger`.
-8. Invokes `SessionInitializer.Initialize(workflowName, terminationNotifier)` which returns an `InitResult` containing `PersistentSession`, `WorkflowDefinition`, and `Error`.
+8. Invokes `SessionInitializer.Initialize(workflowName, sessionID, terminationNotifier)` which returns an `InitResult` containing `PersistentSession`, `WorkflowDefinition`, and `Error`.
 9. If `InitResult.Error != nil` and `InitResult.PersistentSession == nil` (failure before session entity construction), returns `(1, error)` with message: `"failed to initialize session: <error>"`. SessionFinalizer is not invoked.
 10. If `InitResult.Error != nil` and `InitResult.PersistentSession != nil` (failure after session entity construction), proceeds to cleanup and SessionFinalizer (steps 33-39), then returns the exit code from SessionFinalizer and error: `"failed to initialize session: <error>"`.
 
@@ -105,7 +105,7 @@ Construction constraint: Runtime is an exported function `Run(workflowName strin
 26. Runtime's main loop blocks on `select` waiting for the first signal:
     - **Case: `<-terminationNotifier`** — Session reached terminal status (completed/failed). Logs: `"received session termination notification"`. Proceeds to cleanup.
     - **Case: `err := <-listenerErrCh`** — Fatal listener error. Logs: `"listener error: <error>"`. If `PersistentSession.GetStatusSafe()` is not "completed" or "failed", constructs a RuntimeError with `Issuer="Runtime"`, `Message="listener error"`, `Detail` containing the error, and calls `PersistentSession.Fail(runtimeError, terminationNotifier)`. If status is already terminal, skips Fail. Proceeds to cleanup.
-    - **Case: `sig := <-signalCh`** — OS signal received. Stores `sig` in `receivedSignal`. Logs: `"received signal <signal-name>, initiating graceful shutdown"`. Does **not** call `PersistentSession.Fail()`. Proceeds to cleanup.
+    - **Case: `sig := <-signalCh`** — OS signal received. Stores `sig` in `receivedSignal`. Logs: `"received signal <signal-name>, initiating graceful shutdown"`. Checks `PersistentSession.GetStatusSafe()`: if status is not "completed" and not "failed", constructs a RuntimeError with `Issuer="Runtime"`, `Message="terminated by signal <signal-name>"`, `Detail=nil`, `SessionID=persistentSession.ID`, `FailingState=persistentSession.GetCurrentStateSafe()`, `OccurredAt=now()`, and calls `PersistentSession.Fail(runtimeError, terminationNotifier)`. If `Fail` returns an error (session already terminal due to race), logs warning: `"attempted to fail session on signal but session already in terminal state: <error>"`. If status is already terminal, skips Fail. Proceeds to cleanup.
 27. After receiving the first termination signal, Runtime does not continue monitoring other channels.
 
 ### Grace Period and Second Signal
@@ -125,7 +125,7 @@ Construction constraint: Runtime is an exported function `Run(workflowName strin
 37. Invokes `SessionFinalizer.Finalize(persistentSession)` which returns an exit code (int).
 38. SessionFinalizer logs the final session status via Logger. It does not return errors.
 39. Runtime determines the final return value:
-    - If `receivedSignal != nil` (OS signal terminated the session): returns `(exitCode, error)` where error is `"session terminated by signal <signal-name>"` and exitCode is from SessionFinalizer (which returns 1 for non-terminal status).
+    - If `receivedSignal != nil` (OS signal terminated the runtime): returns `(1, error)` where error is `"session terminated by signal <signal-name>"`. Exit code is always 1 regardless of SessionFinalizer's return value, because the runtime exit path was abnormal (operator-initiated interruption).
     - If `receivedSignal == nil` and SessionFinalizer returns exit code 0: returns `(0, nil)`.
     - If `receivedSignal == nil` and SessionFinalizer returns exit code 1: returns `(1, error)` where error is `"session failed: <persistentSession.GetErrorSafe().Error()>"` if error is non-nil, or `"session terminated with non-terminal status"` otherwise.
 
@@ -134,6 +134,7 @@ Construction constraint: Runtime is an exported function `Run(workflowName strin
 | Field | Type | Constraints | Required |
 |-------|------|-------------|----------|
 | workflowName | string | Non-empty, must reference a valid workflow definition file | Yes |
+| sessionID | string | Valid UUID format if non-empty; empty string means auto-generate | No |
 | logger | logger.Logger | Non-nil Logger interface implementation | Yes |
 
 ## Outputs
@@ -155,7 +156,7 @@ Construction constraint: Runtime is an exported function `Run(workflowName strin
 | `"failed to start socket listener: <error>"` | from SessionFinalizer | Listen failed |
 | `"failed to dispatch entry node: <error>"` | from SessionFinalizer | TransitionToNode failed for entry node |
 | `"session failed: <error message>"` | from SessionFinalizer | Session reached "failed" status |
-| `"session terminated by signal <signal-name>"` | from SessionFinalizer | OS signal terminated runtime |
+| `"session terminated by signal <signal-name>"` | 1 (always) | OS signal terminated runtime |
 | `"session terminated with non-terminal status"` | from SessionFinalizer | Unexpected non-terminal status |
 | `"cleanup timeout"` | 1 | Grace period exceeded |
 | `"forced exit by second signal"` | 1 | Second OS signal forced exit |
@@ -166,7 +167,7 @@ Construction constraint: Runtime is an exported function `Run(workflowName strin
 
 2. **Function Form**: Runtime is an exported function, not a struct. All dependencies are constructed internally.
 
-3. **Logger Injection**: Logger is the only externally provided dependency. All other dependencies are constructed within Runtime using projectRoot and session UUID.
+3. **Logger and SessionID Injection**: Logger and sessionID are the only externally provided dependencies. All other dependencies are constructed within Runtime using projectRoot and session UUID. Runtime passes sessionID through to SessionInitializer without validation.
 
 4. **ProjectRoot Discovery**: Runtime must call `SpectraFinder.Find()` at the beginning of execution. projectRoot is not passed as input.
 
@@ -178,7 +179,7 @@ Construction constraint: Runtime is an exported function `Run(workflowName strin
 
 8. **PersistentSession.Fail on Runtime Errors**: If Runtime encounters errors after PersistentSession is constructed (socket, listener, initial dispatch, listener error), Runtime must construct a RuntimeError and call PersistentSession.Fail before cleanup.
 
-9. **No PersistentSession.Fail on OS Signals**: When an OS signal is received, Runtime must not call PersistentSession.Fail. Session status remains unchanged (non-terminal).
+9. **PersistentSession.Fail on OS Signals**: When an OS signal is received and session status is not already terminal ("completed" or "failed"), Runtime must construct a RuntimeError and call PersistentSession.Fail to transition session status to "failed" before proceeding to cleanup. If session is already terminal (race with completion), Fail is skipped.
 
 10. **Cleanup Order**: Runtime must perform cleanup in order: (1) signal.Stop, (2) DeleteSocket, (3) wait listenerDoneCh, (4) SessionFinalizer.
 
@@ -234,7 +235,7 @@ Construction constraint: Runtime is an exported function `Run(workflowName strin
   **Expected**: ErrorProcessor calls PersistentSession.Fail, notification sent. Runtime receives notification, proceeds to cleanup, SessionFinalizer returns 1. Runtime returns `(1, "session failed: <message>")`.
 
 - **Condition**: User presses Ctrl+C (SIGINT) while session is running.
-  **Expected**: Runtime receives SIGINT, stores in receivedSignal, logs shutdown message, does not call Fail, proceeds to cleanup and SessionFinalizer. SessionFinalizer logs non-terminal status warning. Returns `(1, "session terminated by signal interrupt")`.
+  **Expected**: Runtime receives SIGINT, stores in receivedSignal, logs shutdown message, checks status is "running" (non-terminal), constructs RuntimeError with Message="terminated by signal interrupt", calls PersistentSession.Fail. Proceeds to cleanup and SessionFinalizer. SessionFinalizer logs failed status with RuntimeError details. Returns `(1, "session terminated by signal interrupt")`.
 
 - **Condition**: User presses Ctrl+C twice (second signal during grace period).
   **Expected**: First SIGINT begins cleanup. Second SIGINT detected during grace period. Logs force exit message. Returns `(1, "forced exit by second signal")` immediately.
@@ -258,7 +259,7 @@ Construction constraint: Runtime is an exported function `Run(workflowName strin
   **Expected**: `<-listenerDoneCh` returns immediately. Proceeds to SessionFinalizer.
 
 - **Condition**: SIGTERM received on Unix while session is running.
-  **Expected**: Same as SIGINT but signal name is "terminated". Returns `(1, "session terminated by signal terminated")`.
+  **Expected**: Same as SIGINT but signal name is "terminated". Constructs RuntimeError with Message="terminated by signal terminated", calls PersistentSession.Fail. Returns `(1, "session terminated by signal terminated")`.
 
 - **Condition**: SIGTERM on Windows (not available).
   **Expected**: Only SIGINT registered. SIGTERM is not caught. Process terminated by OS without graceful shutdown.
@@ -267,7 +268,10 @@ Construction constraint: Runtime is an exported function `Run(workflowName strin
   **Expected**: Each generates unique session UUID via SessionInitializer. No conflict.
 
 - **Condition**: Session is in "initializing" status when SIGINT is received (signal during SessionInitializer timeout path where PersistentSession exists but Run() failed).
-  **Expected**: Runtime receives signal, does not call Fail, proceeds to cleanup. SessionFinalizer logs non-terminal status. Returns `(1, "session terminated by signal interrupt")`.
+  **Expected**: Runtime receives signal, checks status is "initializing" (non-terminal), constructs RuntimeError with Message="terminated by signal interrupt" and FailingState from GetCurrentStateSafe(), calls PersistentSession.Fail. Session transitions from "initializing" to "failed". Proceeds to cleanup and SessionFinalizer. Returns `(1, "session terminated by signal interrupt")`.
+
+- **Condition**: SIGINT received but session has already completed (race: terminationNotifier and signalCh both ready, select picks signalCh).
+  **Expected**: Runtime receives signal, checks status is "completed" (terminal), skips Fail. Proceeds to cleanup. SessionFinalizer sees "completed" and returns exit code 0. However, since `receivedSignal != nil`, Runtime overrides to exit code 1 per step 39. Returns `(1, "session terminated by signal interrupt")`.
 
 - **Condition**: DeleteSocket fails internally (permission error on socket file).
   **Expected**: DeleteSocket logs warning internally. Runtime continues to wait for listenerDoneCh and invoke SessionFinalizer.

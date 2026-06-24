@@ -65,9 +65,9 @@ var newSubTimerFunc = func(d time.Duration) (<-chan struct{}, func()) {
 
 // sessionInitializeFunc is a seam for constructing and invoking SessionInitializer.
 // In production it constructs a real SessionInitializer and calls Initialize.
-var sessionInitializeFunc = func(projectRoot string, wfLoader WorkflowLoader, dirMgr SessionDirManager, log logger.Logger, workflowName string, terminationNotifier chan<- struct{}) InitResult {
+var sessionInitializeFunc = func(projectRoot string, wfLoader WorkflowLoader, dirMgr SessionDirManager, log logger.Logger, workflowName string, sessionID string, terminationNotifier chan<- struct{}) InitResult {
 	si := NewSessionInitializer(projectRoot, wfLoader, dirMgr, log)
-	return si.Initialize(workflowName, terminationNotifier)
+	return si.Initialize(workflowName, sessionID, terminationNotifier)
 }
 
 // constructPostSessionDepsFunc is a seam for constructing post-session dependencies.
@@ -138,7 +138,7 @@ func (a *messageHandlerAdapter) Handle(sessionUUID string, msg entities.RuntimeM
 // initializes a session, creates the runtime socket, performs the initial
 // dispatch of the entry node, runs the main event loop, handles termination
 // signals, and returns an exit code with an optional error.
-func Run(workflowName string, log logger.Logger) (int, error) {
+func Run(workflowName string, sessionID string, log logger.Logger) (int, error) {
 	// Step 2: Locate project root.
 	projectRoot, err := spectraFinderFunc()
 	if err != nil {
@@ -155,7 +155,7 @@ func Run(workflowName string, log logger.Logger) (int, error) {
 	}
 
 	// Step 7-8: Construct SessionInitializer and initialize session.
-	initResult := sessionInitializeFunc(projectRoot, wfLoader, dirMgr, log, workflowName, terminationNotifier)
+	initResult := sessionInitializeFunc(projectRoot, wfLoader, dirMgr, log, workflowName, sessionID, terminationNotifier)
 
 	// Step 9-10: Handle initialization failure.
 	if initResult.Error != nil {
@@ -263,6 +263,14 @@ func Run(workflowName string, log logger.Logger) (int, error) {
 		// OS signal received.
 		receivedSignal = sig
 		log.Info(fmt.Sprintf("received signal %s, initiating graceful shutdown", sig.String()))
+		// Step 26 (case signalCh): If session is not terminal, fail it with RuntimeError.
+		status := ps.GetStatusSafe()
+		if status != "completed" && status != "failed" {
+			rtErr := buildRuntimeError("Runtime", fmt.Sprintf("terminated by signal %s", sig.String()), nil, ps)
+			if failErr := ps.Fail(rtErr, terminationNotifier); failErr != nil {
+				log.Warn(fmt.Sprintf("attempted to fail session on signal but session already in terminal state: %s", failErr.Error()))
+			}
+		}
 	}
 
 	// Step 28-31: Grace period and cleanup.
@@ -318,7 +326,8 @@ func Run(workflowName string, log logger.Logger) (int, error) {
 	exitCode := finalizer.Finalize(ps)
 
 	if receivedSignal != nil {
-		return exitCode, fmt.Errorf("session terminated by signal %s", receivedSignal.String())
+		// Step 39: Exit code is always 1 when signal received, regardless of SessionFinalizer.
+		return 1, fmt.Errorf("session terminated by signal %s", receivedSignal.String())
 	}
 
 	if exitCode == 0 {

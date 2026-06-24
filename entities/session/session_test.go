@@ -10,13 +10,14 @@ import (
 // --- Happy Path — Construction ---
 
 func TestNewSession_ValidInputs(t *testing.T) {
-	s, err := NewSession(testUUID, "my-workflow", "start", int64(1700000000))
+	s, err := NewSession(testUUID, "my-workflow", "start", 1234, int64(1700000000))
 
 	require.NoError(t, err)
 	require.NotNil(t, s)
 
 	assert.Equal(t, testUUID, s.ID)
 	assert.Equal(t, "my-workflow", s.WorkflowName)
+	assert.Equal(t, 1234, s.Pid)
 	assert.Equal(t, "initializing", s.Status)
 	assert.Equal(t, int64(1700000000), s.CreatedAt)
 	assert.Equal(t, s.CreatedAt, s.UpdatedAt)
@@ -29,7 +30,7 @@ func TestNewSession_ValidInputs(t *testing.T) {
 }
 
 func TestNewSession_MinimalCreatedAt(t *testing.T) {
-	s, err := NewSession(testUUID, "w", "n", 1)
+	s, err := NewSession(testUUID, "w", "n", 1, 1)
 
 	require.NoError(t, err)
 	require.NotNil(t, s)
@@ -39,7 +40,7 @@ func TestNewSession_MinimalCreatedAt(t *testing.T) {
 // --- Validation Failures — id ---
 
 func TestNewSession_InvalidUUID_Empty(t *testing.T) {
-	s, err := NewSession("", "w", "start", testCreatedAt)
+	s, err := NewSession("", "w", "start", 1, testCreatedAt)
 
 	assert.Nil(t, s)
 	require.Error(t, err)
@@ -47,7 +48,7 @@ func TestNewSession_InvalidUUID_Empty(t *testing.T) {
 }
 
 func TestNewSession_InvalidUUID_Malformed(t *testing.T) {
-	s, err := NewSession("not-a-uuid", "w", "start", testCreatedAt)
+	s, err := NewSession("not-a-uuid", "w", "start", 1, testCreatedAt)
 
 	assert.Nil(t, s)
 	require.Error(t, err)
@@ -55,7 +56,7 @@ func TestNewSession_InvalidUUID_Malformed(t *testing.T) {
 }
 
 func TestNewSession_InvalidUUID_TooShort(t *testing.T) {
-	s, err := NewSession("550e8400-e29b-41d4", "w", "start", testCreatedAt)
+	s, err := NewSession("550e8400-e29b-41d4", "w", "start", 1, testCreatedAt)
 
 	assert.Nil(t, s)
 	require.Error(t, err)
@@ -65,7 +66,7 @@ func TestNewSession_InvalidUUID_TooShort(t *testing.T) {
 // --- Validation Failures — workflowName ---
 
 func TestNewSession_EmptyWorkflowName(t *testing.T) {
-	s, err := NewSession(testUUID, "", "start", testCreatedAt)
+	s, err := NewSession(testUUID, "", "start", 1, testCreatedAt)
 
 	assert.Nil(t, s)
 	require.Error(t, err)
@@ -75,17 +76,35 @@ func TestNewSession_EmptyWorkflowName(t *testing.T) {
 // --- Validation Failures — entryNode ---
 
 func TestNewSession_EmptyEntryNode(t *testing.T) {
-	s, err := NewSession(testUUID, "w", "", testCreatedAt)
+	s, err := NewSession(testUUID, "w", "", 1, testCreatedAt)
 
 	assert.Nil(t, s)
 	require.Error(t, err)
 	assert.Equal(t, "entry node cannot be empty", err.Error())
 }
 
+// --- Validation Failures — pid ---
+
+func TestNewSession_PidZero(t *testing.T) {
+	s, err := NewSession(testUUID, "w", "n", 0, testCreatedAt)
+
+	assert.Nil(t, s)
+	require.Error(t, err)
+	assert.Equal(t, "pid must be a positive integer", err.Error())
+}
+
+func TestNewSession_PidNegative(t *testing.T) {
+	s, err := NewSession(testUUID, "w", "n", -1, testCreatedAt)
+
+	assert.Nil(t, s)
+	require.Error(t, err)
+	assert.Equal(t, "pid must be a positive integer", err.Error())
+}
+
 // --- Validation Failures — createdAt ---
 
 func TestNewSession_CreatedAtZero(t *testing.T) {
-	s, err := NewSession(testUUID, "w", "n", 0)
+	s, err := NewSession(testUUID, "w", "n", 1, 0)
 
 	assert.Nil(t, s)
 	require.Error(t, err)
@@ -93,7 +112,7 @@ func TestNewSession_CreatedAtZero(t *testing.T) {
 }
 
 func TestNewSession_CreatedAtNegative(t *testing.T) {
-	s, err := NewSession(testUUID, "w", "n", -1)
+	s, err := NewSession(testUUID, "w", "n", 1, -1)
 
 	assert.Nil(t, s)
 	require.Error(t, err)

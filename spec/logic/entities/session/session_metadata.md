@@ -39,6 +39,7 @@ SessionMetadata is not invoked; it is constructed as part of Session initializat
 |---|---|---|---|
 | `ID` | string (UUID) | Valid UUID format; immutable after construction | Unique session identifier |
 | `WorkflowName` | string | Non-empty; immutable after construction | Name of the workflow being executed |
+| `Pid` | int | > 0; immutable after construction | OS process ID of the `spectra run` process that owns this session |
 | `Status` | string | Enum: `"initializing"`, `"running"`, `"completed"`, `"failed"` | Current execution status |
 | `CreatedAt` | int64 (POSIX seconds) | > 0; immutable after construction | Timestamp at construction |
 | `UpdatedAt` | int64 (POSIX seconds) | >= `CreatedAt` | Timestamp of last in-memory mutation |
@@ -60,15 +61,19 @@ SessionMetadata is not invoked; it is constructed as part of Session initializat
 
 6. **Non-Empty WorkflowName**: `WorkflowName` must always be a non-empty string.
 
-7. **Non-Empty CurrentState**: `CurrentState` must always be a non-empty string representing a workflow-defined node name.
+7. **Positive Pid**: `Pid` must always be > 0. It is immutable after construction.
 
-8. **SessionData Never Nil**: `SessionData` must never be nil; it is initialized as an empty map `map[string]any{}` if there are no entries.
+8. **Non-Empty CurrentState**: `CurrentState` must always be a non-empty string representing a workflow-defined node name.
 
-9. **JSON Serialization Compatibility**: All field types must be JSON-serializable. The Error field's dynamic type (`*AgentError` or `*RuntimeError`) exposes getter methods sufficient for external serializers; these entities are not required to implement `json.Marshaler` themselves. Serialization logic is owned by the persistence layer (SessionMetadataStore).
+9. **SessionData Never Nil**: `SessionData` must never be nil; it is initialized as an empty map `map[string]any{}` if there are no entries.
 
-10. **Error Field Omitempty**: When Error is nil, it is omitted from JSON serialization (enforced via `omitempty` JSON struct tag).
+10. **JSON Serialization Compatibility**: All field types must be JSON-serializable. The Error field's dynamic type (`*AgentError` or `*RuntimeError`) exposes getter methods sufficient for external serializers; these entities are not required to implement `json.Marshaler` themselves. Serialization logic is owned by the persistence layer (SessionMetadataStore).
 
-11. **No Standalone Construction**: SessionMetadata must not be instantiated independently — it is only valid when embedded in Session and initialized by `NewSession`.
+11. **Error Field Omitempty**: When Error is nil, it is omitted from JSON serialization (enforced via `omitempty` JSON struct tag).
+
+12. **Pid No Omitempty**: The `Pid` field is always serialized in JSON (no omitempty). It is always > 0 for any valid session.
+
+13. **No Standalone Construction**: SessionMetadata must not be instantiated independently — it is only valid when embedded in Session and initialized by `NewSession`.
 
 ## Edge Cases
 

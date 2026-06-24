@@ -359,6 +359,7 @@ type fakeRuntime struct {
 	// Captured state
 	calledCount  int
 	workflowName string
+	sessionID    string
 	loggerWasNil bool
 }
 
@@ -371,9 +372,10 @@ func newFakeRuntime(exitCode int, err error) *fakeRuntime {
 
 // Run satisfies the RunRuntime interface defined in run.go.
 // It captures invocation details and returns the configured result.
-func (f *fakeRuntime) Run(workflowName string, log logger.Logger) (int, error) {
+func (f *fakeRuntime) Run(workflowName string, sessionID string, log logger.Logger) (int, error) {
 	f.calledCount++
 	f.workflowName = workflowName
+	f.sessionID = sessionID
 	f.loggerWasNil = (log == nil)
 	return f.exitCode, f.err
 }

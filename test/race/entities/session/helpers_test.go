@@ -14,6 +14,7 @@ const (
 	testUUID          = "550e8400-e29b-41d4-a716-446655440000"
 	testWorkflow      = "my-workflow"
 	testEntryNode     = "start"
+	testPid           = 42
 	testCreatedAt     = int64(1700000000)
 	testSessionID     = testUUID
 	testEventType     = "TaskCompleted"
@@ -28,7 +29,7 @@ const (
 // newTestSession constructs a valid session for race testing.
 func newTestSession(t *testing.T) *session.Session {
 	t.Helper()
-	s, err := session.NewSession(testUUID, testWorkflow, testEntryNode, testCreatedAt)
+	s, err := session.NewSession(testUUID, testWorkflow, testEntryNode, testPid, testCreatedAt)
 	if err != nil {
 		t.Fatalf("newTestSession: unexpected error: %v", err)
 	}

@@ -19,6 +19,8 @@
 | `TestRun_Success_ExitsZero` | `unit` | Exits with code 0 when Runtime returns success. | Mock `Runtime.Run()` to return `(0, nil)`. | `--workflow "MyWorkflow"` | Exit code 0; no output to stderr |
 | `TestRun_PassesWorkflowNameToRuntime` | `unit` | Passes the workflow name from --workflow flag to Runtime.Run. | Mock `Runtime.Run()` to capture arguments and return `(0, nil)`. | `--workflow "deploy-prod"` | `Runtime.Run()` called with `workflowName="deploy-prod"` |
 | `TestRun_PassesLoggerToRuntime` | `unit` | Passes a non-nil Logger to Runtime.Run. | Mock `Runtime.Run()` to capture arguments and return `(0, nil)`. | `--workflow "MyWorkflow"` | `Runtime.Run()` called with a non-nil `logger.Logger` |
+| `TestRun_PassesSessionIDToRuntime` | `unit` | Passes the session ID from --session-id flag to Runtime.Run. | Mock `Runtime.Run()` to capture arguments and return `(0, nil)`. | `--workflow "MyWorkflow" --session-id "550e8400-e29b-41d4-a716-446655440000"` | `Runtime.Run()` called with `sessionID="550e8400-e29b-41d4-a716-446655440000"` |
+| `TestRun_OmittedSessionID_PassesEmptyString` | `unit` | Passes empty string when --session-id is not provided. | Mock `Runtime.Run()` to capture arguments and return `(0, nil)`. | `--workflow "MyWorkflow"` | `Runtime.Run()` called with `sessionID=""` |
 
 ### Validation Failures
 
