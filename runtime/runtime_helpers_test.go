@@ -331,9 +331,9 @@ func newRuntimeTestFixture(t *testing.T) *runtimeTestFixture {
 		},
 		Session:              sess,
 		SignalSource:         newFakeSignalSource(),
-		GraceTimer:          newFakeTimer(),
-		ListenerTimer:       newFakeTimer(),
-		SequenceTracker:     newCallSequenceTracker(),
+		GraceTimer:           newFakeTimer(),
+		ListenerTimer:        newFakeTimer(),
+		SequenceTracker:      newCallSequenceTracker(),
 		ClaudeProcessCleaner: &mockProcessCleaner{},
 	}
 
