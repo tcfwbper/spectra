@@ -35,6 +35,23 @@
 | `TestUpdateSessionDataSafe_ClaudeSessionID_NilValue` | `unit` | Rejects nil value for ClaudeSessionID key. | Construct session | `key="nodeA.ClaudeSessionID"`, `value=nil` | Returns error containing `"ClaudeSessionID value must be a string"` |
 | `TestUpdateSessionDataSafe_ClaudeSessionID_Stringer` | `unit` | Rejects fmt.Stringer that is not dynamic type string. | Construct session | `key="nodeA.ClaudeSessionID"`, `value=bytes.NewBufferString("x")` | Returns error containing `"ClaudeSessionID value must be a string"` |
 
+### Happy Path — UpdateSessionDataSafe (PID)
+
+| Test ID | Category | Description | Setup | Input | Expected |
+|---|---|---|---|---|---|
+| `TestUpdateSessionDataSafe_PID_ValidPositiveInt` | `unit` | Accepts a positive integer value for a PID key. | Construct session | `key="nodeA.PID"`, `value=12345` | Returns `nil`; `GetSessionDataSafe("nodeA.PID")` returns `(12345, true)` |
+| `TestUpdateSessionDataSafe_PID_Zero` | `unit` | Accepts zero for a PID key (type is int, semantics not validated). | Construct session | `key="nodeA.PID"`, `value=0` | Returns `nil`; `GetSessionDataSafe("nodeA.PID")` returns `(0, true)` |
+| `TestUpdateSessionDataSafe_PID_Negative` | `unit` | Accepts negative integer for a PID key (type is int, semantics not validated). | Construct session | `key="nodeA.PID"`, `value=-1` | Returns `nil`; `GetSessionDataSafe("nodeA.PID")` returns `(-1, true)` |
+
+### Validation Failures — PID type
+
+| Test ID | Category | Description | Setup | Input | Expected |
+|---|---|---|---|---|---|
+| `TestUpdateSessionDataSafe_PID_StringValue` | `unit` | Rejects string value for PID key. | Construct session | `key="nodeA.PID"`, `value="1234"` | Returns error with message `"PID value must be an int, got string"` |
+| `TestUpdateSessionDataSafe_PID_Int64Value` | `unit` | Rejects int64 value for PID key (strict dynamic type int). | Construct session | `key="nodeA.PID"`, `value=int64(1234)` | Returns error with message `"PID value must be an int, got int64"` |
+| `TestUpdateSessionDataSafe_PID_Float64Value` | `unit` | Rejects float64 value for PID key (strict dynamic type int). | Construct session | `key="nodeA.PID"`, `value=float64(1234)` | Returns error with message `"PID value must be an int, got float64"` |
+| `TestUpdateSessionDataSafe_PID_NilValue` | `unit` | Rejects nil value for PID key. | Construct session | `key="nodeA.PID"`, `value=nil` | Returns error containing `"PID value must be an int"` |
+
 ---
 
 ## `GetSessionDataSafe`
