@@ -236,14 +236,12 @@ func TestAgentInvoker_Invoke_NewSession(t *testing.T) {
 	assert.True(t, containsArg(cmdStarter.args, "--session-id"))
 	assert.True(t, containsArg(cmdStarter.args, "generated-uuid"))
 	assert.False(t, containsArg(cmdStarter.args, "--resume"))
-	assert.Equal(t, 1, sess.updateSessionDataCalled)
-	assert.Equal(t, "MyNode.ClaudeSessionID", sess.updateSessionDataInputKey)
-	assert.Equal(t, "generated-uuid", sess.updateSessionDataInputVal)
+	// UpdateSessionDataSafe called for ClaudeSessionID and PID
+	assertUpdateSessionDataCalledWith(t, sess, "MyNode.ClaudeSessionID", "generated-uuid")
+	assertUpdateSessionDataCalledWith(t, sess, "MyNode.PID", 0)
 }
 
 func TestAgentInvoker_Invoke_ExistingSession(t *testing.T) {
-	t.Skip("scaffolded: production AgentInvoker.Invoke does not yet record PID after cmd.Start() — missing CommandHandle.Pid() seam and UpdateSessionDataSafe call for PID")
-
 	// Setup
 	sess := newDefaultMockSession()
 	sess.getSessionDataResultVal = "existing-id"
@@ -540,8 +538,6 @@ func TestAgentInvoker_Invoke_CommandStructure(t *testing.T) {
 // =============================================================================
 
 func TestAgentInvoker_Invoke_RecordsPID(t *testing.T) {
-	t.Skip("scaffolded: production AgentInvoker.Invoke does not yet record PID after cmd.Start() — missing CommandHandle.Pid() seam and UpdateSessionDataSafe call for PID")
-
 	// Setup
 	sess := newDefaultMockSession()
 	sess.id = "sess-1"
@@ -568,8 +564,6 @@ func TestAgentInvoker_Invoke_RecordsPID(t *testing.T) {
 }
 
 func TestAgentInvoker_Invoke_PIDOverwriteOnResume(t *testing.T) {
-	t.Skip("scaffolded: production AgentInvoker.Invoke does not yet record PID after cmd.Start() — missing CommandHandle.Pid() seam and UpdateSessionDataSafe call for PID")
-
 	// Setup
 	sess := newDefaultMockSession()
 	sess.id = "sess-1"
@@ -595,8 +589,6 @@ func TestAgentInvoker_Invoke_PIDOverwriteOnResume(t *testing.T) {
 }
 
 func TestAgentInvoker_Invoke_PIDRecordingFailureNonFatal(t *testing.T) {
-	t.Skip("scaffolded: production AgentInvoker.Invoke does not yet record PID after cmd.Start() — missing CommandHandle.Pid() seam, WithLogger option, and non-fatal PID error handling")
-
 	// Setup
 	sess := newDefaultMockSession()
 	sess.id = "sess-1"
@@ -616,7 +608,7 @@ func TestAgentInvoker_Invoke_PIDRecordingFailureNonFatal(t *testing.T) {
 	cmdStarter.pid = 1234
 
 	// Act
-	invoker := NewAgentInvoker(ps, projectRoot, WithUUIDGenerator(uuidGen), WithCommandStarter(cmdStarter))
+	invoker := NewAgentInvoker(ps, projectRoot, WithUUIDGenerator(uuidGen), WithCommandStarter(cmdStarter), WithLogger(log))
 	err := invoker.Invoke("MyNode", "msg", agentDef)
 
 	// Assert: Returns nil (success); warning logged about PID recording failure
@@ -792,8 +784,6 @@ func TestAgentInvoker_Invoke_CmdStartFails(t *testing.T) {
 // =============================================================================
 
 func TestAgentInvoker_Invoke_NoClaudeSessionIDUpdateWhenExisting(t *testing.T) {
-	t.Skip("scaffolded: production AgentInvoker.Invoke does not yet record PID after cmd.Start() — missing CommandHandle.Pid() seam and UpdateSessionDataSafe call for PID")
-
 	// Setup
 	sess := newDefaultMockSession()
 	sess.getSessionDataResultVal = "existing-id"

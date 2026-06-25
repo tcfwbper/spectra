@@ -119,8 +119,6 @@ func TestUpdateSessionDataSafe_ClaudeSessionID_Stringer(t *testing.T) {
 // --- Happy Path — UpdateSessionDataSafe (PID) ---
 
 func TestUpdateSessionDataSafe_PID_ValidPositiveInt(t *testing.T) {
-	t.Skip("scaffolded: production data.go does not yet implement PID type validation (missing .PID suffix check in UpdateSessionDataSafe)")
-
 	s := newTestSession(t)
 
 	err := s.UpdateSessionDataSafe("nodeA.PID", 12345)
@@ -132,8 +130,6 @@ func TestUpdateSessionDataSafe_PID_ValidPositiveInt(t *testing.T) {
 }
 
 func TestUpdateSessionDataSafe_PID_Zero(t *testing.T) {
-	t.Skip("scaffolded: production data.go does not yet implement PID type validation (missing .PID suffix check in UpdateSessionDataSafe)")
-
 	s := newTestSession(t)
 
 	err := s.UpdateSessionDataSafe("nodeA.PID", 0)
@@ -145,8 +141,6 @@ func TestUpdateSessionDataSafe_PID_Zero(t *testing.T) {
 }
 
 func TestUpdateSessionDataSafe_PID_Negative(t *testing.T) {
-	t.Skip("scaffolded: production data.go does not yet implement PID type validation (missing .PID suffix check in UpdateSessionDataSafe)")
-
 	s := newTestSession(t)
 
 	err := s.UpdateSessionDataSafe("nodeA.PID", -1)
@@ -160,8 +154,6 @@ func TestUpdateSessionDataSafe_PID_Negative(t *testing.T) {
 // --- Validation Failures — PID type ---
 
 func TestUpdateSessionDataSafe_PID_StringValue(t *testing.T) {
-	t.Skip("scaffolded: production data.go does not yet implement PID type validation (missing .PID suffix check in UpdateSessionDataSafe)")
-
 	s := newTestSession(t)
 
 	err := s.UpdateSessionDataSafe("nodeA.PID", "1234")
@@ -171,8 +163,6 @@ func TestUpdateSessionDataSafe_PID_StringValue(t *testing.T) {
 }
 
 func TestUpdateSessionDataSafe_PID_Int64Value(t *testing.T) {
-	t.Skip("scaffolded: production data.go does not yet implement PID type validation (missing .PID suffix check in UpdateSessionDataSafe)")
-
 	s := newTestSession(t)
 
 	err := s.UpdateSessionDataSafe("nodeA.PID", int64(1234))
@@ -182,8 +172,6 @@ func TestUpdateSessionDataSafe_PID_Int64Value(t *testing.T) {
 }
 
 func TestUpdateSessionDataSafe_PID_Float64Value(t *testing.T) {
-	t.Skip("scaffolded: production data.go does not yet implement PID type validation (missing .PID suffix check in UpdateSessionDataSafe)")
-
 	s := newTestSession(t)
 
 	err := s.UpdateSessionDataSafe("nodeA.PID", float64(1234))
@@ -193,8 +181,6 @@ func TestUpdateSessionDataSafe_PID_Float64Value(t *testing.T) {
 }
 
 func TestUpdateSessionDataSafe_PID_NilValue(t *testing.T) {
-	t.Skip("scaffolded: production data.go does not yet implement PID type validation (missing .PID suffix check in UpdateSessionDataSafe)")
-
 	s := newTestSession(t)
 
 	err := s.UpdateSessionDataSafe("nodeA.PID", nil)

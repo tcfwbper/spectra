@@ -500,10 +500,11 @@ func wireFixtureToSeams(t *testing.T, f *runtimeTestFixture) {
 	// Wire constructPostSessionDepsFunc.
 	constructPostSessionDepsFunc = func(projectRoot string, ps *PersistentSession, wfDef *components.WorkflowDefinition, terminationNotifier chan<- struct{}, log logger.Logger) (*runtimePostSessionDeps, error) {
 		return &runtimePostSessionDeps{
-			socketManager:  f.SocketManager,
-			transitionNode: f.TransitionToNode,
-			messageRouter:  NewMessageRouter(ps, nil, nil, terminationNotifier, log),
-			finalizer:      NewSessionFinalizer(log),
+			socketManager:        f.SocketManager,
+			transitionNode:       f.TransitionToNode,
+			messageRouter:        NewMessageRouter(ps, nil, nil, terminationNotifier, log),
+			finalizer:            NewSessionFinalizer(log),
+			claudeProcessCleaner: NewClaudeProcessCleaner(ps, log),
 		}, nil
 	}
 
