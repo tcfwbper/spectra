@@ -89,6 +89,7 @@ export class SessionDetailController implements Disposable {
   private readonly _projectRoot: string;
   private readonly _logger: SessionDetailControllerLogger;
   private readonly _deps: SessionDetailControllerDeps;
+  private readonly _fallbackScanDelayMs: number;
   private readonly _stateEmitter: IEventEmitter<SessionDetailState>;
   private readonly _errorEmitter: IEventEmitter<Error>;
 
@@ -104,6 +105,7 @@ export class SessionDetailController implements Disposable {
   private _dirty = false;
   private _scanning = false;
   private _disposed = false;
+  private _fallbackTimer: ReturnType<typeof setTimeout> | null = null;
 
   /** Cached workflow parse results for use in re-scans. */
   private _entryNode = "";
@@ -113,10 +115,12 @@ export class SessionDetailController implements Disposable {
     projectRoot: string,
     logger: SessionDetailControllerLogger,
     deps: SessionDetailControllerDeps,
+    fallbackScanDelayMs?: number,
   ) {
     this._projectRoot = projectRoot;
     this._logger = logger;
     this._deps = deps;
+    this._fallbackScanDelayMs = fallbackScanDelayMs ?? 800;
 
     this._stateEmitter = deps.createStateEmitter();
     this._errorEmitter = deps.createErrorEmitter();
@@ -139,6 +143,12 @@ export class SessionDetailController implements Disposable {
     if (this._currentWatcher !== null) {
       this._currentWatcher.dispose();
       this._currentWatcher = null;
+    }
+
+    // Cancel any pending fallback timer
+    if (this._fallbackTimer !== null) {
+      clearTimeout(this._fallbackTimer);
+      this._fallbackTimer = null;
     }
 
     // Increment generation
@@ -211,6 +221,28 @@ export class SessionDetailController implements Disposable {
 
     try {
       await this._deps.dispatchEvent(eventType, this._currentSessionId!, message, this._projectRoot, this._logger);
+
+      // Schedule fallback timer if a session is open (currentWatcher is not null)
+      if (this._currentWatcher !== null) {
+        // Debounce: cancel any existing fallback timer
+        if (this._fallbackTimer !== null) {
+          clearTimeout(this._fallbackTimer);
+          this._fallbackTimer = null;
+        }
+
+        const timerGeneration = this._generation;
+        this._fallbackTimer = setTimeout(() => {
+          this._fallbackTimer = null;
+          if (this._disposed || this._generation !== timerGeneration) {
+            return;
+          }
+          this._logger.info(
+            `fallback scan triggered after sendEvent for session ${this._currentSessionId}`,
+          );
+          this._runFallbackScan(timerGeneration);
+        }, this._fallbackScanDelayMs);
+      }
+
       return true;
     } catch (err: any) {
       if (!this._disposed) {
@@ -229,6 +261,12 @@ export class SessionDetailController implements Disposable {
       return;
     }
     this._disposed = true;
+
+    // Cancel any pending fallback timer
+    if (this._fallbackTimer !== null) {
+      clearTimeout(this._fallbackTimer);
+      this._fallbackTimer = null;
+    }
 
     if (this._currentWatcher !== null) {
       this._currentWatcher.dispose();
@@ -314,5 +352,31 @@ export class SessionDetailController implements Disposable {
         this._runScan();
       }
     }
+  }
+
+  /**
+   * Runs a fallback scan triggered by the fallback timer.
+   * Uses the same coalescing mechanism (dirty flag) as onDidChange.
+   * Catches errors and logs via logger.error without firing onDidError.
+   */
+  private _runFallbackScan(timerGeneration: number): void {
+    if (this._disposed) {
+      return;
+    }
+    if (this._generation !== timerGeneration) {
+      return;
+    }
+
+    // Use the same coalescing mechanism: if a scan is in-flight, set dirty
+    if (this._scanning) {
+      this._dirty = true;
+      return;
+    }
+
+    this._runScan().catch((err: any) => {
+      if (!this._disposed) {
+        this._logger.error(err.message);
+      }
+    });
   }
 }

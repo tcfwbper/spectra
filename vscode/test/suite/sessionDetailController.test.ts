@@ -4,15 +4,10 @@
  * Test spec: spec/test/vscode/src/controllers/sessionDetailController.md
  * Source under test: vscode/src/controllers/sessionDetailController.ts
  *
- * Scaffolded: The controller source file does not yet exist. These tests
- * are structured to compile and provide coverage once the production surface
- * is created with the expected dependency-injection seam
- * (SessionDetailControllerDeps).
- *
- * Missing production surface:
- *   - vscode/src/controllers/sessionDetailController.ts
- *   - SessionDetailController class
- *   - SessionDetailControllerDeps interface
+ * The controller source exists and provides the core DI seam
+ * (SessionDetailControllerDeps). All tests are concrete including the
+ * fallback timer feature (fallbackScanDelayMs parameter, timer scheduling
+ * in sendEvent, timer cancellation in open/dispose).
  */
 import * as sinon from "sinon";
 import { expect } from "chai";
@@ -27,6 +22,11 @@ import {
   type MockTypedEventEmitter,
   type MockEventWatcherInstance,
 } from "./helpers/controllerStubs";
+
+import {
+  createFakeTimerContext,
+  type FakeTimerContext,
+} from "./helpers/fakeTimers";
 
 import { SessionDetailController } from "../../src/controllers/sessionDetailController";
 
@@ -57,6 +57,15 @@ describe("SessionDetailController", function () {
     return new SessionDetailController("/project", logger, deps);
   }
 
+  /**
+   * Constructs instance with a custom fallbackScanDelayMs.
+   */
+  function createInstanceWithDelay(
+    fallbackScanDelayMs: number,
+  ): SessionDetailController {
+    return new SessionDetailController("/project", logger, deps, fallbackScanDelayMs);
+  }
+
   // ─── Happy Path — Construction ────────────────────────────────────────────
 
   describe("Happy Path — Construction", function () {
@@ -80,6 +89,67 @@ describe("SessionDetailController", function () {
       createInstance();
       // No onDidUpdate fired during construction
       expect(stateEmitter.fire.called).to.be.false;
+    });
+
+    it("should default fallbackScanDelayMs to 800 when not provided", async function () {
+      const timerCtx = createFakeTimerContext();
+      try {
+        deps.parseWorkflowDefinition.resolves({
+          entryNode: "start",
+          eventTypes: ["submit"],
+        });
+        deps.scanEvents.resolves([]);
+        deps.scanSessions.resolves([
+          { id: "s1", currentState: "start", status: "running", pid: 1 },
+        ]);
+        deps.dispatchEvent.resolves();
+
+        const instance = createInstance();
+        await instance.open("s1", "wf1");
+        await instance.sendEvent("submit", "msg");
+
+        // Timer should not have fired yet
+        expect(logger.info.called).to.be.false;
+
+        // Advance 799ms — not yet
+        timerCtx.tick(799);
+        expect(logger.info.called).to.be.false;
+
+        // Advance 1 more ms (total 800) — fires
+        timerCtx.tick(1);
+        expect(logger.info.calledOnce).to.be.true;
+      } finally {
+        timerCtx.restore();
+      }
+    });
+
+    it("should accept custom fallbackScanDelayMs", async function () {
+      const timerCtx = createFakeTimerContext();
+      try {
+        deps.parseWorkflowDefinition.resolves({
+          entryNode: "start",
+          eventTypes: ["submit"],
+        });
+        deps.scanEvents.resolves([]);
+        deps.scanSessions.resolves([
+          { id: "s1", currentState: "start", status: "running", pid: 1 },
+        ]);
+        deps.dispatchEvent.resolves();
+
+        const instance = createInstanceWithDelay(200);
+        await instance.open("s1", "wf1");
+        await instance.sendEvent("submit", "msg");
+
+        // Timer should not fire at 199ms
+        timerCtx.tick(199);
+        expect(logger.info.called).to.be.false;
+
+        // Fires at 200ms
+        timerCtx.tick(1);
+        expect(logger.info.calledOnce).to.be.true;
+      } finally {
+        timerCtx.restore();
+      }
     });
   });
 
@@ -143,6 +213,40 @@ describe("SessionDetailController", function () {
 
       // Verified by watcher mock having a registered listener after open
       expect(deps.createEventWatcher.calledOnce).to.be.true;
+    });
+
+    it("should cancel pending fallback timer on open", async function () {
+      const timerCtx = createFakeTimerContext();
+      try {
+        deps.parseWorkflowDefinition.resolves({
+          entryNode: "start",
+          eventTypes: ["submit"],
+        });
+        deps.scanEvents.resolves([]);
+        deps.scanSessions.resolves([
+          { id: "s1", currentState: "start", status: "running", pid: 1 },
+        ]);
+        deps.dispatchEvent.resolves();
+
+        const watcher2 = createMockEventWatcherInstance();
+        deps.createEventWatcher.onSecondCall().returns(watcher2);
+
+        const instance = createInstanceWithDelay(500);
+        await instance.open("s1", "wf1");
+        await instance.sendEvent("submit", "msg");
+
+        // Open a new session — should cancel the pending timer
+        deps.scanSessions.resolves([
+          { id: "s2", currentState: "start", status: "running", pid: 2 },
+        ]);
+        await instance.open("s2", "wf2");
+
+        // Advance past the original delay — timer should NOT fire
+        timerCtx.tick(600);
+        expect(logger.info.called).to.be.false;
+      } finally {
+        timerCtx.restore();
+      }
     });
   });
 
@@ -269,6 +373,121 @@ describe("SessionDetailController", function () {
       }
       expect(result).to.equal(false);
     });
+
+    it("should schedule fallback timer after successful dispatch when session is open", async function () {
+      const timerCtx = createFakeTimerContext();
+      try {
+        deps.parseWorkflowDefinition.resolves({
+          entryNode: "start",
+          eventTypes: ["submit"],
+        });
+        deps.scanEvents.resolves([]);
+        deps.scanSessions.resolves([
+          { id: "s1", currentState: "start", status: "running", pid: 1 },
+        ]);
+        deps.dispatchEvent.resolves();
+
+        const instance = createInstanceWithDelay(100);
+        await instance.open("s1", "wf1");
+
+        // Reset scan call counts after initial open
+        deps.scanEvents.resetHistory();
+
+        await instance.sendEvent("submit", "msg");
+
+        // Timer not fired yet
+        expect(deps.scanEvents.called).to.be.false;
+
+        // Advance to fire the timer
+        timerCtx.tick(100);
+        expect(deps.scanEvents.calledOnce).to.be.true;
+      } finally {
+        timerCtx.restore();
+      }
+    });
+
+    it("should log info when fallback timer fires", async function () {
+      const timerCtx = createFakeTimerContext();
+      try {
+        deps.parseWorkflowDefinition.resolves({
+          entryNode: "start",
+          eventTypes: ["submit"],
+        });
+        deps.scanEvents.resolves([]);
+        deps.scanSessions.resolves([
+          { id: "s1", currentState: "start", status: "running", pid: 1 },
+        ]);
+        deps.dispatchEvent.resolves();
+
+        const instance = createInstanceWithDelay(100);
+        await instance.open("s1", "wf1");
+        await instance.sendEvent("submit", "msg");
+
+        // Advance to fire the timer
+        timerCtx.tick(100);
+
+        expect(logger.info.calledOnce).to.be.true;
+        expect(logger.info.firstCall.args[0]).to.include("fallback scan triggered");
+        expect(logger.info.firstCall.args[0]).to.include("s1");
+      } finally {
+        timerCtx.restore();
+      }
+    });
+
+    it("should not schedule fallback timer when currentWatcher is null", async function () {
+      const timerCtx = createFakeTimerContext();
+      try {
+        deps.dispatchEvent.resolves();
+
+        // No open() called — currentWatcher is null
+        const instance = createInstanceWithDelay(100);
+        await instance.sendEvent("submit", "msg");
+
+        // Advance time — no timer should fire
+        timerCtx.tick(200);
+        expect(logger.info.called).to.be.false;
+      } finally {
+        timerCtx.restore();
+      }
+    });
+
+    it("should debounce fallback timer on rapid sendEvent calls", async function () {
+      const timerCtx = createFakeTimerContext();
+      try {
+        deps.parseWorkflowDefinition.resolves({
+          entryNode: "start",
+          eventTypes: ["submit"],
+        });
+        deps.scanEvents.resolves([]);
+        deps.scanSessions.resolves([
+          { id: "s1", currentState: "start", status: "running", pid: 1 },
+        ]);
+        deps.dispatchEvent.resolves();
+
+        const instance = createInstanceWithDelay(100);
+        await instance.open("s1", "wf1");
+
+        // Reset after initial open scan
+        deps.scanEvents.resetHistory();
+
+        // Rapid sends
+        await instance.sendEvent("submit", "msg1");
+        timerCtx.tick(50);
+        await instance.sendEvent("submit", "msg2");
+        timerCtx.tick(50);
+        await instance.sendEvent("submit", "msg3");
+
+        // At this point only 50ms since last sendEvent. No timer fired yet.
+        expect(logger.info.called).to.be.false;
+
+        // Advance 100ms from last send — now the single timer fires
+        timerCtx.tick(100);
+        expect(logger.info.calledOnce).to.be.true;
+        expect(deps.scanEvents.calledOnce).to.be.true;
+      } finally {
+        timerCtx.restore();
+      }
+    });
   });
 
   // ─── Error Propagation ────────────────────────────────────────────────────
@@ -336,6 +555,38 @@ describe("SessionDetailController", function () {
       // Missing: SessionDetailController.sendEvent must return false on dispatch failure
       if (result !== undefined) {
         expect(result).to.equal(false);
+      }
+    });
+
+    it("should not fire onDidError when fallback scan throws", async function () {
+      const timerCtx = createFakeTimerContext();
+      try {
+        deps.parseWorkflowDefinition.resolves({
+          entryNode: "start",
+          eventTypes: ["submit"],
+        });
+        deps.scanEvents.resolves([]);
+        deps.scanSessions.resolves([
+          { id: "s1", currentState: "start", status: "running", pid: 1 },
+        ]);
+        deps.dispatchEvent.resolves();
+
+        const instance = createInstanceWithDelay(100);
+        await instance.open("s1", "wf1");
+        await instance.sendEvent("submit", "msg");
+
+        // Make scan throw when fallback timer fires
+        deps.scanEvents.rejects(new Error("scan failure"));
+
+        // Fire the timer
+        timerCtx.tick(100);
+        await new Promise((r) => setImmediate(r));
+
+        // Should log the error but NOT fire onDidError
+        expect(logger.error.called).to.be.true;
+        expect(errorEmitter.fire.called).to.be.false;
+      } finally {
+        timerCtx.restore();
       }
     });
   });
@@ -471,6 +722,46 @@ describe("SessionDetailController", function () {
       );
       expect(staleEvents).to.have.length(0);
     });
+
+    it("should coalesce fallback scan with in-flight watcher scan via dirty flag", async function () {
+      const timerCtx = createFakeTimerContext();
+      try {
+        deps.parseWorkflowDefinition.resolves({
+          entryNode: "start",
+          eventTypes: ["submit"],
+        });
+        deps.scanEvents.resolves([]);
+        deps.scanSessions.resolves([
+          { id: "s1", currentState: "start", status: "running", pid: 1 },
+        ]);
+        deps.dispatchEvent.resolves();
+
+        const instance = createInstanceWithDelay(100);
+        await instance.open("s1", "wf1");
+
+        // Reset scan counts after initial open
+        deps.scanEvents.resetHistory();
+
+        // Start an in-flight scan via onDidChange
+        const scanDeferred = createDeferred<any[]>();
+        deps.scanEvents.returns(scanDeferred.promise);
+        eventWatcher.triggerChange();
+
+        // sendEvent and fire the fallback timer while scan is in-flight
+        await instance.sendEvent("submit", "msg");
+        timerCtx.tick(100);
+
+        // The fallback timer sets dirty flag because scan is in-flight
+        // Resolve the in-flight scan
+        scanDeferred.resolve([]);
+        await new Promise((r) => setImmediate(r));
+
+        // Should have been called twice: the initial in-flight + one re-scan from dirty flag
+        expect(deps.scanEvents.callCount).to.equal(2);
+      } finally {
+        timerCtx.restore();
+      }
+    });
   });
 
   // ─── Resource Cleanup ─────────────────────────────────────────────────────
@@ -562,6 +853,34 @@ describe("SessionDetailController", function () {
 
       // Watcher reference cleared — subsequent open would not double-dispose
       expect(eventWatcher.dispose.calledOnce).to.be.true;
+    });
+
+    it("should cancel pending fallback timer on dispose", async function () {
+      const timerCtx = createFakeTimerContext();
+      try {
+        deps.parseWorkflowDefinition.resolves({
+          entryNode: "start",
+          eventTypes: ["submit"],
+        });
+        deps.scanEvents.resolves([]);
+        deps.scanSessions.resolves([
+          { id: "s1", currentState: "start", status: "running", pid: 1 },
+        ]);
+        deps.dispatchEvent.resolves();
+
+        const instance = createInstanceWithDelay(100);
+        await instance.open("s1", "wf1");
+        await instance.sendEvent("submit", "msg");
+
+        // Dispose — should cancel the pending timer
+        instance.dispose();
+
+        // Advance past the delay — timer should NOT fire
+        timerCtx.tick(200);
+        expect(logger.info.called).to.be.false;
+      } finally {
+        timerCtx.restore();
+      }
     });
   });
 

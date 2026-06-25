@@ -6,7 +6,7 @@ Manages state and interactions for a single Session detail view. Orchestrates Ev
 
 ## Boundaries
 
-- Owns: constructing and disposing EventWatcher instances (one per open session), subscribing to `onDidChange`, triggering scans via EventScanner and SessionScanner, parsing event types and entry node via WorkflowDefinitionParser, assembling and pushing `SessionDetailState` (including `entryNode`, `currentState`, `status`), coalescing overlapping scan requests (dirty-flag mechanism), maintaining a generation counter to discard stale scan results, dispatching events via EventDispatcher, and suppressing callbacks after dispose.
+- Owns: constructing and disposing EventWatcher instances (one per open session), subscribing to `onDidChange`, triggering scans via EventScanner and SessionScanner, parsing event types and entry node via WorkflowDefinitionParser, assembling and pushing `SessionDetailState` (including `entryNode`, `currentState`, `status`), coalescing overlapping scan requests (dirty-flag mechanism), maintaining a generation counter to discard stale scan results, dispatching events via EventDispatcher, scheduling and cancelling fallback scan timers after successful event dispatch, and suppressing callbacks after dispose.
 - Delegates: filesystem watching and debounce to EventWatcher.
 - Delegates: event file reading/parsing to EventScanner (static method).
 - Delegates: workflow definition parsing to WorkflowDefinitionParser (static method).
@@ -32,7 +32,8 @@ Manages state and interactions for a single Session detail view. Orchestrates Ev
 | Logger (`{ info, warn, error }`) | Diagnostic output | `info()`, `warn()`, `error()` | — |
 
 Construction constraints:
-- Instantiated via `new SessionDetailController(projectRoot, logger)`.
+- Instantiated via `new SessionDetailController(projectRoot, logger, fallbackScanDelayMs?)`.
+- `fallbackScanDelayMs` is optional; defaults to `800` if not provided. Allows tests to inject a shorter or zero delay for deterministic behavior.
 - Internally constructs two `vscode.EventEmitter` instances (for state and error events) during construction.
 - Does NOT construct an EventWatcher during construction — EventWatcher is created lazily in `open()`.
 - Implements `vscode.Disposable`.
@@ -41,57 +42,64 @@ Construction constraints:
 
 ### Construction
 
-1. Stores `projectRoot` and `logger`.
+1. Stores `projectRoot`, `logger`, and `fallbackScanDelayMs` (defaults to `800` if not provided).
 2. Creates a `vscode.EventEmitter<SessionDetailState>` and exposes its `.event` as `onDidUpdate`.
 3. Creates a `vscode.EventEmitter<Error>` and exposes its `.event` as `onDidError`.
 4. Initializes internal state: `currentWatcher` as `null`, `currentSessionId` as `null`, `currentWorkflowName` as `null`, `generation` as `0`.
 5. Initializes the dirty flag to `false` and scanning flag to `false`.
-6. Sets the disposed flag to `false`.
+6. Initializes `fallbackTimer` as `null`.
+7. Sets the disposed flag to `false`.
 
 ### open(sessionId, workflowName)
 
-7. If disposed, returns immediately (no-op).
-8. If `currentWatcher` is not null, calls `currentWatcher.dispose()`.
-9. Increments `generation` by 1. Captures the new value as `openGeneration`.
-10. Stores `sessionId` as `currentSessionId` and `workflowName` as `currentWorkflowName`.
-11. Resets dirty flag to `false` and scanning flag to `false`.
-12. Constructs a new `EventWatcher(projectRoot, sessionId)`. If construction throws, the error propagates to the caller (no catch).
-13. Stores the new instance as `currentWatcher`.
-14. Subscribes to `currentWatcher.onDidChange` → calls the internal scan routine.
-15. Calls `WorkflowDefinitionParser.parse(projectRoot, workflowName, logger)` to obtain the `WorkflowParseResult` (`entryNode` and `eventTypes`).
-16. Calls `EventScanner.scan(projectRoot, sessionId, logger)` to load historical events.
-17. Calls `SessionScanner.scan(projectRoot, logger)` to load all session summaries, then finds the matching session by `sessionId` to extract `currentState`, `status`, and `pid`.
-18. After all calls resolve: checks if `generation` still equals `openGeneration`. If not, discards results and returns (a newer open() has taken over).
-19. Stores `entryNode` from the parse result for use in subsequent scan routines.
-20. Assembles `SessionDetailState` from the results (including `entryNode`, `currentState`, `status`, `pid`, `eventTypes`, `events`) and fires `onDidUpdate`.
+8. If disposed, returns immediately (no-op).
+9. If `currentWatcher` is not null, calls `currentWatcher.dispose()`.
+10. Cancels any pending fallback timer (clears `fallbackTimer` and sets it to `null`).
+11. Increments `generation` by 1. Captures the new value as `openGeneration`.
+12. Stores `sessionId` as `currentSessionId` and `workflowName` as `currentWorkflowName`.
+13. Resets dirty flag to `false` and scanning flag to `false`.
+14. Constructs a new `EventWatcher(projectRoot, sessionId)`. If construction throws, the error propagates to the caller (no catch).
+15. Stores the new instance as `currentWatcher`.
+16. Subscribes to `currentWatcher.onDidChange` → calls the internal scan routine.
+17. Calls `WorkflowDefinitionParser.parse(projectRoot, workflowName, logger)` to obtain the `WorkflowParseResult` (`entryNode` and `eventTypes`).
+18. Calls `EventScanner.scan(projectRoot, sessionId, logger)` to load historical events.
+19. Calls `SessionScanner.scan(projectRoot, logger)` to load all session summaries, then finds the matching session by `sessionId` to extract `currentState`, `status`, and `pid`.
+20. After all calls resolve: checks if `generation` still equals `openGeneration`. If not, discards results and returns (a newer open() has taken over).
+21. Stores `entryNode` from the parse result for use in subsequent scan routines.
+22. Assembles `SessionDetailState` from the results (including `entryNode`, `currentState`, `status`, `pid`, `eventTypes`, `events`) and fires `onDidUpdate`.
 
-### Internal Scan Routine (triggered by onDidChange)
+### Internal Scan Routine (triggered by onDidChange or fallback timer)
 
-21. If disposed, returns immediately.
-22. Checks if `generation` matches the generation captured at subscription time. If not, returns (watcher is stale).
-23. If a scan is already in-flight, sets the dirty flag to `true` and returns immediately.
-24. Sets scanning flag to `true`.
-25. Captures the current `generation` as `scanGeneration`.
-26. Calls `EventScanner.scan(projectRoot, currentSessionId, logger)`.
-27. Calls `SessionScanner.scan(projectRoot, logger)` and finds the matching session by `currentSessionId` to extract `currentState`, `status`, and `pid`.
-28. After both calls resolve: checks if `generation` still equals `scanGeneration`. If not, sets scanning flag to `false` and returns.
-29. Assembles `SessionDetailState` using the new events, previously stored `entryNode` and `eventTypes`, and freshly read `currentState`, `status`, and `pid`, then fires `onDidUpdate`.
-30. Sets scanning flag to `false`.
-31. If the dirty flag is `true`, resets it to `false` and re-invokes this routine (loop until clean).
+23. If disposed, returns immediately.
+24. Checks if `generation` matches the generation captured at invocation time. If not, returns (watcher is stale or session has changed).
+25. If a scan is already in-flight, sets the dirty flag to `true` and returns immediately.
+26. Sets scanning flag to `true`.
+27. Captures the current `generation` as `scanGeneration`.
+28. Calls `EventScanner.scan(projectRoot, currentSessionId, logger)`.
+29. Calls `SessionScanner.scan(projectRoot, logger)` and finds the matching session by `currentSessionId` to extract `currentState`, `status`, and `pid`.
+30. After both calls resolve: checks if `generation` still equals `scanGeneration`. If not, sets scanning flag to `false` and returns.
+31. Assembles `SessionDetailState` using the new events, previously stored `entryNode` and `eventTypes`, and freshly read `currentState`, `status`, and `pid`, then fires `onDidUpdate`.
+32. Sets scanning flag to `false`.
+33. If the dirty flag is `true`, resets it to `false` and re-invokes this routine (loop until clean).
 
 ### sendEvent(eventType, message) → Promise\<boolean\>
 
-32. If disposed, returns `false` immediately.
-33. Calls `EventDispatcher.dispatch(eventType, currentSessionId, message, projectRoot, logger)`.
-34. If the call throws (spawn failure — ENOENT, EACCES), catches the error, logs via `logger.error`, fires `onDidError` with the caught error, and returns `false`.
-35. If the call succeeds, returns `true`. No other immediate action (the EventWatcher will detect the resulting file change and trigger a re-scan).
+34. If disposed, returns `false` immediately.
+35. Calls `EventDispatcher.dispatch(eventType, currentSessionId, message, projectRoot, logger)`.
+36. If the call throws (spawn failure — ENOENT, EACCES), catches the error, logs via `logger.error`, fires `onDidError` with the caught error, and returns `false`.
+37. If the call succeeds and `currentWatcher` is not null (a session is open):
+    - Cancels any existing `fallbackTimer` (debounce-style reset).
+    - Schedules a new `fallbackTimer` with delay `fallbackScanDelayMs`.
+    - When the timer fires: logs via `logger.info` (e.g., "fallback scan triggered after sendEvent for session \<id\>"), then invokes the internal scan routine with the current `generation`. If the scan throws, catches the error and logs via `logger.error` (does NOT fire `onDidError`).
+38. Returns `true`.
 
 ### Dispose
 
-36. Sets the disposed flag to `true`.
-37. If `currentWatcher` is not null, calls `currentWatcher.dispose()` and sets `currentWatcher` to null.
-38. Disposes both `EventEmitter` instances.
-39. All in-flight async operations that complete after dispose check the disposed flag and suppress any callback invocations (`fire()` calls).
+39. Sets the disposed flag to `true`.
+40. Cancels any pending `fallbackTimer` (clears it and sets to `null`).
+41. If `currentWatcher` is not null, calls `currentWatcher.dispose()` and sets `currentWatcher` to null.
+42. Disposes both `EventEmitter` instances.
+43. All in-flight async operations that complete after dispose check the disposed flag and suppress any callback invocations (`fire()` calls).
 
 ## Inputs
 
@@ -99,6 +107,7 @@ Construction constraints:
 |---|---|---|---|
 | projectRoot | string | Non-empty, absolute path | Yes (constructor) |
 | logger | `{ info, warn, error }` | Must provide info, warn, error methods | Yes (constructor) |
+| fallbackScanDelayMs | number | Positive integer, milliseconds | No (constructor, defaults to 800) |
 | sessionId | string | Non-empty | Yes (open method) |
 | workflowName | string | Non-empty | Yes (open method) |
 | eventType | string | Non-empty | Yes (sendEvent method) |
@@ -138,11 +147,15 @@ Construction constraints:
 - Must dispose the previous EventWatcher before creating a new one in `open()`.
 - Must not catch errors thrown during EventWatcher construction — propagates to caller.
 - Must use the generation counter to discard scan results from a superseded `open()` call.
-- Must coalesce overlapping scan requests triggered by `onDidChange`: at most one scan in-flight, with at most one pending re-scan queued via dirty flag.
+- Must coalesce overlapping scan requests triggered by `onDidChange` or fallback timer: at most one scan in-flight, with at most one pending re-scan queued via dirty flag.
 - Must fire `onDidError` for EventDispatcher spawn failures (ENOENT, EACCES).
 - Must log via `logger.error` every time `onDidError` is fired.
 - Must not fire events or invoke scans after disposed flag is set.
 - At most one EventWatcher exists at any time (the current one).
+- At most one fallback timer is pending at any time (debounce-style reset on each successful sendEvent).
+- Must cancel any pending fallback timer on `open()` and `dispose()`.
+- Must not fire `onDidError` for errors occurring during the fallback scan — logs via `logger.error` only.
+- Must log via `logger.info` when a fallback scan timer fires, to distinguish from EventWatcher-triggered scans.
 
 ## Edge Cases
 
@@ -181,6 +194,24 @@ Construction constraints:
 
 - Condition: `WorkflowDefinitionParser.parse()` returns failure result (empty `entryNode` and empty `eventTypes`).
   Expected: `entryNode` in the pushed state is empty string, `eventTypes` is empty array. No error fired. The send-button in the webview will remain disabled because the guard condition (`currentState === entryNode`) cannot meaningfully match.
+
+- Condition: `sendEvent()` succeeds but `currentWatcher` is null (no session open via `open()`).
+  Expected: No fallback timer is scheduled. Returns `true`.
+
+- Condition: `sendEvent()` is called multiple times rapidly before the fallback timer fires.
+  Expected: Each subsequent call resets the timer (debounce). Only one timer is pending at any time. The timer fires once, `fallbackScanDelayMs` after the last successful sendEvent.
+
+- Condition: The fallback timer fires but EventWatcher already triggered a scan that is currently in-flight.
+  Expected: The fallback scan invocation sets the dirty flag (existing coalescing) and returns. A re-scan runs after the current scan completes.
+
+- Condition: The fallback timer fires but `open()` was called after `sendEvent()` (session switched).
+  Expected: The timer was cancelled by `open()`. No fallback scan runs.
+
+- Condition: The fallback timer fires but `dispose()` was called after `sendEvent()`.
+  Expected: The timer was cancelled by `dispose()`. No fallback scan runs.
+
+- Condition: The fallback scan itself throws (e.g., unexpected filesystem error in EventScanner).
+  Expected: The error is caught, logged via `logger.error`. No `onDidError` is fired. The controller continues operating normally.
 
 ## Related
 
