@@ -5,20 +5,9 @@
  * Source under test: vscode/src/controllers/sessionDetailController.ts
  *
  * The controller source exists and provides the core DI seam
- * (SessionDetailControllerDeps). Most tests are concrete.
- *
- * Scaffolded rows (10 total): all related to the fallback timer feature
- * (fallbackScanDelayMs parameter, timer scheduling in sendEvent, timer
- * cancellation in open/dispose). The production surface does not yet
- * implement this feature — see logic spec steps 10, 37, 40 and the
- * `fallbackScanDelayMs` constructor parameter.
- *
- * Missing production surface for scaffolded rows:
- *   - SessionDetailController constructor: optional `fallbackScanDelayMs` parameter
- *   - SessionDetailController.sendEvent: fallback timer scheduling after successful dispatch
- *   - SessionDetailController.open: cancel pending fallbackTimer
- *   - SessionDetailController.dispose: cancel pending fallbackTimer
- *   - Fallback timer callback: logger.info on fire, catch scan errors without onDidError
+ * (SessionDetailControllerDeps). All tests are concrete including the
+ * fallback timer feature (fallbackScanDelayMs parameter, timer scheduling
+ * in sendEvent, timer cancellation in open/dispose).
  */
 import * as sinon from "sinon";
 import { expect } from "chai";
@@ -69,19 +58,12 @@ describe("SessionDetailController", function () {
   }
 
   /**
-   * Scaffolded helper: constructs instance with a custom fallbackScanDelayMs.
-   * Once the production surface supports the parameter (4th arg or via deps),
-   * this helper will pass it through. Currently equivalent to createInstance().
-   *
-   * Missing: SessionDetailController constructor must accept optional
-   * fallbackScanDelayMs parameter.
+   * Constructs instance with a custom fallbackScanDelayMs.
    */
   function createInstanceWithDelay(
-    _fallbackScanDelayMs: number,
+    fallbackScanDelayMs: number,
   ): SessionDetailController {
-    // TODO: pass fallbackScanDelayMs once production surface supports it
-    // e.g. new SessionDetailController("/project", logger, deps, fallbackScanDelayMs)
-    return new SessionDetailController("/project", logger, deps);
+    return new SessionDetailController("/project", logger, deps, fallbackScanDelayMs);
   }
 
   // ─── Happy Path — Construction ────────────────────────────────────────────
@@ -109,19 +91,65 @@ describe("SessionDetailController", function () {
       expect(stateEmitter.fire.called).to.be.false;
     });
 
-    it("should default fallbackScanDelayMs to 800 when not provided", function () {
-      // Scaffolded: production surface does not yet accept fallbackScanDelayMs
-      // as a constructor parameter. The controller currently takes (projectRoot, logger, deps)
-      // and does not schedule fallback timers.
-      // Missing: SessionDetailController constructor must accept optional fallbackScanDelayMs
-      // (4th parameter or via deps), and sendEvent must schedule a timer with that delay.
-      this.skip(); // Missing: fallbackScanDelayMs constructor parameter and timer scheduling in sendEvent
+    it("should default fallbackScanDelayMs to 800 when not provided", async function () {
+      const timerCtx = createFakeTimerContext();
+      try {
+        deps.parseWorkflowDefinition.resolves({
+          entryNode: "start",
+          eventTypes: ["submit"],
+        });
+        deps.scanEvents.resolves([]);
+        deps.scanSessions.resolves([
+          { id: "s1", currentState: "start", status: "running", pid: 1 },
+        ]);
+        deps.dispatchEvent.resolves();
+
+        const instance = createInstance();
+        await instance.open("s1", "wf1");
+        await instance.sendEvent("submit", "msg");
+
+        // Timer should not have fired yet
+        expect(logger.info.called).to.be.false;
+
+        // Advance 799ms — not yet
+        timerCtx.tick(799);
+        expect(logger.info.called).to.be.false;
+
+        // Advance 1 more ms (total 800) — fires
+        timerCtx.tick(1);
+        expect(logger.info.calledOnce).to.be.true;
+      } finally {
+        timerCtx.restore();
+      }
     });
 
-    it("should accept custom fallbackScanDelayMs", function () {
-      // Scaffolded: production surface does not yet accept fallbackScanDelayMs
-      // Missing: SessionDetailController constructor must accept optional fallbackScanDelayMs
-      this.skip(); // Missing: fallbackScanDelayMs constructor parameter and timer scheduling in sendEvent
+    it("should accept custom fallbackScanDelayMs", async function () {
+      const timerCtx = createFakeTimerContext();
+      try {
+        deps.parseWorkflowDefinition.resolves({
+          entryNode: "start",
+          eventTypes: ["submit"],
+        });
+        deps.scanEvents.resolves([]);
+        deps.scanSessions.resolves([
+          { id: "s1", currentState: "start", status: "running", pid: 1 },
+        ]);
+        deps.dispatchEvent.resolves();
+
+        const instance = createInstanceWithDelay(200);
+        await instance.open("s1", "wf1");
+        await instance.sendEvent("submit", "msg");
+
+        // Timer should not fire at 199ms
+        timerCtx.tick(199);
+        expect(logger.info.called).to.be.false;
+
+        // Fires at 200ms
+        timerCtx.tick(1);
+        expect(logger.info.calledOnce).to.be.true;
+      } finally {
+        timerCtx.restore();
+      }
     });
   });
 
@@ -187,12 +215,38 @@ describe("SessionDetailController", function () {
       expect(deps.createEventWatcher.calledOnce).to.be.true;
     });
 
-    it("should cancel pending fallback timer on open", function () {
-      // Scaffolded: production surface does not yet schedule fallback timers
-      // in sendEvent, so there is no timer to cancel in open().
-      // Missing: SessionDetailController.sendEvent must schedule a fallback timer;
-      // SessionDetailController.open must cancel any pending fallbackTimer (step 10 in logic spec).
-      this.skip(); // Missing: fallbackTimer scheduling in sendEvent and cancellation in open()
+    it("should cancel pending fallback timer on open", async function () {
+      const timerCtx = createFakeTimerContext();
+      try {
+        deps.parseWorkflowDefinition.resolves({
+          entryNode: "start",
+          eventTypes: ["submit"],
+        });
+        deps.scanEvents.resolves([]);
+        deps.scanSessions.resolves([
+          { id: "s1", currentState: "start", status: "running", pid: 1 },
+        ]);
+        deps.dispatchEvent.resolves();
+
+        const watcher2 = createMockEventWatcherInstance();
+        deps.createEventWatcher.onSecondCall().returns(watcher2);
+
+        const instance = createInstanceWithDelay(500);
+        await instance.open("s1", "wf1");
+        await instance.sendEvent("submit", "msg");
+
+        // Open a new session — should cancel the pending timer
+        deps.scanSessions.resolves([
+          { id: "s2", currentState: "start", status: "running", pid: 2 },
+        ]);
+        await instance.open("s2", "wf2");
+
+        // Advance past the original delay — timer should NOT fire
+        timerCtx.tick(600);
+        expect(logger.info.called).to.be.false;
+      } finally {
+        timerCtx.restore();
+      }
     });
   });
 
@@ -320,29 +374,119 @@ describe("SessionDetailController", function () {
       expect(result).to.equal(false);
     });
 
-    it("should schedule fallback timer after successful dispatch when session is open", function () {
-      // Scaffolded: production surface does not yet schedule fallback timers.
-      // Missing: SessionDetailController.sendEvent must schedule a fallback timer
-      // (step 37 in logic spec) that invokes internal scan routine after fallbackScanDelayMs.
-      this.skip(); // Missing: fallbackTimer scheduling in sendEvent after successful dispatch
+    it("should schedule fallback timer after successful dispatch when session is open", async function () {
+      const timerCtx = createFakeTimerContext();
+      try {
+        deps.parseWorkflowDefinition.resolves({
+          entryNode: "start",
+          eventTypes: ["submit"],
+        });
+        deps.scanEvents.resolves([]);
+        deps.scanSessions.resolves([
+          { id: "s1", currentState: "start", status: "running", pid: 1 },
+        ]);
+        deps.dispatchEvent.resolves();
+
+        const instance = createInstanceWithDelay(100);
+        await instance.open("s1", "wf1");
+
+        // Reset scan call counts after initial open
+        deps.scanEvents.resetHistory();
+
+        await instance.sendEvent("submit", "msg");
+
+        // Timer not fired yet
+        expect(deps.scanEvents.called).to.be.false;
+
+        // Advance to fire the timer
+        timerCtx.tick(100);
+        expect(deps.scanEvents.calledOnce).to.be.true;
+      } finally {
+        timerCtx.restore();
+      }
     });
 
-    it("should log info when fallback timer fires", function () {
-      // Scaffolded: production surface does not yet schedule fallback timers.
-      // Missing: fallback timer callback must log via logger.info before triggering scan.
-      this.skip(); // Missing: fallbackTimer scheduling and logger.info call on timer fire
+    it("should log info when fallback timer fires", async function () {
+      const timerCtx = createFakeTimerContext();
+      try {
+        deps.parseWorkflowDefinition.resolves({
+          entryNode: "start",
+          eventTypes: ["submit"],
+        });
+        deps.scanEvents.resolves([]);
+        deps.scanSessions.resolves([
+          { id: "s1", currentState: "start", status: "running", pid: 1 },
+        ]);
+        deps.dispatchEvent.resolves();
+
+        const instance = createInstanceWithDelay(100);
+        await instance.open("s1", "wf1");
+        await instance.sendEvent("submit", "msg");
+
+        // Advance to fire the timer
+        timerCtx.tick(100);
+
+        expect(logger.info.calledOnce).to.be.true;
+        expect(logger.info.firstCall.args[0]).to.include("fallback scan triggered");
+        expect(logger.info.firstCall.args[0]).to.include("s1");
+      } finally {
+        timerCtx.restore();
+      }
     });
 
-    it("should not schedule fallback timer when currentWatcher is null", function () {
-      // Scaffolded: production surface does not yet schedule fallback timers.
-      // Missing: sendEvent must skip timer scheduling when currentWatcher is null (no session open).
-      this.skip(); // Missing: fallbackTimer scheduling conditional on currentWatcher !== null
+    it("should not schedule fallback timer when currentWatcher is null", async function () {
+      const timerCtx = createFakeTimerContext();
+      try {
+        deps.dispatchEvent.resolves();
+
+        // No open() called — currentWatcher is null
+        const instance = createInstanceWithDelay(100);
+        await instance.sendEvent("submit", "msg");
+
+        // Advance time — no timer should fire
+        timerCtx.tick(200);
+        expect(logger.info.called).to.be.false;
+      } finally {
+        timerCtx.restore();
+      }
     });
 
-    it("should debounce fallback timer on rapid sendEvent calls", function () {
-      // Scaffolded: production surface does not yet schedule fallback timers.
-      // Missing: sendEvent must cancel previous fallbackTimer (debounce) before scheduling new one.
-      this.skip(); // Missing: fallbackTimer debounce logic in sendEvent
+    it("should debounce fallback timer on rapid sendEvent calls", async function () {
+      const timerCtx = createFakeTimerContext();
+      try {
+        deps.parseWorkflowDefinition.resolves({
+          entryNode: "start",
+          eventTypes: ["submit"],
+        });
+        deps.scanEvents.resolves([]);
+        deps.scanSessions.resolves([
+          { id: "s1", currentState: "start", status: "running", pid: 1 },
+        ]);
+        deps.dispatchEvent.resolves();
+
+        const instance = createInstanceWithDelay(100);
+        await instance.open("s1", "wf1");
+
+        // Reset after initial open scan
+        deps.scanEvents.resetHistory();
+
+        // Rapid sends
+        await instance.sendEvent("submit", "msg1");
+        timerCtx.tick(50);
+        await instance.sendEvent("submit", "msg2");
+        timerCtx.tick(50);
+        await instance.sendEvent("submit", "msg3");
+
+        // At this point only 50ms since last sendEvent. No timer fired yet.
+        expect(logger.info.called).to.be.false;
+
+        // Advance 100ms from last send — now the single timer fires
+        timerCtx.tick(100);
+        expect(logger.info.calledOnce).to.be.true;
+        expect(deps.scanEvents.calledOnce).to.be.true;
+      } finally {
+        timerCtx.restore();
+      }
     });
   });
 
@@ -414,11 +558,36 @@ describe("SessionDetailController", function () {
       }
     });
 
-    it("should not fire onDidError when fallback scan throws", function () {
-      // Scaffolded: production surface does not yet schedule fallback timers.
-      // Missing: fallback timer callback must catch scan errors and log via logger.error
-      // without firing onDidError (step 37 in logic spec).
-      this.skip(); // Missing: fallbackTimer scheduling and error-handling in timer callback
+    it("should not fire onDidError when fallback scan throws", async function () {
+      const timerCtx = createFakeTimerContext();
+      try {
+        deps.parseWorkflowDefinition.resolves({
+          entryNode: "start",
+          eventTypes: ["submit"],
+        });
+        deps.scanEvents.resolves([]);
+        deps.scanSessions.resolves([
+          { id: "s1", currentState: "start", status: "running", pid: 1 },
+        ]);
+        deps.dispatchEvent.resolves();
+
+        const instance = createInstanceWithDelay(100);
+        await instance.open("s1", "wf1");
+        await instance.sendEvent("submit", "msg");
+
+        // Make scan throw when fallback timer fires
+        deps.scanEvents.rejects(new Error("scan failure"));
+
+        // Fire the timer
+        timerCtx.tick(100);
+        await new Promise((r) => setImmediate(r));
+
+        // Should log the error but NOT fire onDidError
+        expect(logger.error.called).to.be.true;
+        expect(errorEmitter.fire.called).to.be.false;
+      } finally {
+        timerCtx.restore();
+      }
     });
   });
 
@@ -554,11 +723,44 @@ describe("SessionDetailController", function () {
       expect(staleEvents).to.have.length(0);
     });
 
-    it("should coalesce fallback scan with in-flight watcher scan via dirty flag", function () {
-      // Scaffolded: production surface does not yet schedule fallback timers.
-      // Missing: fallback timer fires during an in-flight scan and sets dirty flag
-      // via the same coalescing mechanism used by onDidChange (steps 25, 37 in logic spec).
-      this.skip(); // Missing: fallbackTimer scheduling and integration with dirty-flag coalescing
+    it("should coalesce fallback scan with in-flight watcher scan via dirty flag", async function () {
+      const timerCtx = createFakeTimerContext();
+      try {
+        deps.parseWorkflowDefinition.resolves({
+          entryNode: "start",
+          eventTypes: ["submit"],
+        });
+        deps.scanEvents.resolves([]);
+        deps.scanSessions.resolves([
+          { id: "s1", currentState: "start", status: "running", pid: 1 },
+        ]);
+        deps.dispatchEvent.resolves();
+
+        const instance = createInstanceWithDelay(100);
+        await instance.open("s1", "wf1");
+
+        // Reset scan counts after initial open
+        deps.scanEvents.resetHistory();
+
+        // Start an in-flight scan via onDidChange
+        const scanDeferred = createDeferred<any[]>();
+        deps.scanEvents.returns(scanDeferred.promise);
+        eventWatcher.triggerChange();
+
+        // sendEvent and fire the fallback timer while scan is in-flight
+        await instance.sendEvent("submit", "msg");
+        timerCtx.tick(100);
+
+        // The fallback timer sets dirty flag because scan is in-flight
+        // Resolve the in-flight scan
+        scanDeferred.resolve([]);
+        await new Promise((r) => setImmediate(r));
+
+        // Should have been called twice: the initial in-flight + one re-scan from dirty flag
+        expect(deps.scanEvents.callCount).to.equal(2);
+      } finally {
+        timerCtx.restore();
+      }
     });
   });
 
@@ -653,10 +855,32 @@ describe("SessionDetailController", function () {
       expect(eventWatcher.dispose.calledOnce).to.be.true;
     });
 
-    it("should cancel pending fallback timer on dispose", function () {
-      // Scaffolded: production surface does not yet schedule fallback timers.
-      // Missing: SessionDetailController.dispose must cancel fallbackTimer (step 40 in logic spec).
-      this.skip(); // Missing: fallbackTimer scheduling in sendEvent and cancellation in dispose()
+    it("should cancel pending fallback timer on dispose", async function () {
+      const timerCtx = createFakeTimerContext();
+      try {
+        deps.parseWorkflowDefinition.resolves({
+          entryNode: "start",
+          eventTypes: ["submit"],
+        });
+        deps.scanEvents.resolves([]);
+        deps.scanSessions.resolves([
+          { id: "s1", currentState: "start", status: "running", pid: 1 },
+        ]);
+        deps.dispatchEvent.resolves();
+
+        const instance = createInstanceWithDelay(100);
+        await instance.open("s1", "wf1");
+        await instance.sendEvent("submit", "msg");
+
+        // Dispose — should cancel the pending timer
+        instance.dispose();
+
+        // Advance past the delay — timer should NOT fire
+        timerCtx.tick(200);
+        expect(logger.info.called).to.be.false;
+      } finally {
+        timerCtx.restore();
+      }
     });
   });
 
