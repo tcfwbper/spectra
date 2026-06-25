@@ -4,15 +4,21 @@
  * Test spec: spec/test/vscode/src/controllers/sessionDetailController.md
  * Source under test: vscode/src/controllers/sessionDetailController.ts
  *
- * Scaffolded: The controller source file does not yet exist. These tests
- * are structured to compile and provide coverage once the production surface
- * is created with the expected dependency-injection seam
- * (SessionDetailControllerDeps).
+ * The controller source exists and provides the core DI seam
+ * (SessionDetailControllerDeps). Most tests are concrete.
  *
- * Missing production surface:
- *   - vscode/src/controllers/sessionDetailController.ts
- *   - SessionDetailController class
- *   - SessionDetailControllerDeps interface
+ * Scaffolded rows (10 total): all related to the fallback timer feature
+ * (fallbackScanDelayMs parameter, timer scheduling in sendEvent, timer
+ * cancellation in open/dispose). The production surface does not yet
+ * implement this feature — see logic spec steps 10, 37, 40 and the
+ * `fallbackScanDelayMs` constructor parameter.
+ *
+ * Missing production surface for scaffolded rows:
+ *   - SessionDetailController constructor: optional `fallbackScanDelayMs` parameter
+ *   - SessionDetailController.sendEvent: fallback timer scheduling after successful dispatch
+ *   - SessionDetailController.open: cancel pending fallbackTimer
+ *   - SessionDetailController.dispose: cancel pending fallbackTimer
+ *   - Fallback timer callback: logger.info on fire, catch scan errors without onDidError
  */
 import * as sinon from "sinon";
 import { expect } from "chai";
@@ -27,6 +33,11 @@ import {
   type MockTypedEventEmitter,
   type MockEventWatcherInstance,
 } from "./helpers/controllerStubs";
+
+import {
+  createFakeTimerContext,
+  type FakeTimerContext,
+} from "./helpers/fakeTimers";
 
 import { SessionDetailController } from "../../src/controllers/sessionDetailController";
 
@@ -57,6 +68,22 @@ describe("SessionDetailController", function () {
     return new SessionDetailController("/project", logger, deps);
   }
 
+  /**
+   * Scaffolded helper: constructs instance with a custom fallbackScanDelayMs.
+   * Once the production surface supports the parameter (4th arg or via deps),
+   * this helper will pass it through. Currently equivalent to createInstance().
+   *
+   * Missing: SessionDetailController constructor must accept optional
+   * fallbackScanDelayMs parameter.
+   */
+  function createInstanceWithDelay(
+    _fallbackScanDelayMs: number,
+  ): SessionDetailController {
+    // TODO: pass fallbackScanDelayMs once production surface supports it
+    // e.g. new SessionDetailController("/project", logger, deps, fallbackScanDelayMs)
+    return new SessionDetailController("/project", logger, deps);
+  }
+
   // ─── Happy Path — Construction ────────────────────────────────────────────
 
   describe("Happy Path — Construction", function () {
@@ -80,6 +107,21 @@ describe("SessionDetailController", function () {
       createInstance();
       // No onDidUpdate fired during construction
       expect(stateEmitter.fire.called).to.be.false;
+    });
+
+    it("should default fallbackScanDelayMs to 800 when not provided", function () {
+      // Scaffolded: production surface does not yet accept fallbackScanDelayMs
+      // as a constructor parameter. The controller currently takes (projectRoot, logger, deps)
+      // and does not schedule fallback timers.
+      // Missing: SessionDetailController constructor must accept optional fallbackScanDelayMs
+      // (4th parameter or via deps), and sendEvent must schedule a timer with that delay.
+      this.skip(); // Missing: fallbackScanDelayMs constructor parameter and timer scheduling in sendEvent
+    });
+
+    it("should accept custom fallbackScanDelayMs", function () {
+      // Scaffolded: production surface does not yet accept fallbackScanDelayMs
+      // Missing: SessionDetailController constructor must accept optional fallbackScanDelayMs
+      this.skip(); // Missing: fallbackScanDelayMs constructor parameter and timer scheduling in sendEvent
     });
   });
 
@@ -143,6 +185,14 @@ describe("SessionDetailController", function () {
 
       // Verified by watcher mock having a registered listener after open
       expect(deps.createEventWatcher.calledOnce).to.be.true;
+    });
+
+    it("should cancel pending fallback timer on open", function () {
+      // Scaffolded: production surface does not yet schedule fallback timers
+      // in sendEvent, so there is no timer to cancel in open().
+      // Missing: SessionDetailController.sendEvent must schedule a fallback timer;
+      // SessionDetailController.open must cancel any pending fallbackTimer (step 10 in logic spec).
+      this.skip(); // Missing: fallbackTimer scheduling in sendEvent and cancellation in open()
     });
   });
 
@@ -269,6 +319,31 @@ describe("SessionDetailController", function () {
       }
       expect(result).to.equal(false);
     });
+
+    it("should schedule fallback timer after successful dispatch when session is open", function () {
+      // Scaffolded: production surface does not yet schedule fallback timers.
+      // Missing: SessionDetailController.sendEvent must schedule a fallback timer
+      // (step 37 in logic spec) that invokes internal scan routine after fallbackScanDelayMs.
+      this.skip(); // Missing: fallbackTimer scheduling in sendEvent after successful dispatch
+    });
+
+    it("should log info when fallback timer fires", function () {
+      // Scaffolded: production surface does not yet schedule fallback timers.
+      // Missing: fallback timer callback must log via logger.info before triggering scan.
+      this.skip(); // Missing: fallbackTimer scheduling and logger.info call on timer fire
+    });
+
+    it("should not schedule fallback timer when currentWatcher is null", function () {
+      // Scaffolded: production surface does not yet schedule fallback timers.
+      // Missing: sendEvent must skip timer scheduling when currentWatcher is null (no session open).
+      this.skip(); // Missing: fallbackTimer scheduling conditional on currentWatcher !== null
+    });
+
+    it("should debounce fallback timer on rapid sendEvent calls", function () {
+      // Scaffolded: production surface does not yet schedule fallback timers.
+      // Missing: sendEvent must cancel previous fallbackTimer (debounce) before scheduling new one.
+      this.skip(); // Missing: fallbackTimer debounce logic in sendEvent
+    });
   });
 
   // ─── Error Propagation ────────────────────────────────────────────────────
@@ -337,6 +412,13 @@ describe("SessionDetailController", function () {
       if (result !== undefined) {
         expect(result).to.equal(false);
       }
+    });
+
+    it("should not fire onDidError when fallback scan throws", function () {
+      // Scaffolded: production surface does not yet schedule fallback timers.
+      // Missing: fallback timer callback must catch scan errors and log via logger.error
+      // without firing onDidError (step 37 in logic spec).
+      this.skip(); // Missing: fallbackTimer scheduling and error-handling in timer callback
     });
   });
 
@@ -471,6 +553,13 @@ describe("SessionDetailController", function () {
       );
       expect(staleEvents).to.have.length(0);
     });
+
+    it("should coalesce fallback scan with in-flight watcher scan via dirty flag", function () {
+      // Scaffolded: production surface does not yet schedule fallback timers.
+      // Missing: fallback timer fires during an in-flight scan and sets dirty flag
+      // via the same coalescing mechanism used by onDidChange (steps 25, 37 in logic spec).
+      this.skip(); // Missing: fallbackTimer scheduling and integration with dirty-flag coalescing
+    });
   });
 
   // ─── Resource Cleanup ─────────────────────────────────────────────────────
@@ -562,6 +651,12 @@ describe("SessionDetailController", function () {
 
       // Watcher reference cleared — subsequent open would not double-dispose
       expect(eventWatcher.dispose.calledOnce).to.be.true;
+    });
+
+    it("should cancel pending fallback timer on dispose", function () {
+      // Scaffolded: production surface does not yet schedule fallback timers.
+      // Missing: SessionDetailController.dispose must cancel fallbackTimer (step 40 in logic spec).
+      this.skip(); // Missing: fallbackTimer scheduling in sendEvent and cancellation in dispose()
     });
   });
 
