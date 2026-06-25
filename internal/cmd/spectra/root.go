@@ -15,7 +15,7 @@ import (
 )
 
 // version is the current version of the spectra CLI.
-const version = "1.1.0"
+const version = "1.1.1"
 
 // NewRootCommand creates and returns the root cobra.Command for the spectra CLI.
 // It registers global flags (--version) and all subcommands (init, run, clear).
