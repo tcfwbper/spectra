@@ -123,6 +123,26 @@ func (m *mockRuntimeSocketManager) DeleteSocket() {
 // Ensure mockRuntimeSocketManager satisfies SocketManager.
 var _ SocketManager = (*mockRuntimeSocketManager)(nil)
 
+// mockProcessCleaner is a mock for ProcessCleaner.
+type mockProcessCleaner struct {
+	mu          sync.Mutex
+	cleanCalled int
+	cleanFunc   func()
+}
+
+func (m *mockProcessCleaner) Clean() {
+	m.mu.Lock()
+	m.cleanCalled++
+	fn := m.cleanFunc
+	m.mu.Unlock()
+	if fn != nil {
+		fn()
+	}
+}
+
+// Ensure mockProcessCleaner satisfies ProcessCleaner.
+var _ ProcessCleaner = (*mockProcessCleaner)(nil)
+
 // mockRuntimeTransitionToNode is a mock for TransitionToNode dispatch.
 // It satisfies the TransitionToNodeExecutor interface.
 type mockRuntimeTransitionToNode struct {
@@ -266,18 +286,19 @@ func (ft *fakeTimer) Chan() <-chan struct{} {
 
 // runtimeTestFixture holds all mock dependencies for a runtime test scenario.
 type runtimeTestFixture struct {
-	Logger             *mockLogger
-	SpectraFinder      *mockSpectraFinder
-	SessionInitializer *mockRuntimeSessionInitializer
-	SocketManager      *mockRuntimeSocketManager
-	TransitionToNode   *mockRuntimeTransitionToNode
-	SessionFinalizer   *mockRuntimeSessionFinalizer
-	WorkflowDef        *mockRuntimeWorkflowDef
-	Session            *mockSession
-	SignalSource       *fakeSignalSource
-	GraceTimer         *fakeTimer
-	ListenerTimer      *fakeTimer
-	SequenceTracker    *callSequenceTracker
+	Logger               *mockLogger
+	SpectraFinder        *mockSpectraFinder
+	SessionInitializer   *mockRuntimeSessionInitializer
+	SocketManager        *mockRuntimeSocketManager
+	TransitionToNode     *mockRuntimeTransitionToNode
+	SessionFinalizer     *mockRuntimeSessionFinalizer
+	WorkflowDef          *mockRuntimeWorkflowDef
+	Session              *mockSession
+	SignalSource         *fakeSignalSource
+	GraceTimer           *fakeTimer
+	ListenerTimer        *fakeTimer
+	SequenceTracker      *callSequenceTracker
+	ClaudeProcessCleaner *mockProcessCleaner
 }
 
 // newRuntimeTestFixture creates a fully-wired fixture with defaults for a
@@ -308,11 +329,12 @@ func newRuntimeTestFixture(t *testing.T) *runtimeTestFixture {
 		WorkflowDef: &mockRuntimeWorkflowDef{
 			entryNode: testEntryNode,
 		},
-		Session:         sess,
-		SignalSource:    newFakeSignalSource(),
-		GraceTimer:      newFakeTimer(),
-		ListenerTimer:   newFakeTimer(),
-		SequenceTracker: newCallSequenceTracker(),
+		Session:              sess,
+		SignalSource:         newFakeSignalSource(),
+		GraceTimer:          newFakeTimer(),
+		ListenerTimer:       newFakeTimer(),
+		SequenceTracker:     newCallSequenceTracker(),
+		ClaudeProcessCleaner: &mockProcessCleaner{},
 	}
 
 	// Wire the session initializer to return a successful InitResult.
@@ -504,7 +526,7 @@ func wireFixtureToSeams(t *testing.T, f *runtimeTestFixture) {
 			transitionNode:       f.TransitionToNode,
 			messageRouter:        NewMessageRouter(ps, nil, nil, terminationNotifier, log),
 			finalizer:            NewSessionFinalizer(log),
-			claudeProcessCleaner: NewClaudeProcessCleaner(ps, log),
+			claudeProcessCleaner: f.ClaudeProcessCleaner,
 		}, nil
 	}
 

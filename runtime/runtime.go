@@ -86,6 +86,11 @@ type SocketManager interface {
 	DeleteSocket()
 }
 
+// ProcessCleaner defines the interface for cleaning up orphaned processes.
+type ProcessCleaner interface {
+	Clean()
+}
+
 // --- Adapters ---
 
 // sessionDirManagerAdapter adapts the package-level storage.CreateSessionDirectory
@@ -354,7 +359,7 @@ type runtimePostSessionDeps struct {
 	transitionNode       TransitionToNodeExecutor
 	messageRouter        *MessageRouter
 	finalizer            *SessionFinalizer
-	claudeProcessCleaner *ClaudeProcessCleaner
+	claudeProcessCleaner ProcessCleaner
 }
 
 // constructPostSessionDeps creates all post-session dependencies.

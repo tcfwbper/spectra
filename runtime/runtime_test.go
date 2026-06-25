@@ -469,8 +469,6 @@ func TestRun_InitialDispatchMessage(t *testing.T) {
 }
 
 func TestRun_ClaudeProcessCleanerCalledDuringCleanup(t *testing.T) {
-	t.Skip("scaffolded: production runtime.go does not yet integrate ClaudeProcessCleaner — missing ClaudeProcessCleaner construction in constructPostSessionDeps and Clean() call in cleanup sequence")
-
 	// Setup
 	f := newRuntimeTestFixture(t)
 	f.Session.getStatusResult = "completed"
@@ -498,8 +496,7 @@ func TestRun_ClaudeProcessCleanerCalledDuringCleanup(t *testing.T) {
 	_, _ = Run("wf", "", f.Logger)
 
 	// Assert: ClaudeProcessCleaner.Clean() called exactly once
-	// This requires a mock ClaudeProcessCleaner wired into the runtimePostSessionDeps fixture.
-	// assert.Equal(t, 1, f.ClaudeProcessCleaner.cleanCalled)
+	assert.Equal(t, 1, f.ClaudeProcessCleaner.cleanCalled)
 }
 
 func TestRun_DeleteSocketCalledDuringCleanup(t *testing.T) {
@@ -587,8 +584,6 @@ func TestRun_SessionFinalizerNotInvokedWhenNoSession(t *testing.T) {
 }
 
 func TestRun_CleanupOrder(t *testing.T) {
-	t.Skip("scaffolded: production runtime.go does not yet integrate ClaudeProcessCleaner — missing ClaudeProcessCleaner.Clean() call between SignalStop and DeleteSocket in cleanup sequence")
-
 	// Setup
 	f := newRuntimeTestFixture(t)
 	f.Session.getStatusResult = "completed"
@@ -601,6 +596,10 @@ func TestRun_CleanupOrder(t *testing.T) {
 	f.SocketManager.deleteSocketFunc = func() {
 		tracker.Record("DeleteSocket")
 		close(listenerDoneCh)
+	}
+
+	f.ClaudeProcessCleaner.cleanFunc = func() {
+		tracker.Record("ClaudeProcessCleaner.Clean")
 	}
 
 	f.SessionInitializer.initializeFunc = func(workflowName string, sessionID string, terminationNotifier chan<- struct{}) InitResult {
