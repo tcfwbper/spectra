@@ -2,10 +2,68 @@ package runtime
 
 import (
 	"fmt"
+	"os"
 	"strings"
+	"syscall"
+	"time"
 
 	"github.com/tcfwbper/spectra/logger"
 )
+
+// --- Default OS implementations (internal) ---
+
+type osProcessInspector struct{}
+
+func (o *osProcessInspector) IsRunning(pid int) bool {
+	proc, err := os.FindProcess(pid)
+	if err != nil {
+		return false
+	}
+	return proc.Signal(syscall.Signal(0)) == nil
+}
+
+func (o *osProcessInspector) Command(pid int) string {
+	data, err := os.ReadFile(fmt.Sprintf("/proc/%d/cmdline", pid))
+	if err != nil {
+		return ""
+	}
+	return strings.ReplaceAll(string(data), "\x00", " ")
+}
+
+type osSignalSender struct{}
+
+func (o *osSignalSender) SendSIGTERM(pid int) error {
+	proc, err := os.FindProcess(pid)
+	if err != nil {
+		return err
+	}
+	return proc.Signal(syscall.SIGTERM)
+}
+
+func (o *osSignalSender) SendSIGKILL(pid int) error {
+	proc, err := os.FindProcess(pid)
+	if err != nil {
+		return err
+	}
+	return proc.Signal(syscall.SIGKILL)
+}
+
+type osProcessWaiter struct{}
+
+func (o *osProcessWaiter) WaitForExit(pid int) bool {
+	deadline := time.Now().Add(2 * time.Second)
+	for time.Now().Before(deadline) {
+		proc, err := os.FindProcess(pid)
+		if err != nil {
+			return true
+		}
+		if proc.Signal(syscall.Signal(0)) != nil {
+			return true
+		}
+		time.Sleep(100 * time.Millisecond)
+	}
+	return false
+}
 
 // ProcessInspector defines the interface for checking process state.
 type ProcessInspector interface {
@@ -62,8 +120,11 @@ func WithProcessWaiter(waiter ProcessWaiter) ClaudeProcessCleanerOption {
 // PersistentSession and Logger.
 func NewClaudeProcessCleaner(ps *PersistentSession, log logger.Logger, opts ...ClaudeProcessCleanerOption) *ClaudeProcessCleaner {
 	c := &ClaudeProcessCleaner{
-		ps:  ps,
-		log: log,
+		ps:        ps,
+		log:       log,
+		inspector: &osProcessInspector{},
+		sender:    &osSignalSender{},
+		waiter:    &osProcessWaiter{},
 	}
 	for _, opt := range opts {
 		opt(c)
@@ -105,9 +166,6 @@ func (c *ClaudeProcessCleaner) Clean() {
 	// Step 7-8: Verify each candidate PID.
 	var killList []int
 	for _, pid := range candidates {
-		if c.inspector == nil {
-			continue
-		}
 		if !c.inspector.IsRunning(pid) {
 			continue
 		}
@@ -128,9 +186,6 @@ func (c *ClaudeProcessCleaner) Clean() {
 	// Step 10-12: Send SIGTERM to all processes in kill list.
 	var waitList []int
 	for _, pid := range killList {
-		if c.sender == nil {
-			continue
-		}
 		if err := c.sender.SendSIGTERM(pid); err != nil {
 			c.log.Warn(fmt.Sprintf("failed to send SIGTERM to PID %d: %s", pid, err.Error()))
 			continue
@@ -140,16 +195,14 @@ func (c *ClaudeProcessCleaner) Clean() {
 	c.log.Info(fmt.Sprintf("sent SIGTERM to %d claude process(es)", len(waitList)))
 
 	// Step 13-16: Wait for processes to exit, escalate to SIGKILL if needed.
-	if c.waiter != nil && c.sender != nil {
-		for _, pid := range waitList {
-			if c.waiter.WaitForExit(pid) {
-				continue
-			}
-			// Process did not exit within timeout — escalate to SIGKILL.
-			c.log.Warn(fmt.Sprintf("escalating to SIGKILL for PID %d", pid))
-			if err := c.sender.SendSIGKILL(pid); err != nil {
-				c.log.Warn(fmt.Sprintf("failed to kill claude process: pid=%d error=%s", pid, err.Error()))
-			}
+	for _, pid := range waitList {
+		if c.waiter.WaitForExit(pid) {
+			continue
+		}
+		// Process did not exit within timeout — escalate to SIGKILL.
+		c.log.Warn(fmt.Sprintf("escalating to SIGKILL for PID %d", pid))
+		if err := c.sender.SendSIGKILL(pid); err != nil {
+			c.log.Warn(fmt.Sprintf("failed to kill claude process: pid=%d error=%s", pid, err.Error()))
 		}
 	}
 
