@@ -9,6 +9,7 @@ AgentInvoker is responsible for invoking a Claude CLI agent process with the app
 - Owns: Claude session ID lifecycle per node (read existing or generate new, persist to session data).
 - Owns: CLI command construction (flags, arguments, working directory, environment variables).
 - Owns: process startup via `exec.Command` + `cmd.Start()`.
+- Owns: PID recording to session data after successful process startup.
 - Owns: working directory validation (existence and directory-type check).
 - Delegates: RuntimeError construction and `PersistentSession.Fail()` invocation to the runtime error-handling owner.
 - Delegates: process lifecycle monitoring (exit detection, crash handling) to the event-driven runtime model (agents emit events via `spectra-agent event emit`).
@@ -58,7 +59,10 @@ Construction constraint: AgentInvoker is initialized with a `PersistentSession` 
 12. Sets `cmd.Env` by appending `SPECTRA_SESSION_ID=<PersistentSession.ID>` and `SPECTRA_CLAUDE_SESSION_ID=<ClaudeSessionID>` to the parent process's environment (`os.Environ()`).
 13. Calls `cmd.Start()` to start the process asynchronously.
 14. If `cmd.Start()` fails, returns an error immediately.
-15. Returns `nil` on success. The Claude CLI process runs independently in the background.
+15. After successful `cmd.Start()`, reads `cmd.Process.Pid` (the OS process ID of the started process).
+16. Calls `PersistentSession.UpdateSessionDataSafe("<NodeName>.PID", pid)` to record the process ID. This overwrites any previously stored PID for the same node (from a prior invocation).
+17. If `PersistentSession.UpdateSessionDataSafe()` returns an error (in-memory validation failure), logs a warning but does not return an error — the process is already running and PID recording is best-effort for cleanup purposes.
+18. Returns `nil` on success. The Claude CLI process runs independently in the background.
 
 ## Inputs
 
@@ -88,6 +92,7 @@ Construction constraint: AgentInvoker is initialized with a `PersistentSession` 
 **Side effects**:
 - Claude CLI process started and running in the background (stdout/stderr inherited from parent process).
 - If a new Claude session ID was generated, `SessionData["<NodeName>.ClaudeSessionID"]` is updated and persisted via `PersistentSession.UpdateSessionDataSafe()`.
+- `SessionData["<NodeName>.PID"]` is updated with the OS process ID of the started process (best-effort; failure is logged but not propagated).
 
 ### Error Cases
 
@@ -103,29 +108,31 @@ Construction constraint: AgentInvoker is initialized with a `PersistentSession` 
 
 1. **ClaudeSessionID Non-Empty After Resolution**: After step 4 completes without error, ClaudeSessionID is guaranteed to be a non-empty string (either retrieved or newly generated).
 
-2. **Session Data Write-If-And-Only-If New**: `PersistentSession.UpdateSessionDataSafe()` is called if and only if the Claude session ID was newly generated (key did not exist in session data).
+2. **Session Data Write-If-And-Only-If New (ClaudeSessionID)**: `PersistentSession.UpdateSessionDataSafe()` for the ClaudeSessionID key is called if and only if the Claude session ID was newly generated (key did not exist in session data).
 
-3. **Command Construction Safety**: Must use `exec.Command` with each flag and value as separate arguments. Must never construct a shell command string or pass arguments to a shell interpreter.
+3. **PID Always Written After Start**: `PersistentSession.UpdateSessionDataSafe("<NodeName>.PID", pid)` is called after every successful `cmd.Start()`, regardless of whether the Claude session is new or resumed. PID recording failure is non-fatal (logged only).
 
-4. **No Manual Escaping**: Must not manually quote or escape arguments. `exec.Command` handles argument passing safely.
+4. **Command Construction Safety**: Must use `exec.Command` with each flag and value as separate arguments. Must never construct a shell command string or pass arguments to a shell interpreter.
 
-5. **Working Directory Is Absolute**: `cmd.Dir` is always set to an absolute path (ProjectRoot joined with AgentDefinition.AgentRoot()).
+5. **No Manual Escaping**: Must not manually quote or escape arguments. `exec.Command` handles argument passing safely.
 
-6. **Environment Variable Injection**: The started process's environment always contains both `SPECTRA_SESSION_ID` and `SPECTRA_CLAUDE_SESSION_ID`. Appended values take precedence over any pre-existing values in the parent environment (last-value-wins behavior).
+6. **Working Directory Is Absolute**: `cmd.Dir` is always set to an absolute path (ProjectRoot joined with AgentDefinition.AgentRoot()).
 
-7. **Resume vs Session-ID Mutual Exclusivity**: The command includes exactly one of `--resume <ID>` (existing session) or `--session-id <ID>` (new session), never both.
+7. **Environment Variable Injection**: The started process's environment always contains both `SPECTRA_SESSION_ID` and `SPECTRA_CLAUDE_SESSION_ID`. Appended values take precedence over any pre-existing values in the parent environment (last-value-wins behavior).
 
-8. **Conditional Tool Flags**: `--allowed-tools` is omitted entirely when `AllowedTools()` returns an empty slice. Same for `--disallowed-tools` and `DisallowedTools()`.
+8. **Resume vs Session-ID Mutual Exclusivity**: The command includes exactly one of `--resume <ID>` (existing session) or `--session-id <ID>` (new session), never both.
 
-9. **Fail-Fast**: Returns immediately on first error. No subsequent steps execute after an error.
+9. **Conditional Tool Flags**: `--allowed-tools` is omitted entirely when `AllowedTools()` returns an empty slice. Same for `--disallowed-tools` and `DisallowedTools()`.
 
-10. **No Output Capture**: Must not redirect or capture stdout/stderr. The Claude CLI process inherits the parent process's output streams.
+10. **Fail-Fast**: Returns immediately on first error before `cmd.Start()`. No subsequent steps execute after an error. After `cmd.Start()` succeeds, PID recording failure is non-fatal.
 
-11. **Asynchronous Non-Blocking**: Returns immediately after `cmd.Start()` succeeds. Does not call `cmd.Wait()` or monitor the process.
+11. **No Output Capture**: Must not redirect or capture stdout/stderr. The Claude CLI process inherits the parent process's output streams.
 
-12. **Error Delegation**: Returns plain Go errors. Must not construct RuntimeError or call `PersistentSession.Fail()`.
+12. **Asynchronous Non-Blocking**: Returns immediately after `cmd.Start()` succeeds and PID is recorded. Does not call `cmd.Wait()` or monitor the process.
 
-13. **Thread Safety**: Safe for concurrent invocations targeting different nodes within the same session. Each invocation operates on a distinct `<NodeName>.ClaudeSessionID` key. `PersistentSession.UpdateSessionDataSafe()` serializes concurrent writes via session's internal lock. Concurrent invocations for the same node are not supported and must be serialized externally by the caller.
+13. **Error Delegation**: Returns plain Go errors. Must not construct RuntimeError or call `PersistentSession.Fail()`.
+
+14. **Thread Safety**: Safe for concurrent invocations targeting different nodes within the same session. Each invocation operates on distinct `<NodeName>.ClaudeSessionID` and `<NodeName>.PID` keys. `PersistentSession.UpdateSessionDataSafe()` serializes concurrent writes via session's internal lock. Concurrent invocations for the same node are not supported and must be serialized externally by the caller.
 
 ## Edge Cases
 
@@ -178,11 +185,18 @@ Construction constraint: AgentInvoker is initialized with a `PersistentSession` 
   Expected: AgentInvoker does not validate UUID format of stored values. Passes as-is. Claude CLI is responsible for validation.
 
 - Condition: Parent process terminates while Claude CLI processes are running.
-  Expected: Claude CLI processes are not automatically terminated. They may become orphaned. This is outside AgentInvoker's responsibility.
+  Expected: Claude CLI processes are not automatically terminated by AgentInvoker. Termination of orphaned processes is ClaudeProcessCleaner's responsibility (invoked by Runtime during cleanup).
+
+- Condition: `cmd.Start()` succeeds but `UpdateSessionDataSafe("<NodeName>.PID", pid)` fails.
+  Expected: Warning is logged. The process is already running. AgentInvoker returns nil (success). The PID is not recorded — ClaudeProcessCleaner will not be able to terminate this process on shutdown.
+
+- Condition: Node is visited a second time (resume). Previous PID is stale.
+  Expected: The new `cmd.Start()` produces a new PID which overwrites the old value via `UpdateSessionDataSafe`. The old process should have already exited after emitting its event.
 
 ## Related
 
 - [AgentDefinition](../components/agent_definition.md) — provides agent configuration (model, effort, system prompt, tools, agent root)
-- [Session](../entities/session/session.md) — stores Claude session IDs in SessionData; provides thread-safe read/write methods
+- [Session](../entities/session/session.md) — stores Claude session IDs and PIDs in SessionData; provides thread-safe read/write methods
 - [RuntimeError](../entities/runtime_error.md) — constructed by the runtime error-handling owner when AgentInvoker's caller propagates an error
 - [TransitionToNode](./transition_to_node.md) — direct caller; invokes AgentInvoker and propagates errors upward
+- [ClaudeProcessCleaner](./claude_process_cleaner.md) — reads `<NodeName>.PID` values written by AgentInvoker to terminate orphaned processes

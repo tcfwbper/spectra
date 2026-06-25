@@ -142,19 +142,21 @@ These are the cross-method invariants. Per-method invariants live in the corresp
 
 5. **Event History Immutability**: Once appended via [`UpdateEventHistorySafe`](./event_history.md), events are never removed, reordered, or modified.
 
-6. **SessionData Namespace Discipline**: Keys with namespace prefixes (`logicSpec.*`, `<NodeName>.ClaudeSessionID`) follow the conventions documented in [`data.md`](./data.md). The Session does not enforce namespace ownership.
+6. **SessionData Namespace Discipline**: Keys with namespace prefixes (`logicSpec.*`, `<NodeName>.ClaudeSessionID`, `<NodeName>.PID`) follow the conventions documented in [`data.md`](./data.md). The Session does not enforce namespace ownership.
 
 7. **ClaudeSessionID Type Discipline**: Keys matching `<NodeName>.ClaudeSessionID` always hold `string` values; this is enforced by [`UpdateSessionDataSafe`](./data.md) at write time.
 
-8. **Terminal State Finality**: Once `Status` reaches `"completed"` or `"failed"`, no lifecycle method may transition it elsewhere. [`Run`](./lifecycle.md) and [`Done`](./lifecycle.md) reject all non-matching statuses via preconditions. [`Fail`](./lifecycle.md) explicitly rejects both `"completed"` and `"failed"`.
+8. **PID Type Discipline**: Keys matching `<NodeName>.PID` always hold `int` values; this is enforced by [`UpdateSessionDataSafe`](./data.md) at write time.
 
-9. **Thread-Safety via Read-Write Lock**: All access to `Status`, `CurrentState`, `EventHistory`, `SessionData`, `Error`, and `UpdatedAt` after construction goes through the methods listed in this index. Direct field access from outside the `session` package is disallowed.
+9. **Terminal State Finality**: Once `Status` reaches `"completed"` or `"failed"`, no lifecycle method may transition it elsewhere. [`Run`](./lifecycle.md) and [`Done`](./lifecycle.md) reject all non-matching statuses via preconditions. [`Fail`](./lifecycle.md) explicitly rejects both `"completed"` and `"failed"`.
 
-10. **First Error Wins**: The first successful [`Fail`](./lifecycle.md) call is authoritative. Subsequent `Fail` calls are rejected with `"session already failed"`.
+10. **Thread-Safety via Read-Write Lock**: All access to `Status`, `CurrentState`, `EventHistory`, `SessionData`, `Error`, and `UpdatedAt` after construction goes through the methods listed in this index. Direct field access from outside the `session` package is disallowed.
 
-11. **No Persistence**: Session never performs I/O. All state is purely in-memory. The runtime caller is responsible for persisting state if desired.
+11. **First Error Wins**: The first successful [`Fail`](./lifecycle.md) call is authoritative. Subsequent `Fail` calls are rejected with `"session already failed"`.
 
-12. **Construction Only Via Constructor**: Must be constructed via `NewSession`. Direct struct literal construction is forbidden. The constructor validates all inputs and establishes all invariants.
+12. **No Persistence**: Session never performs I/O. All state is purely in-memory. The runtime caller is responsible for persisting state if desired.
+
+13. **Construction Only Via Constructor**: Must be constructed via `NewSession`. Direct struct literal construction is forbidden. The constructor validates all inputs and establishes all invariants.
 
 ## Edge Cases
 
