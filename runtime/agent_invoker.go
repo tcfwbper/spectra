@@ -7,6 +7,8 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+
+	"github.com/tcfwbper/spectra/logger"
 )
 
 // AgentDef defines the read-only interface for agent definitions consumed by
@@ -26,13 +28,14 @@ type UUIDGenerator interface {
 }
 
 // CommandHandle abstracts an exec.Cmd for testing. It exposes the minimal
-// surface needed by AgentInvoker: Start, and field setters.
+// surface needed by AgentInvoker: Start, Pid, and field setters.
 type CommandHandle interface {
 	SetDir(dir string)
 	SetEnv(env []string)
 	SetStdout(w io.Writer)
 	SetStderr(w io.Writer)
 	Start() error
+	Pid() int
 }
 
 // CommandStarter abstracts the creation of a command (exec.Command).
@@ -81,6 +84,13 @@ func (h *execCommandHandle) Start() error {
 	return h.cmd.Start()
 }
 
+func (h *execCommandHandle) Pid() int {
+	if h.cmd.Process != nil {
+		return h.cmd.Process.Pid
+	}
+	return 0
+}
+
 // defaultCommandStarter creates real exec.Cmd instances.
 type defaultCommandStarter struct{}
 
@@ -97,6 +107,7 @@ type AgentInvoker struct {
 	projectRoot string
 	uuidGen     UUIDGenerator
 	cmdStarter  CommandStarter
+	log         logger.Logger
 }
 
 // AgentInvokerOption is a functional option for configuring AgentInvoker.
@@ -113,6 +124,13 @@ func WithUUIDGenerator(gen UUIDGenerator) AgentInvokerOption {
 func WithCommandStarter(starter CommandStarter) AgentInvokerOption {
 	return func(ai *AgentInvoker) {
 		ai.cmdStarter = starter
+	}
+}
+
+// WithLogger sets a custom logger for the AgentInvoker.
+func WithLogger(log logger.Logger) AgentInvokerOption {
+	return func(ai *AgentInvoker) {
+		ai.log = log
 	}
 }
 
@@ -168,6 +186,15 @@ func (ai *AgentInvoker) Invoke(nodeName, message string, agentDef AgentDef) erro
 	// Step 6: Start the process.
 	if err := cmd.Start(); err != nil {
 		return fmt.Errorf("failed to start Claude CLI process: %w", err)
+	}
+
+	// Step 7: Record PID after successful start (best-effort).
+	pid := cmd.Pid()
+	pidKey := nodeName + ".PID"
+	if err := ai.ps.UpdateSessionDataSafe(pidKey, pid); err != nil {
+		if ai.log != nil {
+			ai.log.Warn(fmt.Sprintf("failed to record PID for node %s: %s", nodeName, err.Error()))
+		}
 	}
 
 	return nil

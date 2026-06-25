@@ -63,9 +63,39 @@ jobs:
           path: dist/*.tar.gz
           if-no-files-found: error
 
+  vscode:
+    name: Build VS Code extension
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: vscode/package-lock.json
+
+      - name: Build VSIX
+        working-directory: vscode
+        run: |
+          npm ci
+          npm run compile
+          npx @vscode/vsce package --out ../spectra-vscode.vsix
+
+      - name: Upload VSIX artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-vscode
+          path: spectra-vscode.vsix
+          if-no-files-found: error
+
   publish:
     name: Publish GitHub release
-    needs: release
+    needs: [release, vscode]
     runs-on: ubuntu-latest
     timeout-minutes: 10
 
@@ -79,7 +109,8 @@ jobs:
         run: |
           mkdir -p release-assets
           find dist -type f -name '*.tar.gz' -exec cp {} release-assets/ \;
-          (cd release-assets && sha256sum *.tar.gz > checksums.txt)
+          find dist -type f -name '*.vsix' -exec cp {} release-assets/ \;
+          (cd release-assets && sha256sum * > checksums.txt)
 
       - name: Create GitHub release
         uses: softprops/action-gh-release@v2
@@ -90,4 +121,5 @@ jobs:
           prerelease: ${{ github.ref_type != 'tag' }}
           files: |
             release-assets/*.tar.gz
+            release-assets/*.vsix
             release-assets/checksums.txt

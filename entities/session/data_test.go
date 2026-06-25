@@ -116,6 +116,79 @@ func TestUpdateSessionDataSafe_ClaudeSessionID_Stringer(t *testing.T) {
 	assert.Contains(t, err.Error(), "ClaudeSessionID value must be a string")
 }
 
+// --- Happy Path — UpdateSessionDataSafe (PID) ---
+
+func TestUpdateSessionDataSafe_PID_ValidPositiveInt(t *testing.T) {
+	s := newTestSession(t)
+
+	err := s.UpdateSessionDataSafe("nodeA.PID", 12345)
+
+	require.NoError(t, err)
+	val, ok := s.GetSessionDataSafe("nodeA.PID")
+	assert.True(t, ok)
+	assert.Equal(t, 12345, val)
+}
+
+func TestUpdateSessionDataSafe_PID_Zero(t *testing.T) {
+	s := newTestSession(t)
+
+	err := s.UpdateSessionDataSafe("nodeA.PID", 0)
+
+	require.NoError(t, err)
+	val, ok := s.GetSessionDataSafe("nodeA.PID")
+	assert.True(t, ok)
+	assert.Equal(t, 0, val)
+}
+
+func TestUpdateSessionDataSafe_PID_Negative(t *testing.T) {
+	s := newTestSession(t)
+
+	err := s.UpdateSessionDataSafe("nodeA.PID", -1)
+
+	require.NoError(t, err)
+	val, ok := s.GetSessionDataSafe("nodeA.PID")
+	assert.True(t, ok)
+	assert.Equal(t, -1, val)
+}
+
+// --- Validation Failures — PID type ---
+
+func TestUpdateSessionDataSafe_PID_StringValue(t *testing.T) {
+	s := newTestSession(t)
+
+	err := s.UpdateSessionDataSafe("nodeA.PID", "1234")
+
+	require.Error(t, err)
+	assert.Equal(t, "PID value must be an int, got string", err.Error())
+}
+
+func TestUpdateSessionDataSafe_PID_Int64Value(t *testing.T) {
+	s := newTestSession(t)
+
+	err := s.UpdateSessionDataSafe("nodeA.PID", int64(1234))
+
+	require.Error(t, err)
+	assert.Equal(t, "PID value must be an int, got int64", err.Error())
+}
+
+func TestUpdateSessionDataSafe_PID_Float64Value(t *testing.T) {
+	s := newTestSession(t)
+
+	err := s.UpdateSessionDataSafe("nodeA.PID", float64(1234))
+
+	require.Error(t, err)
+	assert.Equal(t, "PID value must be an int, got float64", err.Error())
+}
+
+func TestUpdateSessionDataSafe_PID_NilValue(t *testing.T) {
+	s := newTestSession(t)
+
+	err := s.UpdateSessionDataSafe("nodeA.PID", nil)
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "PID value must be an int")
+}
+
 // --- Happy Path — GetSessionDataSafe ---
 
 func TestGetSessionDataSafe_ExistingKey(t *testing.T) {

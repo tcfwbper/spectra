@@ -19,6 +19,13 @@ func (s *Session) UpdateSessionDataSafe(key string, value any) error {
 		}
 	}
 
+	// PID type validation.
+	if strings.HasSuffix(key, ".PID") {
+		if _, ok := value.(int); !ok {
+			return fmt.Errorf("PID value must be an int, got %T", value)
+		}
+	}
+
 	s.mu.Lock()
 	s.SessionData[key] = value
 	s.UpdatedAt = time.Now().Unix()

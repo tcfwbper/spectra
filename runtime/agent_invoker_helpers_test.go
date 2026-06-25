@@ -37,3 +37,8 @@ func (m *mockCommandStarter) Start() error {
 	m.startCalled++
 	return m.startErr
 }
+
+// Pid implements the CommandHandle interface for mockCommandStarter.
+func (m *mockCommandStarter) Pid() int {
+	return m.pid
+}

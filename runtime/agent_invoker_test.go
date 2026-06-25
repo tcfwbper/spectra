@@ -65,6 +65,10 @@ type mockCommandStarter struct {
 
 	// Configured behavior
 	startErr error
+
+	// PID simulation: returned by Pid() after Start() succeeds.
+	// Used by tests that verify PID recording behavior.
+	pid int
 }
 
 // newDefaultMockAgentDefinition returns a mock with standard test values.
@@ -157,6 +161,32 @@ func argsContainSequence(args []string, seq ...string) bool {
 	return false
 }
 
+// --- PID-related assertion helpers ---
+
+// assertUpdateSessionDataCalledWith checks that at least one call to
+// UpdateSessionDataSafe matched the given key and value.
+func assertUpdateSessionDataCalledWith(t *testing.T, sess *mockSession, key string, value any) {
+	t.Helper()
+	for _, call := range sess.updateSessionDataCalls {
+		if call.key == key && call.value == value {
+			return
+		}
+	}
+	t.Errorf("expected UpdateSessionDataSafe called with (%q, %v), got calls: %+v", key, value, sess.updateSessionDataCalls)
+}
+
+// assertUpdateSessionDataNotCalledWithKeySuffix checks that no call to
+// UpdateSessionDataSafe used a key ending with the given suffix.
+func assertUpdateSessionDataNotCalledWithKeySuffix(t *testing.T, sess *mockSession, suffix string) {
+	t.Helper()
+	for _, call := range sess.updateSessionDataCalls {
+		if len(call.key) >= len(suffix) && call.key[len(call.key)-len(suffix):] == suffix {
+			t.Errorf("expected no UpdateSessionDataSafe call with key suffix %q, but found call with key=%q value=%v", suffix, call.key, call.value)
+			return
+		}
+	}
+}
+
 // =============================================================================
 // Happy Path — Construction
 // =============================================================================
@@ -206,9 +236,9 @@ func TestAgentInvoker_Invoke_NewSession(t *testing.T) {
 	assert.True(t, containsArg(cmdStarter.args, "--session-id"))
 	assert.True(t, containsArg(cmdStarter.args, "generated-uuid"))
 	assert.False(t, containsArg(cmdStarter.args, "--resume"))
-	assert.Equal(t, 1, sess.updateSessionDataCalled)
-	assert.Equal(t, "MyNode.ClaudeSessionID", sess.updateSessionDataInputKey)
-	assert.Equal(t, "generated-uuid", sess.updateSessionDataInputVal)
+	// UpdateSessionDataSafe called for ClaudeSessionID and PID
+	assertUpdateSessionDataCalledWith(t, sess, "MyNode.ClaudeSessionID", "generated-uuid")
+	assertUpdateSessionDataCalledWith(t, sess, "MyNode.PID", 0)
 }
 
 func TestAgentInvoker_Invoke_ExistingSession(t *testing.T) {
@@ -224,6 +254,7 @@ func TestAgentInvoker_Invoke_ExistingSession(t *testing.T) {
 
 	agentDef := newDefaultMockAgentDefinition()
 	cmdStarter := newDefaultMockCommandStarter()
+	cmdStarter.pid = 7777
 
 	// Act
 	invoker := NewAgentInvoker(ps, projectRoot, WithCommandStarter(cmdStarter))
@@ -234,7 +265,9 @@ func TestAgentInvoker_Invoke_ExistingSession(t *testing.T) {
 	assert.True(t, containsArg(cmdStarter.args, "--resume"))
 	assert.True(t, containsArg(cmdStarter.args, "existing-id"))
 	assert.False(t, containsArg(cmdStarter.args, "--session-id"))
-	assert.Equal(t, 0, sess.updateSessionDataCalled)
+	// Updated spec: UpdateSessionDataSafe called with ("MyNode.PID", 7777) only (not for ClaudeSessionID)
+	assertUpdateSessionDataCalledWith(t, sess, "MyNode.PID", 7777)
+	assertUpdateSessionDataNotCalledWithKeySuffix(t, sess, ".ClaudeSessionID")
 }
 
 func TestAgentInvoker_Invoke_WithAllowedTools(t *testing.T) {
@@ -501,6 +534,89 @@ func TestAgentInvoker_Invoke_CommandStructure(t *testing.T) {
 }
 
 // =============================================================================
+// Happy Path — Invoke (PID Recording)
+// =============================================================================
+
+func TestAgentInvoker_Invoke_RecordsPID(t *testing.T) {
+	// Setup
+	sess := newDefaultMockSession()
+	sess.id = "sess-1"
+	sess.getSessionDataResultVal = nil
+	sess.getSessionDataResultOK = false
+	metaStore := newDefaultMockMetadataStore()
+	evStore := newDefaultMockEventStore()
+	log := newDefaultMockLogger()
+	ps := NewPersistentSession(sess, metaStore, evStore, log)
+	projectRoot := createTempProjectRoot(t)
+
+	agentDef := newDefaultMockAgentDefinition()
+	uuidGen := &mockUUIDGenerator{result: "uuid-1"}
+	cmdStarter := newDefaultMockCommandStarter()
+	cmdStarter.pid = 9999
+
+	// Act
+	invoker := NewAgentInvoker(ps, projectRoot, WithUUIDGenerator(uuidGen), WithCommandStarter(cmdStarter))
+	err := invoker.Invoke("MyNode", "msg", agentDef)
+
+	// Assert: Returns nil; PersistentSession.UpdateSessionDataSafe called with ("MyNode.PID", 9999)
+	require.NoError(t, err)
+	assertUpdateSessionDataCalledWith(t, sess, "MyNode.PID", 9999)
+}
+
+func TestAgentInvoker_Invoke_PIDOverwriteOnResume(t *testing.T) {
+	// Setup
+	sess := newDefaultMockSession()
+	sess.id = "sess-1"
+	sess.getSessionDataResultVal = "existing-id"
+	sess.getSessionDataResultOK = true
+	metaStore := newDefaultMockMetadataStore()
+	evStore := newDefaultMockEventStore()
+	log := newDefaultMockLogger()
+	ps := NewPersistentSession(sess, metaStore, evStore, log)
+	projectRoot := createTempProjectRoot(t)
+
+	agentDef := newDefaultMockAgentDefinition()
+	cmdStarter := newDefaultMockCommandStarter()
+	cmdStarter.pid = 5555
+
+	// Act
+	invoker := NewAgentInvoker(ps, projectRoot, WithCommandStarter(cmdStarter))
+	err := invoker.Invoke("ResumeNode", "msg", agentDef)
+
+	// Assert: Returns nil; PersistentSession.UpdateSessionDataSafe called with ("ResumeNode.PID", 5555)
+	require.NoError(t, err)
+	assertUpdateSessionDataCalledWith(t, sess, "ResumeNode.PID", 5555)
+}
+
+func TestAgentInvoker_Invoke_PIDRecordingFailureNonFatal(t *testing.T) {
+	// Setup
+	sess := newDefaultMockSession()
+	sess.id = "sess-1"
+	sess.getSessionDataResultVal = nil
+	sess.getSessionDataResultOK = false
+	// UpdateSessionDataSafe succeeds for ClaudeSessionID but fails for PID
+	sess.updateSessionDataErrOnPID = errors.New("PID value must be an int, got string")
+	metaStore := newDefaultMockMetadataStore()
+	evStore := newDefaultMockEventStore()
+	log := newDefaultMockLogger()
+	ps := NewPersistentSession(sess, metaStore, evStore, log)
+	projectRoot := createTempProjectRoot(t)
+
+	agentDef := newDefaultMockAgentDefinition()
+	uuidGen := &mockUUIDGenerator{result: "uuid-1"}
+	cmdStarter := newDefaultMockCommandStarter()
+	cmdStarter.pid = 1234
+
+	// Act
+	invoker := NewAgentInvoker(ps, projectRoot, WithUUIDGenerator(uuidGen), WithCommandStarter(cmdStarter), WithLogger(log))
+	err := invoker.Invoke("MyNode", "msg", agentDef)
+
+	// Assert: Returns nil (success); warning logged about PID recording failure
+	require.NoError(t, err)
+	assertLoggerHasWarnMsgContaining(t, log, "PID")
+}
+
+// =============================================================================
 // Error Propagation — Invoke
 // =============================================================================
 
@@ -667,7 +783,7 @@ func TestAgentInvoker_Invoke_CmdStartFails(t *testing.T) {
 // Mock / Dependency Interaction — Invoke
 // =============================================================================
 
-func TestAgentInvoker_Invoke_NoUpdateWhenExistingSession(t *testing.T) {
+func TestAgentInvoker_Invoke_NoClaudeSessionIDUpdateWhenExisting(t *testing.T) {
 	// Setup
 	sess := newDefaultMockSession()
 	sess.getSessionDataResultVal = "existing-id"
@@ -681,14 +797,16 @@ func TestAgentInvoker_Invoke_NoUpdateWhenExistingSession(t *testing.T) {
 
 	agentDef := newDefaultMockAgentDefinition()
 	cmdStarter := newDefaultMockCommandStarter()
+	cmdStarter.pid = 1111
 
 	// Act
 	invoker := NewAgentInvoker(ps, projectRoot, WithCommandStarter(cmdStarter))
 	err := invoker.Invoke("ResumeNode", "msg", agentDef)
 
-	// Assert
+	// Assert: UpdateSessionDataSafe called only with ("ResumeNode.PID", 1111), not with any ClaudeSessionID key
 	require.NoError(t, err)
-	assert.Equal(t, 0, sess.updateSessionDataCalled)
+	assertUpdateSessionDataCalledWith(t, sess, "ResumeNode.PID", 1111)
+	assertUpdateSessionDataNotCalledWithKeySuffix(t, sess, ".ClaudeSessionID")
 }
 
 func TestAgentInvoker_Invoke_DoesNotCallCmdRunOrOutput(t *testing.T) {

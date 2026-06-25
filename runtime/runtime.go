@@ -86,6 +86,11 @@ type SocketManager interface {
 	DeleteSocket()
 }
 
+// ProcessCleaner defines the interface for cleaning up orphaned processes.
+type ProcessCleaner interface {
+	Clean()
+}
+
 // --- Adapters ---
 
 // sessionDirManagerAdapter adapts the package-level storage.CreateSessionDirectory
@@ -289,7 +294,10 @@ func Run(workflowName string, sessionID string, log logger.Logger) (int, error) 
 		// Step 32: Stop OS signal notification.
 		localSignalStop(signalCh)
 
-		// Step 33: Delete socket.
+		// Step 33: ClaudeProcessCleaner.Clean() — terminate orphaned claude processes.
+		deps.claudeProcessCleaner.Clean()
+
+		// Step 34: Delete socket.
 		socketMgr.DeleteSocket()
 
 		// Step 35-36: Wait for listenerDoneCh with 2-second sub-timeout.
@@ -347,29 +355,32 @@ func Run(workflowName string, sessionID string, log logger.Logger) (int, error) 
 
 // runtimePostSessionDeps holds all post-session dependencies.
 type runtimePostSessionDeps struct {
-	socketManager  SocketManager
-	transitionNode TransitionToNodeExecutor
-	messageRouter  *MessageRouter
-	finalizer      *SessionFinalizer
+	socketManager        SocketManager
+	transitionNode       TransitionToNodeExecutor
+	messageRouter        *MessageRouter
+	finalizer            *SessionFinalizer
+	claudeProcessCleaner ProcessCleaner
 }
 
 // constructPostSessionDeps creates all post-session dependencies.
 func constructPostSessionDeps(projectRoot string, ps *PersistentSession, wfDef *components.WorkflowDefinition, terminationNotifier chan<- struct{}, log logger.Logger) (*runtimePostSessionDeps, error) {
 	agentDefLoader := storage.NewAgentDefinitionLoader(projectRoot)
 	socketMgr := storage.NewRuntimeSocketManager(projectRoot, ps.ID, log)
-	agentInvoker := NewAgentInvoker(ps, projectRoot)
+	agentInvoker := NewAgentInvoker(ps, projectRoot, WithLogger(log))
 	invokerAdapter := &agentInvokerAdapter{invoker: agentInvoker}
 	transitionToNode := NewTransitionToNode(ps, wfDef, &agentDefLoaderAdapter{loader: agentDefLoader}, invokerAdapter)
 	eventProcessor := NewEventProcessor(ps, wfDef, transitionToNode, terminationNotifier)
 	errorProcessor := NewErrorProcessor(ps, wfDef, terminationNotifier)
 	messageRouter := NewMessageRouter(ps, eventProcessor, errorProcessor, terminationNotifier, log)
+	claudeProcessCleaner := NewClaudeProcessCleaner(ps, log)
 	finalizer := NewSessionFinalizer(log)
 
 	return &runtimePostSessionDeps{
-		socketManager:  socketMgr,
-		transitionNode: transitionToNode,
-		messageRouter:  messageRouter,
-		finalizer:      finalizer,
+		socketManager:        socketMgr,
+		transitionNode:       transitionToNode,
+		messageRouter:        messageRouter,
+		finalizer:            finalizer,
+		claudeProcessCleaner: claudeProcessCleaner,
 	}, nil
 }
 

@@ -468,6 +468,37 @@ func TestRun_InitialDispatchMessage(t *testing.T) {
 		"dispatch message should contain 'spectra-agent event emit', got: %s", f.TransitionToNode.capturedMessage)
 }
 
+func TestRun_ClaudeProcessCleanerCalledDuringCleanup(t *testing.T) {
+	// Setup
+	f := newRuntimeTestFixture(t)
+	f.Session.getStatusResult = "completed"
+	f.Session.getCurrentStateResult = testEntryNode
+
+	listenerDoneCh := make(chan struct{})
+	f.SocketManager.listenDoneCh = listenerDoneCh
+	f.SocketManager.listenErrCh = make(chan error, 1)
+	f.SocketManager.deleteSocketFunc = func() {
+		close(listenerDoneCh)
+	}
+
+	f.SessionInitializer.initializeFunc = func(workflowName string, sessionID string, terminationNotifier chan<- struct{}) InitResult {
+		ps := newTestPersistentSession(t, f.Session)
+		go func() { terminationNotifier <- struct{}{} }()
+		return InitResult{
+			PersistentSession:  ps,
+			WorkflowDefinition: mustNewWorkflowDefinition(t),
+			Error:              nil,
+		}
+	}
+	wireFixtureToSeams(t, f)
+
+	// Action
+	_, _ = Run("wf", "", f.Logger)
+
+	// Assert: ClaudeProcessCleaner.Clean() called exactly once
+	assert.Equal(t, 1, f.ClaudeProcessCleaner.cleanCalled)
+}
+
 func TestRun_DeleteSocketCalledDuringCleanup(t *testing.T) {
 	// Setup
 	f := newRuntimeTestFixture(t)
@@ -567,6 +598,10 @@ func TestRun_CleanupOrder(t *testing.T) {
 		close(listenerDoneCh)
 	}
 
+	f.ClaudeProcessCleaner.cleanFunc = func() {
+		tracker.Record("ClaudeProcessCleaner.Clean")
+	}
+
 	f.SessionInitializer.initializeFunc = func(workflowName string, sessionID string, terminationNotifier chan<- struct{}) InitResult {
 		ps := newTestPersistentSession(t, f.Session)
 		go func() { terminationNotifier <- struct{}{} }()
@@ -586,19 +621,24 @@ func TestRun_CleanupOrder(t *testing.T) {
 	// Action
 	_, _ = Run("wf", "", f.Logger)
 
-	// Assert call order: SignalStop before DeleteSocket
+	// Assert call order: SignalStop before ClaudeProcessCleaner.Clean before DeleteSocket
 	calls := tracker.Calls()
 	signalStopIdx := -1
+	cleanIdx := -1
 	deleteSocketIdx := -1
 	for i, c := range calls {
 		if c == "SignalStop" {
 			signalStopIdx = i
 		}
+		if c == "ClaudeProcessCleaner.Clean" {
+			cleanIdx = i
+		}
 		if c == "DeleteSocket" {
 			deleteSocketIdx = i
 		}
 	}
-	assert.Greater(t, deleteSocketIdx, signalStopIdx, "signal.Stop should be called before DeleteSocket")
+	assert.Greater(t, cleanIdx, signalStopIdx, "signal.Stop should be called before ClaudeProcessCleaner.Clean")
+	assert.Greater(t, deleteSocketIdx, cleanIdx, "ClaudeProcessCleaner.Clean should be called before DeleteSocket")
 }
 
 func TestRun_PersistentSessionFailReturnsError(t *testing.T) {

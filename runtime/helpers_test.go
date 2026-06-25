@@ -55,6 +55,10 @@ type mockSession struct {
 	updateSessionDataInputKey string
 	updateSessionDataInputVal any
 	updateSessionDataErr      error
+	updateSessionDataErrOnPID error // if non-nil, returns this error when key ends in ".PID"
+
+	// UpdateSessionDataSafe call history (for multi-call assertions)
+	updateSessionDataCalls []updateSessionDataCall
 
 	// UpdateEventHistorySafe
 	updateEventHistoryCalled int
@@ -102,10 +106,20 @@ func (m *mockSession) UpdateCurrentStateSafe(newState string) error {
 	return m.updateCurrentStateErr
 }
 
+// updateSessionDataCall records a single call to UpdateSessionDataSafe.
+type updateSessionDataCall struct {
+	key   string
+	value any
+}
+
 func (m *mockSession) UpdateSessionDataSafe(key string, value any) error {
 	m.updateSessionDataCalled++
 	m.updateSessionDataInputKey = key
 	m.updateSessionDataInputVal = value
+	m.updateSessionDataCalls = append(m.updateSessionDataCalls, updateSessionDataCall{key: key, value: value})
+	if m.updateSessionDataErrOnPID != nil && len(key) > 4 && key[len(key)-4:] == ".PID" {
+		return m.updateSessionDataErrOnPID
+	}
 	return m.updateSessionDataErr
 }
 

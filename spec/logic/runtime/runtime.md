@@ -16,7 +16,7 @@ Runtime does not manage session directory creation or deletion (SessionInitializ
 - Owns: second signal force exit.
 - Owns: initial dispatch of the entry node after session initialization.
 - Owns: RuntimeError construction for post-session failures (socket, listener, initial dispatch).
-- Owns: cleanup ordering (DeleteSocket → wait listenerDoneCh → SessionFinalizer).
+- Owns: cleanup ordering (ClaudeProcessCleaner → DeleteSocket → wait listenerDoneCh → SessionFinalizer).
 - Owns: exit code propagation from SessionFinalizer to caller.
 - Delegates: project root discovery to SpectraFinder.
 - Delegates: session initialization (UUID, workflow load, directory, session entity, stores, PersistentSession) to SessionInitializer.
@@ -41,6 +41,7 @@ Runtime does not manage session directory creation or deletion (SessionInitializ
 | `RuntimeSocketManager` | Socket lifecycle | `CreateSocket()`, `Listen(handler)`, `DeleteSocket()` | Must not construct via struct literal |
 | `MessageRouter` | Message dispatch | Pass as MessageHandler to Listen | Must not invoke Handle directly |
 | `TransitionToNode` | Node dispatch | `Transition(targetNodeName, message)` | Must not access internal state |
+| `ClaudeProcessCleaner` | Process cleanup | `Clean()` | Must not call before termination signal received |
 | `SessionFinalizer` | Final reporting | `Finalize(persistentSession)` returning exit code | Must not call before cleanup |
 | `RuntimeError` | Error entity | Construct via `NewRuntimeError` for post-session failures | — |
 | `Logger` | Structured logging | `Info(msg, args...)`, `Warn(msg, args...)`, `Error(msg, args...)` | Must not use for session status output (SessionFinalizer's job) |
@@ -75,7 +76,8 @@ Construction constraint: Runtime is an exported function `Run(workflowName strin
     5. `EventProcessor` (requires `PersistentSession`, `WorkflowDefinition`, `TransitionToNode`, `terminationNotifier`)
     6. `ErrorProcessor` (requires `PersistentSession`, `WorkflowDefinition`, `terminationNotifier`)
     7. `MessageRouter` (requires `PersistentSession`, `EventProcessor`, `ErrorProcessor`, `terminationNotifier`, `logger`)
-    8. `SessionFinalizer` (requires `logger`)
+    8. `ClaudeProcessCleaner` via `NewClaudeProcessCleaner(persistentSession, logger)`
+    9. `SessionFinalizer` (requires `logger`)
 12. If any post-session dependency construction fails, constructs a RuntimeError with `Issuer="Runtime"`, `Message="failed to initialize post-session dependencies"`, `Detail` containing the construction error, `SessionID=persistentSession.ID`, `FailingState=persistentSession.GetCurrentStateSafe()`, `OccurredAt=now()`. Calls `PersistentSession.Fail(runtimeError, terminationNotifier)`. Proceeds to cleanup and SessionFinalizer (steps 33-39), returns exit code from SessionFinalizer and error: `"failed to initialize post-session dependencies: <error>"`.
 
 ### Socket Creation and Listener Startup
@@ -118,13 +120,14 @@ Construction constraint: Runtime is an exported function `Run(workflowName strin
 ### Cleanup and SessionFinalizer
 
 32. Runtime stops OS signal notification (`signal.Stop()`).
-33. Calls `RuntimeSocketManager.DeleteSocket()` to stop the listener, close all active connections, and delete the socket file.
-34. `DeleteSocket()` is idempotent and does not return an error. Even if socket deletion fails internally, Runtime continues.
-35. Waits for `listenerDoneCh` to close (using `<-listenerDoneCh` or `select` with a 2-second sub-timeout) to ensure the listener goroutine has fully exited.
-36. If waiting for `listenerDoneCh` exceeds 2 seconds, logs: `"listener shutdown exceeded 2 seconds, proceeding to SessionFinalizer"` and continues without waiting further.
-37. Invokes `SessionFinalizer.Finalize(persistentSession)` which returns an exit code (int).
-38. SessionFinalizer logs the final session status via Logger. It does not return errors.
-39. Runtime determines the final return value:
+33. Calls `ClaudeProcessCleaner.Clean()` to terminate any running Claude CLI processes spawned by this session. `Clean()` is best-effort: it logs failures but never returns an error. Its total duration is bounded (PID verification + 2-second SIGTERM wait + SIGKILL).
+34. Calls `RuntimeSocketManager.DeleteSocket()` to stop the listener, close all active connections, and delete the socket file.
+35. `DeleteSocket()` is idempotent and does not return an error. Even if socket deletion fails internally, Runtime continues.
+36. Waits for `listenerDoneCh` to close (using `<-listenerDoneCh` or `select` with a 2-second sub-timeout) to ensure the listener goroutine has fully exited.
+37. If waiting for `listenerDoneCh` exceeds 2 seconds, logs: `"listener shutdown exceeded 2 seconds, proceeding to SessionFinalizer"` and continues without waiting further.
+38. Invokes `SessionFinalizer.Finalize(persistentSession)` which returns an exit code (int).
+39. SessionFinalizer logs the final session status via Logger. It does not return errors.
+40. Runtime determines the final return value:
     - If `receivedSignal != nil` (OS signal terminated the runtime): returns `(1, error)` where error is `"session terminated by signal <signal-name>"`. Exit code is always 1 regardless of SessionFinalizer's return value, because the runtime exit path was abnormal (operator-initiated interruption).
     - If `receivedSignal == nil` and SessionFinalizer returns exit code 0: returns `(0, nil)`.
     - If `receivedSignal == nil` and SessionFinalizer returns exit code 1: returns `(1, error)` where error is `"session failed: <persistentSession.GetErrorSafe().Error()>"` if error is non-nil, or `"session terminated with non-terminal status"` otherwise.
@@ -181,7 +184,7 @@ Construction constraint: Runtime is an exported function `Run(workflowName strin
 
 9. **PersistentSession.Fail on OS Signals**: When an OS signal is received and session status is not already terminal ("completed" or "failed"), Runtime must construct a RuntimeError and call PersistentSession.Fail to transition session status to "failed" before proceeding to cleanup. If session is already terminal (race with completion), Fail is skipped.
 
-10. **Cleanup Order**: Runtime must perform cleanup in order: (1) signal.Stop, (2) DeleteSocket, (3) wait listenerDoneCh, (4) SessionFinalizer.
+10. **Cleanup Order**: Runtime must perform cleanup in order: (1) signal.Stop, (2) ClaudeProcessCleaner.Clean, (3) DeleteSocket, (4) wait listenerDoneCh, (5) SessionFinalizer.
 
 11. **SessionFinalizer Invocation Condition**: Runtime invokes SessionFinalizer if and only if PersistentSession is non-nil. If initialization fails before PersistentSession construction, SessionFinalizer is not invoked.
 
@@ -284,6 +287,7 @@ Construction constraint: Runtime is an exported function `Run(workflowName strin
 - [SessionInitializer](./session_initializer.md) — Initializes session with 30-second timeout
 - [PersistentSession](./persistent_session.md) — State container with automatic persistence
 - [SessionFinalizer](./session_finalizer.md) — Final status logging and exit code determination
+- [ClaudeProcessCleaner](./claude_process_cleaner.md) — Terminates orphaned Claude CLI processes during cleanup
 - [RuntimeSocketManager](../storage/runtime_socket_manager.md) — Socket lifecycle management
 - [MessageRouter](./message_router.md) — Routes incoming messages to processors
 - [EventProcessor](./event_processor.md) — Processes event messages
